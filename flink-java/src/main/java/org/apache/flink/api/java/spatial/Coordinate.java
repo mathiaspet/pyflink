@@ -32,4 +32,33 @@ public class Coordinate implements Serializable {
 		Coordinate other = (Coordinate) o;
 		return other.lat == this.lat && other.lon == this.lon;
 	}
+	
+	
+	/**
+	 * Returns the coordinate difference of this coordinate minus the given coordinate.
+	 */
+	public Coordinate diff(Coordinate other) {
+		return new Coordinate(this.lat - other.lat, this.lon - other.lon);
+	}
+
+	/**
+	 * Returns the coordinate difference scaled by the given factors in both dimensions
+	 */
+	public Coordinate scale(double latScale, double lonScale) {
+		return new Coordinate(this.lat * latScale, this.lon * lonScale);
+	}
+
+	/**
+	 * Returns the coordinate advanced by a coordinate difference.
+	 */
+	public Coordinate add(Coordinate other) {
+		return new Coordinate(this.lat + other.lat, this.lon + other.lon);
+	}
+	
+	/**
+	 * Returns the coordinate advanced by a coordinate difference scaled by the given factors.
+	 */
+	public Coordinate addScaled(Coordinate diff, double scaleLat, double scaleLon) {
+		return new Coordinate(this.lat + diff.lat * scaleLat, this.lon + diff.lon * scaleLon);
+	}
 }

@@ -1,6 +1,9 @@
 package org.apache.flink.api.java.spatial;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 
 public class TileInfo implements Serializable {
@@ -10,7 +13,26 @@ public class TileInfo implements Serializable {
 
 	public TileInfo() {}
 
+	public TileInfo(InputStream is) throws IOException {
+		byte[] buf = new byte[4096];
+		int offset = 0;
+		int readBytes;
+		while((readBytes = is.read(buf, offset, buf.length - offset)) > 0) {
+			offset += readBytes;
+			if(offset == buf.length) {
+				byte[] buf2 = new byte[2 * buf.length];
+				System.arraycopy(buf, 0, buf2, 0, buf.length);
+				buf = buf2;
+			}
+		}
+		parseInfo(new String(buf, Charset.forName("UTF-8")));
+	}
+
 	public TileInfo(String tileHeader) {
+		parseInfo(tileHeader);
+	}
+
+	private final void parseInfo(String tileHeader) {
 		String name = null;
 		String value = null;
 		int braceImbalance = 0;
@@ -106,5 +128,51 @@ public class TileInfo implements Serializable {
 			return null;
 		}
 		return new Coordinate(lat, lon);
+	}
+
+	private Coordinate parseCoordinate(String latStr, String lonStr) {
+		double lat = Double.parseDouble(latStr);
+		double lon = Double.parseDouble(lonStr);
+		if(lat == Double.NaN || lon == Double.NaN) {
+			return null;
+		}
+		return new Coordinate(lat, lon);
+	}
+
+	public Coordinate getUpperLeftCoordinate() {
+		String[] args = getStringArray("upperleftcornerlatlong");
+		if(args == null || args.length != 2) {
+			return null;
+		}
+		return parseCoordinate(args[0], args[1]);
+	}
+
+	public Coordinate getLowerRightCoordinate() {
+		String[] args = getStringArray("lowerrightcornerlatlong");
+		if(args == null || args.length != 2) {
+			return null;
+		}
+		return parseCoordinate(args[0], args[1]);
+	}
+
+	public String[] getStringArray(String name) {
+		String string = getString(name);
+		if(string == null || !string.startsWith("{") || !string.endsWith("}")) {
+			return null;
+		}
+		String list = string.substring(1, string.length() - 1).trim(); // Strip { }
+		return list.split(", *");
+	}
+	
+	public int getPixelColumns() {
+		return getInteger("samples");
+	}
+	
+	public int getPixelRows() {
+		return getInteger("lines");
+	}
+	
+	public String getInterleaveType() {
+		return getString("interleave");
 	}
 }
