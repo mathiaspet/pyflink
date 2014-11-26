@@ -29,8 +29,18 @@ public class Tile implements Serializable {
 	// Tile width and height in pixels
 	private int tileWidth = -1, tileHeight = -1;
 	
+	//TODO: decide whether to keep this public or not
 	public Tile() { }
-
+	
+	public Tile(Coordinate leftUpper, Coordinate rightLower, short[] content, int width, int height) {
+		this.nwCord = leftUpper;
+		this.seCord = rightLower;
+		this.s16Tile = content;
+		this.tileWidth = width;
+		this.tileHeight = height;
+	}
+	
+	
 	public int getBand() {
 		return this.band;
 	}
