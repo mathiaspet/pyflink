@@ -19,7 +19,7 @@ public class Tile implements Serializable {
 	 *  Tile data in 16-bit signed integers.
 	 *  It is organised in rows of pixels. 
 	 */
-	private short s16Tile[] = null;
+	private short[] s16Tile = null;
 	
 	// Coordinates of north-east and south-west corner of this tile
 	private Coordinate nwCord = null, seCord = null;
