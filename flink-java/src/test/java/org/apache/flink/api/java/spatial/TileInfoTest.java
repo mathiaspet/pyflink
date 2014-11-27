@@ -71,10 +71,12 @@ public class TileInfoTest {
 		Assert.assertEquals("String property", "ENVI Standard", info.getString("file type"));
 		Assert.assertEquals("Integer property", info.getPixelColumns(), 8002);
 		Assert.assertEquals("Image dimensions", info.getPixelRows(), 7232);
+		Assert.assertEquals("Data ignore value", info.getMissingValue(), -9999);
 		Assert.assertEquals("Interleave type", info.getInterleaveType(), "bsq");
 		Assert.assertEquals("Coordinate construction",
 				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"),
 				new Coordinate(-4.829621, -56.076667));
 		Assert.assertEquals("named coordinates as pairs", info.getUpperLeftCoordinate(), new Coordinate(-4.835949, -56.076531));
+		Assert.assertEquals("data type", info.getDataType(), TileInfo.DataTypes.INT);
 	}
 }

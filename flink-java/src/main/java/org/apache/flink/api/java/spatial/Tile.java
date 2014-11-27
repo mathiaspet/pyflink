@@ -56,6 +56,13 @@ public class Tile implements Serializable {
 	}
 	
 	/**
+	 * Update the stored tile array to the given one.
+	 */
+	public void setS16Tile(short[] data) {
+		this.s16Tile = data;
+	}
+	
+	/**
 	 * Convenience function to retrieve a single pixel by pixel coordinates.
 	 * Coordinates start at (0, 0).
 	 */
@@ -99,5 +106,12 @@ public class Tile implements Serializable {
 	 */
 	public TileInfo getTileInfo() {
 		return this.tileInfo;
+	}
+	
+	/**
+	 * Update the tile information to the given object.
+	 */
+	public void setTileInfo(TileInfo tileInfo) {
+		this.tileInfo = tileInfo;
 	}
 }

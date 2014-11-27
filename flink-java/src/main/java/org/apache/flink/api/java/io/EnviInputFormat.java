@@ -18,20 +18,18 @@
 
 package org.apache.flink.api.java.io;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FilterInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.powermock.reflect.exceptions.FieldNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.BlockLocation;
@@ -40,15 +38,13 @@ import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.core.memory.DataInputView;
-import org.apache.flink.core.memory.InputViewDataInputStreamWrapper;
 import org.apache.flink.util.StringUtils;
 
 /**
  * Base class for all input formats that use blocks of fixed size. The input splits are aligned to these blocks. Without
  * configuration, these block sizes equal the native block sizes of the HDFS.
  */
-public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
+public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
 	private static final Logger LOG = LoggerFactory.getLogger(EnviInputFormat.class);
 
@@ -60,9 +56,10 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 
 	private int xsize = -1, ysize = -1;
 	
-	private DataInputStream dataInputStream;
-
+	private TileInfo info;
+	private EnviTilePosition pos;
 	
+	private int readRecords = 0;
 	
 	public EnviInputFormat(Path path) {
 		super(path);
@@ -103,18 +100,26 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 			FileStatus dataFileStatus;
 			try {
 				dataFileStatus = fs.getFileStatus(dataFile);
-			} catch(FieldNotFoundException e) {
+			} catch(FileNotFoundException e) {
 				throw new RuntimeException("Data file " + dataFile + " for header " + file + " not found.", e);
 			}
+			
+			if(info.getDataType() != TileInfo.DataTypes.INT) {
+				throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
+						+ " File: " + file.getPath());
+			}
+			int data_size = 2; // 2 bytes per entry
 			
 			/*
 			 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 			 *  pixels.
 			 */
-			int xsplits = (info.getPixelColumns() + xsize - 1) / xsize;
-			int ysplits = (info.getPixelRows() + ysize - 1) / ysize;
+			int numRows = info.getPixelRows();
+			int numColumns = info.getPixelColumns();
+			int xsplits = (numColumns + xsize - 1) / xsize;
+			int ysplits = (numRows + ysize - 1) / ysize;
 			LOG.info("Splitting " + info.getPixelColumns() + "x" + info.getPixelRows() + " image into " +
-					xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + ".");
+					xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + ": " + file.getPath());
 			
 			// Real coordinates of this image + coordinate differences:
 			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
@@ -124,112 +129,62 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
 					1.0 * ysize / info.getPixelRows());
 
-			for(int x = 0; x < xsplits; x++) {
-				// Calculate pixel coordinate:
-				int pxstart = x *  xsize; // inclusive
-				int pxnext = (x + 1) *  xsize; // EXCLUSIVE
-
-				// Calculate coordinate of leftmost and rightmost pixels
+			// TODO:
+			int numBands = 1;
+			
+			for(int band = 0; band < numBands; band++) {
+				// TODO: Add logic for multiple bands
 
 				for(int y = 0; y < ysplits; y++) {
 					// Calculate pixel coordinate:
-					int pystart = x *  ysize; // inclusive
-					int pynext = (x + 1) *  ysize; // EXCLUSIVE
-
-					Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, xsplits, ysplits);
-					Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, xsplits + 1, ysplits + 1);
-					
-					// Determine list of FS blocks that contain the given block
-					// TODO
+					int pystart = y *  ysize; // inclusive
+					int pynext = (y + 1) *  ysize; // EXCLUSIVE
+	
+					for(int x = 0; x < xsplits; x++) {
+						// Calculate pixel coordinate:
+						int pxstart = x *  xsize; // inclusive
+						int pxnext = (x + 1) *  xsize; // EXCLUSIVE
+						
+						// Calculate coordinate of leftmost and rightmost pixels
+						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, xsplits, ysplits);
+						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, xsplits + 1, ysplits + 1);
+						
+						// Determine start and end position of the pixel block
+						long startPos = 1L * pystart * xsize + pxstart;
+						// Pixel position after last pixel in this tile, cover that the next x might be 0 again:
+						long nextStartPos = x+1 == xsplits ? // x==0 in next round?
+									1L * pynext * xsize             // Then use next y offset
+									: 1L * pystart * xsize + pxnext;  // otherwise, use next x offset, y offset is unchanged
+						long numPixels = nextStartPos - startPos;
+						
+						long offset = startPos * data_size;
+						long length = numPixels * data_size;
+						
+						if(pxstart >= numColumns) {
+							
+						}
+						
+						if(offset + length > dataFileStatus.getLen()) { // Don't read over the end of file
+							offset = dataFileStatus.getLen() - length;
+						}
+						
+						LOG.info("Tile " + x + "x" + y + " at offset " + offset +" +" + length + " bytes");
+						// Determine list of FS blocks that contain the given block
+						final BlockLocation[] blocks = fs.getFileBlockLocations(file, offset, length);
+						Arrays.sort(blocks);
+						
+						inputSplits.add(new EnviInputSplit(inputSplits.size(), file.getPath(), offset, length,
+								blocks[0].getHosts(), info, 
+								new EnviTilePosition(pxstart, pxnext, pystart, pynext, tileUpperLeft, tileLowerRight)));
+					}
 				}
-			}
-			
-			// 3. add block positions for split
-			// 4. remember information in EnviInputSplit?
-=xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + ".");
-			
-			// Real coordinates of this image + coordinate differences:
-			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
-			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
-			Coordinate realDiff = upperLeftCorner.diff(realLowerRightCorner);
-			// Distance between upper left corner and virtual lower right corner of the last tile, including empty pixels:
-			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
-					1.0 * ysize / info.getPixelRows());
-
-			for(int x = 0; x < xsplits; x++) {
-				// Calculate pixel coordinate:
-				int pxstart = x *  xsize; // inclusive
-				int pxnext = (x + 1) *  xsize; // EXCLUSIVE
-
-				// Calculate coordinate of leftmost and rightmost pixels
-
-				for(int y = 0; y < ysplits; y++) {
-					// Calculate pixel coordinate:
-					int pystart = x *  ysize; // inclusive
-					int pynext = (x + 1) *  ysize; // EXCLUSIVE
-
-					Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, xsplits, ysplits);
-					Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, xsplits + 1, ysplits + 1);
-					
-					// Determine list of FS blocks that contain the given block
-					// TODO
-				}
-			}
-			
-			// 3. add block positions for split
-			// 4. remember information in EnviInputSplit?
-=xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + ".");
-			
-			// Real coordinates of this image + coordinate differences:
-			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
-			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
-			Coordinate realDiff = upperLeftCorner.diff(realLowerRightCorner);
-			// Distance between upper left corner and virtual lower right corner of the last tile, including empty pixels:
-			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
-					1.0 * ysize / info.getPixelRows());
-
-			for(int x = 0; x < xsplits; x++) {
-				// Calculate pixel coordinate:
-				int pxstart = x *  xsize; // inclusive
-				int pxnext = (x + 1) *  xsize; // EXCLUSIVE
-
-				// Calculate coordinate of leftmost and rightmost pixels
-
-				for(int y = 0; y < ysplits; y++) {
-					// Calculate pixel coordinate:
-					int pystart = x *  ysize; // inclusive
-					int pynext = (x + 1) *  ysize; // EXCLUSIVE
-
-					Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, xsplits, ysplits);
-					Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, xsplits + 1, ysplits + 1);
-					
-					// Determine list of FS blocks that contain the given block
-					// TODO
-					// 4. remember information in EnviInputSplit?
-				}
-			}
-			
-			// 3. add block positions for split
-			for (long pos = 0, length = file.getLen(); pos < length; pos += blockSize) {
-				long remainingLength = Math.min(pos + blockSize, length) - pos;
-
-				// get the block locations and make sure they are in order with respect to their offset
-				final BlockLocation[] blocks = fs.getFileBlockLocations(file, pos, remainingLength);
-				Arrays.sort(blocks);
-
-				inputSplits.add(new FileInputSplit(inputSplits.size(), file.getPath(), pos, remainingLength,
-					blocks[0].getHosts()));
 			}
 		}
 
 		if (inputSplits.size() < minNumSplits) {
-			LOG.warn(String.format(
-				"With the given block size %d, the file %s cannot be split into %d blocks. Filling up with empty splits...",
-				blockSize, this.filePath, minNumSplits));
-			FileStatus last = files.get(files.size() - 1);
-			final BlockLocation[] blocks = fs.getFileBlockLocations(last, 0, last.getLen());
+			LOG.warn("WARNING: Too few splits generated (" + inputSplits.size() +"), adding dummy splits.");
 			for (int index = files.size(); index < minNumSplits; index++) {
-				inputSplits.add(new FileInputSplit(index, last.getPath(), last.getLen(), 0, blocks[0].getHosts()));
+				inputSplits.add(new FileInputSplit(index, null, 0, 0, null));
 			}
 		}
 
@@ -268,7 +223,6 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 
 	@Override
 	public SequentialStatistics getStatistics(BaseStatistics cachedStats) {
-// TODO
 		final FileBaseStatistics cachedFileStats = (cachedStats != null && cachedStats instanceof FileBaseStatistics) ?
 			(FileBaseStatistics) cachedStats : null;
 
@@ -323,24 +277,23 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 			return null;
 		}
 
-		BlockInfo blockInfo = this.createBlockInfo();
-
 		long totalCount = 0;
+		long totalWidth = 0;
 		for (FileStatus file : files) {
-			// invalid file
-			if (file.getLen() < blockInfo.getInfoSize()) {
-				continue;
-			}
-
-			FSDataInputStream fdis = file.getPath().getFileSystem().open(file.getPath(), blockInfo.getInfoSize());
-			fdis.seek(file.getLen() - blockInfo.getInfoSize());
-
-			DataInputStream input = new DataInputStream(fdis);
-			blockInfo.read(new InputViewDataInputStreamWrapper(input));
-			totalCount += blockInfo.getAccumulatedRecordCount();
+			// TODO: This is quite coarse, get from header file
+			int columns = 8000, rows = 7000;
+			long datasize = 2; // bytes per pixel
+			int bands = 6;
+			
+			int xsplits = (columns + xsize - 1) / xsize;
+			int ysplits = (rows + ysize - 1) / ysize;
+			
+			int tileCount = xsplits * ysplits * bands;
+			totalCount += tileCount;
+			totalWidth += 1L * datasize * tileCount * xsize * ysize;
 		}
 
-		final float avgWidth = totalCount == 0 ? 0 : ((float) stats.getTotalInputSize() / totalCount);
+		final float avgWidth = totalCount == 0 ? 0 : 1.0f * totalWidth / totalCount;
 		return new SequentialStatistics(stats.getLastModificationTime(), stats.getTotalInputSize(), avgWidth,
 			totalCount);
 	}
@@ -360,30 +313,20 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void open(FileInputSplit split) throws IOException {
 		super.open(split);
+		
+		this.info = ((EnviInputSplit) split).info;
+		this.pos = ((EnviInputSplit) split).pos;
 
-		final long blockSize = this.blockSize == NATIVE_BLOCK_SIZE ?
-			this.filePath.getFileSystem().getDefaultBlockSize() : this.blockSize;
-
-		this.blockInfo = this.createBlockInfo();
-		if (this.splitLength > this.blockInfo.getInfoSize()) {
-			// TODO: seek not supported by compressed streams. Will throw exception
-			this.stream.seek(this.splitStart + this.splitLength - this.blockInfo.getInfoSize());
-			DataInputStream infoStream = new DataInputStream(this.stream);
-			this.blockInfo.read(new InputViewDataInputStreamWrapper(infoStream));
-		}
-
-		this.stream.seek(this.splitStart + this.blockInfo.getFirstRecordStart());
-		BlockBasedInput blockBasedInput = new BlockBasedInput(this.stream, (int) blockSize);
-		this.dataInputStream = new DataInputStream(blockBasedInput);
 		this.readRecords = 0;
 	}
 
 	@Override
 	public boolean reachedEnd() throws IOException {
-		return this.readRecords >= this.blockInfo.getRecordCount();
+		return this.readRecords > 0;
 	}
 
 	@Override
@@ -392,65 +335,69 @@ public abstract class EnviInputFormat<T> extends FileInputFormat<T> {
 			return null;
 		}
 		
-		record = this.deserialize(record, new InputViewDataInputStreamWrapper(this.dataInputStream));
+		record = readEnviTile(record);
 		this.readRecords++;
 		return record;
 	}
 
-	protected abstract T deserialize(T reuse, DataInputView dataInput) throws IOException;
-
-	/**
-	 * Writes a block info at the end of the blocks.<br>
-	 * Current implementation uses only int and not long.
-	 */
-	protected class BlockBasedInput extends FilterInputStream {
-		private final int maxPayloadSize;
-
-		private int blockPos;
-
-		public BlockBasedInput(FSDataInputStream in, int blockSize) {
-			super(in);
-			this.blockPos = (int) BinaryInputFormat.this.blockInfo.getFirstRecordStart();
-			this.maxPayloadSize = blockSize - BinaryInputFormat.this.blockInfo.getInfoSize();
+	private T readEnviTile(T record) {
+/*		record.setTileInfo(this.info);
+		short[] values = record.getS16Tile();
+		if(values == null) {
+			values = new short[xsize * ysize];
+			record.setS16Tile(values);
 		}
-
-		@Override
-		public int read() throws IOException {
-			if (this.blockPos++ >= this.maxPayloadSize) {
-				this.skipHeader();
+		int pos = 0;
+		for(int y = 0; y < yread; y++) {
+			for(int x = 0; x < xread; x++) {
+				int b0 = stream.read();
+				int b1 = stream.read();
+				short val = (short)(b0 | (b1 << 8));
+				values[pos++] = val;
 			}
-			return this.in.read();
-		}
-
-		private void skipHeader() throws IOException {
-			byte[] dummy = new byte[BinaryInputFormat.this.blockInfo.getInfoSize()];
-			this.in.read(dummy, 0, dummy.length);
-			this.blockPos = 0;
-		}
-
-		@Override
-		public int read(byte[] b) throws IOException {
-			return this.read(b, 0, b.length);
-		}
-
-		@Override
-		public int read(byte[] b, int off, int len) throws IOException {
-			int totalRead = 0;
-			for (int remainingLength = len, offset = off; remainingLength > 0;) {
-				int blockLen = Math.min(remainingLength, this.maxPayloadSize - this.blockPos);
-				int read = this.in.read(b, offset, blockLen);
-				if (read < 0) {
-					return read;
-				}
-				totalRead += read;
-				this.blockPos += read;
-				offset += read;
-				if (this.blockPos >= this.maxPayloadSize) {
-					this.skipHeader();
-				}
-				remainingLength -= read;
+			for(int x = xread; x < xsize; x++) {
+				values[pos++] = missingData;
 			}
-			return totalRead;
+			// Fill with empty columns:
+		}
+		// fill with empty rows:
+		
+		// stream is positioned, read tile
+	*/	
+		return record;
+	}
+	
+	
+	public static final class EnviTilePosition {
+		public final int xstart, xnext;
+		public final int ystart, ynext;
+		public final Coordinate leftUpperCorner, rightLowerCorner;
+		
+		public EnviTilePosition(int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner) {
+			this.xstart = xstart;
+			this.xnext = xnext;
+			this.ystart = ystart;
+			this.ynext = ynext;
+			this.leftUpperCorner = leftUpperCorner;
+			this.rightLowerCorner = rightLowerCorner;
+		}
+	}
+	
+	public static final class EnviInputSplit extends FileInputSplit {
+		private static final long serialVersionUID = -9205048860784884871L;
+		public final TileInfo info;
+		public final EnviTilePosition pos;
+
+		public EnviInputSplit() {
+			super();
+			this.info = null;
+			this.pos = null;
+		}
+		
+		public EnviInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info, EnviTilePosition pos) {
+			super(num, file, start, length, hosts);
+			this.info = info;
+			this.pos = pos;
 		}
 	}
 }

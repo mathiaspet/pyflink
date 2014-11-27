@@ -8,6 +8,30 @@ import java.util.HashMap;
 
 public class TileInfo implements Serializable {
 	private static final long serialVersionUID = 5579375867489556640L;
+	
+	public static enum DataTypes {
+		UNDEFINED,
+		BYTE,  // uint8
+		INT,   //  int16
+		UINT,  // uint16
+		LONG,  //  int32
+		ULONG, // uint32
+		LONG64,
+		ULONG64,
+		FLOAT,
+		DOUBLE,
+		COMPLEX,
+		DCOMPLEX,
+		STRING,
+		STRUCT,
+		POINTER,
+		OBJREF,
+		LIST,
+		HASH,
+		DICTIONARY,
+		ORDEREDHASH,
+		MISSING // special value, always the last one
+	}
 
 	private HashMap<String, String> entries = new HashMap<String, String>();
 
@@ -174,5 +198,15 @@ public class TileInfo implements Serializable {
 	
 	public String getInterleaveType() {
 		return getString("interleave");
+	}
+	
+	public DataTypes getDataType() {
+		int typeVal = getInteger("data type");
+		if(typeVal == -1) {return DataTypes.MISSING;}
+		return DataTypes.values()[typeVal];
+	}
+	
+	public int getMissingValue() {
+		return getInteger("data ignore value");
 	}
 }
