@@ -21,8 +21,8 @@ public class Tile implements Serializable {
 	 */
 	private short[] s16Tile = null;
 	
-	// Coordinates of north-east and south-west corner of this tile
-	private Coordinate nwCord = null, seCord = null;
+	// Coordinates of left upper and right lower edge
+	private Coordinate luCord = null, rlCord = null;
 
 	private TileInfo tileInfo = null;
 	
@@ -33,8 +33,8 @@ public class Tile implements Serializable {
 	public Tile() { }
 	
 	public Tile(Coordinate leftUpper, Coordinate rightLower, short[] content, int width, int height) {
-		this.nwCord = leftUpper;
-		this.seCord = rightLower;
+		this.luCord = leftUpper;
+		this.rlCord = rightLower;
 		this.s16Tile = content;
 		this.tileWidth = width;
 		this.tileHeight = height;
@@ -90,14 +90,14 @@ public class Tile implements Serializable {
 	 * Return the coordinate of the north-west boundary point of this tile.
 	 */
 	public Coordinate getNWCoord() {
-		return this.nwCord;
+		return this.luCord;
 	}
 
 	/**
 	 * Return the coordinate of the south-east boundary point of this tile.
 	 */
 	public Coordinate getSECoord() {
-		return this.seCord;
+		return this.rlCord;
 	}
 	
 	/**
@@ -111,7 +111,11 @@ public class Tile implements Serializable {
 	/**
 	 * Update the tile information to the given object.
 	 */
-	public void setTileInfo(TileInfo tileInfo) {
+	public void update(TileInfo tileInfo, Coordinate leftUpper, Coordinate rightLower, int width, int height) {
 		this.tileInfo = tileInfo;
+		this.luCord = leftUpper;
+		this.rlCord = rightLower;
+		this.tileWidth = width;
+		this.tileHeight = height;
 	}
 }

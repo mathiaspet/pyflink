@@ -280,7 +280,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		long totalCount = 0;
 		long totalWidth = 0;
 		for (FileStatus file : files) {
-			// TODO: This is quite coarse, get from header file
+			// TODO: This is quite coarse, get info from header file
 			int columns = 8000, rows = 7000;
 			long datasize = 2; // bytes per pixel
 			int bands = 6;
@@ -313,7 +313,6 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void open(FileInputSplit split) throws IOException {
 		super.open(split);
@@ -340,30 +339,58 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		return record;
 	}
 
-	private T readEnviTile(T record) {
-/*		record.setTileInfo(this.info);
+	private T readEnviTile(T record) throws IOException {
+		// Pixel dimensions:
+		int width = this.pos.xnext - this.pos.xstart;
+		int height = this.pos.ynext - this.pos.ystart;
+		
+		if(width != xsize || height != ysize)
+			throw new RuntimeException("Height and width disagree between input split and configuration.");
+		
+		/*
+		 * Determine how may pixels to read from the file.
+		 * All remaining pixels are filled with missing values
+		 */
+		int xread = this.info.getPixelColumns() - this.pos.xstart;
+		if(xread > width) xread = width;
+		int yread = this.info.getPixelRows() - this.pos.ystart;
+		if(yread > height) yread = height;
+		
+		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, width, height);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			values = new short[xsize * ysize];
 			record.setS16Tile(values);
 		}
+		short missingData = (short) info.getMissingValue();
+
 		int pos = 0;
 		for(int y = 0; y < yread; y++) {
+			// Fill in pixels (little endian):
 			for(int x = 0; x < xread; x++) {
 				int b0 = stream.read();
 				int b1 = stream.read();
 				short val = (short)(b0 | (b1 << 8));
 				values[pos++] = val;
 			}
+			// Fill with empty columns:
 			for(int x = xread; x < xsize; x++) {
 				values[pos++] = missingData;
 			}
-			// Fill with empty columns:
+			if(pos % xsize > 0) {
+				throw new RuntimeException("DEBUG: oops, X too short");
+			}
 		}
-		// fill with empty rows:
-		
-		// stream is positioned, read tile
-	*/	
+		if(pos % xsize > 0) {
+			throw new RuntimeException("DEBUG: oops, X misalignment after rows");
+		}
+		if(pos != values.length && yread != height)
+			throw new RuntimeException("DEBUG: oops, misalignment on full record");
+		// Fill with empty rows:
+		while(pos < values.length) {
+			values[pos++] = missingData;
+		}
+
 		return record;
 	}
 	
