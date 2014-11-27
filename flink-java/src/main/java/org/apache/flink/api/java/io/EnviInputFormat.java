@@ -364,6 +364,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		}
 		short missingData = (short) info.getMissingValue();
 
+		// Fill pixel array pixel by pixel (please optimise this!):
 		int pos = 0;
 		for(int y = 0; y < yread; y++) {
 			// Fill in pixels (little endian):
@@ -426,5 +427,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			this.info = info;
 			this.pos = pos;
 		}
+	}
+
+	public void setLimitRectangle(Coordinate leftUpperLimit,
+			Coordinate rightLowerLimit) {
+		// TODO
+		throw new RuntimeException("TODO: limiting is currently unsupported.");
 	}
 }

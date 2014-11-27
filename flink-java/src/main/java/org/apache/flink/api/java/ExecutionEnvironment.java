@@ -319,9 +319,7 @@ public abstract class ExecutionEnvironment {
 
 	/**
 	 * Creates an ENVI reader that parses ENVI files and returns a data set of tiles.
-	 * @param inputFormat
-	 * @param filePath
-	 * @return
+	 * Please supply a directory or a single header file.
 	 */
 	public EnviReader readEnviFile(String filePath) {
 		return new EnviReader(filePath, this);
