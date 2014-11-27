@@ -68,11 +68,13 @@ public class TileInfoTest {
 	@Test
 	public void testParseHeader() {
 		TileInfo info = new TileInfo(testHeader);
-		Assert.assertEquals("ENVI Standard", info.getString("file type"));
-		Assert.assertTrue(-56.076667 == info.getDouble("westboundingcoordinate"));
-		Assert.assertTrue(8002 == info.getInteger("samples"));
-		Assert.assertTrue(7232 == info.getLong("lines"));
-		Assert.assertTrue(new Coordinate(-4.829621, -56.076667).equals(
-				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate")));
+		Assert.assertEquals("String property", "ENVI Standard", info.getString("file type"));
+		Assert.assertEquals("Integer property", info.getPixelColumns(), 8002);
+		Assert.assertEquals("Image dimensions", info.getPixelRows(), 7232);
+		Assert.assertEquals("Interleave type", info.getInterleaveType(), "bsq");
+		Assert.assertEquals("Coordinate construction",
+				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"),
+				new Coordinate(-4.829621, -56.076667));
+		Assert.assertEquals("named coordinates as pairs", info.getUpperLeftCoordinate(), new Coordinate(-4.835949, -56.076531));
 	}
 }

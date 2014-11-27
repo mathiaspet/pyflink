@@ -39,6 +39,7 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.io.CollectionInputFormat;
 import org.apache.flink.api.java.io.CsvReader;
+import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.io.IteratorInputFormat;
 import org.apache.flink.api.java.io.ParallelIteratorInputFormat;
 import org.apache.flink.api.java.io.PrimitiveInputFormat;
@@ -314,6 +315,16 @@ public abstract class ExecutionEnvironment {
 	 */
 	public CsvReader readCsvFile(String filePath) {
 		return new CsvReader(filePath, this);
+	}
+
+	/**
+	 * Creates an ENVI reader that parses ENVI files and returns a data set of tiles.
+	 * @param inputFormat
+	 * @param filePath
+	 * @return
+	 */
+	public EnviReader readEnviFile(String filePath) {
+		return new EnviReader(filePath, this);
 	}
 
 	// ------------------------------------ File Input Format -----------------------------------------
