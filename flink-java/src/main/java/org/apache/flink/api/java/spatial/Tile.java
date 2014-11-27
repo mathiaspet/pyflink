@@ -17,7 +17,7 @@ public class Tile implements Serializable {
 	
 	/**
 	 *  Tile data in 16-bit signed integers.
-	 *  It is organised in rows of pixels. 
+	 *  It is organized in rows of pixels. 
 	 */
 	private short[] s16Tile = null;
 	
