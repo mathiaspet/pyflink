@@ -41,8 +41,9 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.util.StringUtils;
 
 /**
- * Base class for all input formats that use blocks of fixed size. The input splits are aligned to these blocks. Without
- * configuration, these block sizes equal the native block sizes of the HDFS.
+ * An input format to parse ENVI files into Tile objects.
+ * Every input file is split into adjacent tiles of the given size.
+ * Missing pixels are filled with the missing value specified in the ENVI file.
  */
 public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
@@ -138,46 +139,47 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 				// TODO: Add logic for multiple bands
 
 				for(int y = 0; y < ysplits; y++) {
-					// Calculate pixel coordinate:
+					// Calculate pixel coordinate of tile:
 					int pystart = y *  ysize; // inclusive
 					int pynext = (y + 1) *  ysize; // EXCLUSIVE
 	
 					for(int x = 0; x < xsplits; x++) {
-						// Calculate pixel coordinate:
+						// Calculate pixel coordinate of tile:
 						int pxstart = x *  xsize; // inclusive
-						int pxnext = (x + 1) *  xsize; // EXCLUSIVE
+						int pxnext = ((x + 1) % xsplits) *  xsize; // EXCLUSIVE
+						int pxnextNoWrapped = (x + 1) *  xsize; // EXCLUSIVE
 						
 						// Calculate coordinate of leftmost and rightmost pixels
 						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, x, y);
 						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, x + 1, y + 1);
 						
-						// Determine start and end position of the pixel block
-						long startPos = 1L * pystart * xsize + pxstart;
-						// Pixel position after last pixel in this tile, cover that the next x might be 0 again:
-						long nextStartPos = x+1 == xsplits ? // x==0 in next round?
-									1L * pynext * xsize             // Then use next y offset
-									: 1L * pystart * xsize + pxnext;  // otherwise, use next x offset, y offset is unchanged
+						// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
+						long startPos = 1L * pystart * numColumns + pxstart;
+						/*
+						 *  Pixel position after last pixel in this tile.
+						 *  If the next block is in the same row (pxnext >= pxstart), the next start position is not below this block,
+						 *  but in the last row of the current block. Thus, decrement pynext in this case.
+						 */
+						long nextStartPos = 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
 						long numPixels = nextStartPos - startPos;
+						
+						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + x + "x" + y + " startPos: " + startPos +" next: " + nextStartPos); }
 						
 						long offset = startPos * data_size;
 						long length = numPixels * data_size;
 						
-						if(pxstart >= numColumns) {
-							
-						}
-						
 						if(offset + length > dataFileStatus.getLen()) { // Don't read over the end of file
-							offset = dataFileStatus.getLen() - length;
+							length = dataFileStatus.getLen() - offset;
 						}
 						
-						LOG.info("Tile " + x + "x" + y + " at offset " + offset +" +" + length + " bytes");
+						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + x + "x" + y + " at offset " + offset +" +" + length + " bytes"); }
 						// Determine list of FS blocks that contain the given block
 						final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
 						Arrays.sort(blocks);
 						
 						inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
 								blocks[0].getHosts(), info, 
-								new EnviTilePosition(pxstart, pxnext, pystart, pynext, tileUpperLeft, tileLowerRight)));
+								new EnviTilePosition(pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight)));
 					}
 				}
 			}
@@ -322,7 +324,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		this.info = ((EnviInputSplit) split).info;
 		this.pos = ((EnviInputSplit) split).pos;
 
-		LOG.info("Opened ENVI file " + split.getPath() + " with positions: " + pos);
+		if(LOG.isDebugEnabled()) { LOG.debug("Opened ENVI file " + split.getPath() + " with positions: " + pos); }
 		
 		this.readRecords = 0;
 	}
@@ -344,37 +346,32 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	}
 
 	private T readEnviTile(T record) throws IOException {
-		// Pixel dimensions:
-		int width = this.pos.xnext - this.pos.xstart;
-		int height = this.pos.ynext - this.pos.ystart;
-		
-		if(width != xsize || height != ysize) {
-			throw new RuntimeException("Height and width disagree between input split and configuration.");
-		}
-		
 		/*
 		 * Determine how may pixels to read from the file.
 		 * All remaining pixels are filled with missing values
 		 */
-		int xread = this.info.getPixelColumns() - this.pos.xstart;
-		if(xread > width) { xread = width; }
+		int lineWidth = this.info.getPixelColumns();
+		int xread = lineWidth - this.pos.xstart;
+		if(xread > xsize) { xread = xsize; }
 		int yread = this.info.getPixelRows() - this.pos.ystart;
-		if(yread > height) { yread = height; }
+		if(yread > ysize) { yread = ysize; }
 		
-		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, width, height);
+		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			values = new short[xsize * ysize];
 			record.setS16Tile(values);
 		}
 		short missingData = (short) info.getMissingValue();
+		int data_size = 2; // TODO: This is only valid for format INT
 		
-		
-		LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
+		//LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
 		
 		// Fill pixel array pixel by pixel (please optimise this!):
 		int pos = 0;
 		for(int y = 0; y < yread; y++) {
+			// Seek to the beginning of the current line of real data:
+			stream.seek(y * lineWidth * data_size + this.splitStart);
 			// Fill in pixels (little endian):
 			for(int x = 0; x < xread; x++) {
 				int b0 = stream.read();
@@ -386,17 +383,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			for(int x = xread; x < xsize; x++) {
 				values[pos++] = missingData;
 			}
-			if(pos % xsize > 0) {
-				throw new RuntimeException("DEBUG: oops, X too short");
-			}
 		}
-		if(pos % xsize > 0) {
-			throw new RuntimeException("DEBUG: oops, X misalignment after rows");
-		}
-		if(pos != values.length && yread != height) {
-			throw new RuntimeException("DEBUG: oops, misalignment on full record");
-		}
-		// Fill with empty rows:
+		// Fill missing rows with empty data:
 		while(pos < values.length) {
 			values[pos++] = missingData;
 		}
