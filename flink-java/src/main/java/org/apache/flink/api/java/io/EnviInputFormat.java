@@ -180,7 +180,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						
 						inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
 								blocks[0].getHosts(), info, 
-								new EnviTilePosition(pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight)));
+								new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight)));
 					}
 				}
 			}
@@ -359,7 +359,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		int yread = this.info.getPixelRows() - this.pos.ystart;
 		if(yread > ysize) { yread = ysize; }
 		
-		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize);
+		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			values = new short[xsize * ysize];
@@ -397,11 +397,13 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 	
 	public static final class EnviTilePosition {
+		public final int band;
 		public final int xstart, xnext;
 		public final int ystart, ynext;
 		public final Coordinate leftUpperCorner, rightLowerCorner;
 		
-		public EnviTilePosition(int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner) {
+		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner) {
+			this.band = band;
 			this.xstart = xstart;
 			this.xnext = xnext;
 			this.ystart = ystart;
@@ -412,7 +414,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		
 		@Override
 		public String toString() {
-			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner;
+			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner + ", band " + band;
 		}
 	}
 	

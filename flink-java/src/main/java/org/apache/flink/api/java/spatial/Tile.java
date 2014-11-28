@@ -111,11 +111,12 @@ public class Tile implements Serializable {
 	/**
 	 * Update the tile information to the given object.
 	 */
-	public void update(TileInfo tileInfo, Coordinate leftUpper, Coordinate rightLower, int width, int height) {
+	public void update(TileInfo tileInfo, Coordinate leftUpper, Coordinate rightLower, int width, int height, int band) {
 		this.tileInfo = tileInfo;
 		this.luCord = leftUpper;
 		this.rlCord = rightLower;
 		this.tileWidth = width;
 		this.tileHeight = height;
+		this.band = band;
 	}
 }

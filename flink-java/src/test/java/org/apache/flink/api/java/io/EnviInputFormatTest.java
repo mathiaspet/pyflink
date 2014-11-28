@@ -196,12 +196,15 @@ public class EnviInputFormatTest {
 	private void checkResult(EnviInputFormat<Tile> eif, short[][] result) throws IOException {
 		EnviInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
 		Assert.assertEquals("Sub splits generated", result.length, splits.length);
+		int i = 0;
 		for(EnviInputFormat.EnviInputSplit split: splits) {
 			eif.open(split);
 			Tile tile = new Tile();
 			eif.nextRecord(tile);
 			eif.close();
 			Assert.assertArrayEquals(result[split.getSplitNumber()], tile.getS16Tile());
+			Assert.assertEquals("Band is correct for split " + i, i >= result.length / 2 ? 1 : 0, tile.getBand());
+			i++;
 		}
 	}
 }
