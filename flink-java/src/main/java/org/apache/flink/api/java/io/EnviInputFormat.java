@@ -225,20 +225,12 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			// input is directory. list all contained files
 			final FileStatus[] partials = fs.listStatus(this.filePath);
 			for (FileStatus partial : partials) {
-				if (!partial.isDir()) {
+				if (!partial.isDir() && partial.getPath().toUri().toString().endsWith(".hdr")) {
 					files.add(partial);
 				}
 			}
 		} else {
 			files.add(pathFile);
-		}
-		
-		List<FileStatus> headerFiles = new ArrayList<FileStatus>();
-		for(FileStatus fstat: files) {
-			// Only accept header files
-			if(fstat.getPath().toUri().toString().endsWith(".hdr")) {
-				headerFiles.add(fstat);
-			}
 		}
 		
 		return files;
