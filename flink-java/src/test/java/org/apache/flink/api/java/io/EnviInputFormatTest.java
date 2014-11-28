@@ -26,9 +26,10 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
-import org.junit.Assert;
 
+import org.junit.Assert;
 import org.apache.flink.api.java.io.EnviInputFormat.EnviInputSplit;
+import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
@@ -87,6 +88,25 @@ public class EnviInputFormatTest {
 		{
 			50, 51, 52, 53,
 			-1, -1, -1, -1
+		},
+		{
+			54, 55, 56, -1,
+			-1, -1, -1, -1
+		}
+	};
+
+	private static final short[][] expectedIntersectBlocks = {
+		{
+			04,  5,  6, -1,
+			11, 12, 13, -1 
+		},
+		{
+			18, 19, 20, -1,
+			-1, -1, -1, -1
+		},
+		{
+			36, 37, 38, -1,
+			44, 45, 46, -1
 		},
 		{
 			54, 55, 56, -1,
@@ -170,12 +190,7 @@ public class EnviInputFormatTest {
 		Path path = prepareInput(dataBlock1, header1);
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
-
-		final Configuration config = new Configuration();
-		config.setLong(EnviInputFormat.PARAM_XSIZE, 7);
-		config.setLong(EnviInputFormat.PARAM_YSIZE, 3);
-		eif.configure(config);
-		
+		eif.setTileSize(7, 3);
 		checkResult(eif, expectedDataBlocks1);
 	}
 	
@@ -184,13 +199,18 @@ public class EnviInputFormatTest {
 		Path path = prepareInput(dataBlock1, header1);
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
-
-		final Configuration config = new Configuration();
-		config.setLong(EnviInputFormat.PARAM_XSIZE, 4);
-		config.setLong(EnviInputFormat.PARAM_YSIZE, 2);
-		eif.configure(config);
-		
+		eif.setTileSize(4, 2);
 		checkResult(eif, expectedSubBlocks1);
+	}
+
+	@Test
+	public void testIntersect() throws IOException {
+		Path path = prepareInput(dataBlock1, header1);
+		
+		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
+		eif.setTileSize(4, 2);
+		eif.setLimitRectangle(new Coordinate(20, -54), new Coordinate(-8, -30));
+		checkResult(eif, expectedIntersectBlocks);
 	}
 
 	private void checkResult(EnviInputFormat<Tile> eif, short[][] result) throws IOException {

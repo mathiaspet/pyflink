@@ -31,7 +31,6 @@ import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileInfo;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -51,12 +50,6 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
 	private static final Logger LOG = LoggerFactory.getLogger(EnviInputFormat.class);
 
-	/**
-	 * Configuration parameters: Size of each tile in pixels in both dimensions.
-	 */
-	public static final String PARAM_XSIZE = "input.xsize";
-	public static final String PARAM_YSIZE = "input.ysize";
-
 	private int xsize = -1, ysize = -1;
 	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
 	
@@ -69,20 +62,6 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		super(path);
 	} 
 	
-	@Override
-	public void configure(Configuration parameters) {
-		super.configure(parameters);
-
-		this.xsize = parameters.getInteger(PARAM_XSIZE, -1);
-		if(this.xsize <= 0) {
-			throw new IllegalArgumentException("Please set the xsize parameter to a positive value.");
-		}
-		this.ysize = parameters.getInteger(PARAM_YSIZE, -1);
-		if(this.ysize <= 0) {
-			throw new IllegalArgumentException("Please set the ysize parameter to a positive value.");
-		}
-	}
-
 	@Override
 	public FileInputSplit[] createInputSplits(int minNumSplits) throws IOException {
 		List<FileStatus> files = this.getFiles();
@@ -151,8 +130,14 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						int pxnextNoWrapped = (x + 1) *  xsize; // EXCLUSIVE
 						
 						// Calculate coordinate of leftmost and rightmost pixels
-						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, x, y);
-						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, x + 1, y + 1);
+						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, y, x);
+						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, y + 1, x + 1);
+						
+						// Filter this tile if no pixel is contained in the selected region:
+						if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
+							if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + x + "x" + y + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); } 
+							continue;
+						}
 						
 						// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
 						long startPos = bandOffset + 1L * pystart * numColumns + pxstart;
@@ -194,6 +179,39 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		}
 
 		return inputSplits.toArray(new EnviInputSplit[0]);
+	}
+
+	/**
+	 * Return true iff the rectangle with the given left upper and lower right points, which is oriented along the latitudinal 
+	 * and longitudinal lines, intersects with the limits rectangle, which is oriented the same way.
+	 */
+	private final boolean rectIntersectsLimits(Coordinate tileUpperLeft,
+			Coordinate tileLowerRight) {
+		// Rectangles intersect if the pairs of left and right latitudinal or longitudinal lines are not besides each other.
+		return !dotPairsDontMix(this.leftUpperLimit.lat, this.rightLowerLimit.lat, tileUpperLeft.lat, tileLowerRight.lat)
+				&& !dotPairsDontMix(this.leftUpperLimit.lon, this.rightLowerLimit.lon, tileUpperLeft.lon, tileLowerRight.lon);
+	}
+	
+	/**
+	 * Return true iff the four numbers are ordered on a circle with circumfence "repeat" such that
+	 * the intervals a1-a2 and b1-b2 do not intersect.
+	 */
+	private static final boolean dotPairsDontMix(double a1, double a2, double b1, double b2) {
+		// check for both orders on the circel, clockwise:
+		int orderedPairs = 0;
+		if(a1 > a2) { orderedPairs++; }
+		if(a2 > b1) { orderedPairs++; }
+		if(b1 > b2) { orderedPairs++; }
+		if(b2 > a1) { orderedPairs++; }
+		if(orderedPairs == 3) { return true; }
+		
+		// counter-clockwise:
+		orderedPairs = 0;
+		if(a1 < a2) { orderedPairs++; }
+		if(a2 < b1) { orderedPairs++; }
+		if(b1 < b2) { orderedPairs++; }
+		if(b2 < a1) { orderedPairs++; }
+		return orderedPairs == 3;
 	}
 
 	protected List<FileStatus> getFiles() throws IOException {
@@ -440,5 +458,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			Coordinate rightLowerLimit) {
 		this.leftUpperLimit = leftUpperLimit;
 		this.rightLowerLimit = rightLowerLimit;
+	}
+
+	public void setTileSize(int xpixels, int ypixels) {
+		this.xsize = xpixels;
+		this.ysize = ypixels;
 	}
 }

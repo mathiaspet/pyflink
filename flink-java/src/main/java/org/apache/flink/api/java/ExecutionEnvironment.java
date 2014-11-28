@@ -320,9 +320,10 @@ public abstract class ExecutionEnvironment {
 	/**
 	 * Creates an ENVI reader that parses ENVI files and returns a data set of tiles.
 	 * Please supply a directory or a single header file.
+	 * The given pixel numbers represent the size of each tile that a file is cut into.
 	 */
-	public EnviReader readEnviFile(String filePath) {
-		return new EnviReader(filePath, this);
+	public EnviReader readEnviFile(String filePath, int xpixels, int ypixels) {
+		return new EnviReader(filePath, xpixels, ypixels, this);
 	}
 
 	// ------------------------------------ File Input Format -----------------------------------------

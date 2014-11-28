@@ -38,18 +38,24 @@ public class EnviReader {
 	
 	private Coordinate leftUpperLimit, rightLowerLimit;
 	
+	private final int xpixels, ypixels; 
+	
 	// --------------------------------------------------------------------------------------------
 	
-	public EnviReader(Path filePath, ExecutionEnvironment executionContext) {
+	public EnviReader(Path filePath, int xpixels, int ypixels, ExecutionEnvironment executionContext) {
 		Validate.notNull(filePath, "The file path may not be null.");
 		Validate.notNull(executionContext, "The execution context may not be null.");
+		Validate.inclusiveBetween(1, Integer.MAX_VALUE, xpixels, "Positive x pixel count required.");
+		Validate.inclusiveBetween(1, Integer.MAX_VALUE, ypixels, "Positive y pixel count required.");
 		
 		this.path = filePath;
 		this.executionContext = executionContext;
+		this.xpixels = xpixels;
+		this.ypixels = ypixels;
 	}
 	
-	public EnviReader(String filePath, ExecutionEnvironment executionContext) {
-		this(new Path(Validate.notNull(filePath, "The file path may not be null.")), executionContext);
+	public EnviReader(String filePath, int xpixels, int ypixels, ExecutionEnvironment executionContext) {
+		this(new Path(Validate.notNull(filePath, "The file path may not be null.")), xpixels, ypixels, executionContext);
 	}
 	
 	public Path getFilePath() {
@@ -76,6 +82,7 @@ public class EnviReader {
 	
 	private void configureInputFormat(EnviInputFormat<?> format) {
 		format.setLimitRectangle(leftUpperLimit, rightLowerLimit);
+		format.setTileSize(xpixels, ypixels);
 	}
 
 	/**
