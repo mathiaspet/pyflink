@@ -31,7 +31,6 @@ import org.junit.Assert;
 import org.apache.flink.api.java.io.EnviInputFormat.EnviInputSplit;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.junit.After;
 import org.junit.Test;
