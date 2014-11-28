@@ -78,5 +78,7 @@ public class TileInfoTest {
 				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"));
 		Assert.assertEquals("named coordinates as pairs", new Coordinate(-4.835949, -56.076531), info.getUpperLeftCoordinate());
 		Assert.assertEquals("data type", TileInfo.DataTypes.INT, info.getDataType());
+		Assert.assertEquals("number of bands", 6, info.getNumBands());
+
 	}
 }

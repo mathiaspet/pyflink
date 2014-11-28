@@ -39,13 +39,24 @@ public class EnviInputFormatTest {
 	private static final byte[] dataBlock1 = {
 		00, 0,  1, 0,  2, 0,  3, 0,  4, 0,  5, 0,  6, 0,
 		07, 0,  8, 0,  9, 0, 10, 0, 11, 0, 12, 0, 13, 0,
-		14, 0, 15, 0, 16, 0, 17, 0, 18, 0, 19, 0, 20, 0
+		14, 0, 15, 0, 16, 0, 17, 0, 18, 0, 19, 0, 20, 0,
+		32, 0, 33, 0, 34, 0, 35, 0, 36, 0, 37, 0, 38, 0,
+		40, 0, 41, 0, 42, 0, 43, 0, 44, 0, 45, 0, 46, 0,
+		50, 0, 51, 0, 52, 0, 53, 0, 54, 0, 55, 0, 56, 0
+
 	};
 
-	private static final short[] expectedDataBlock1 = {
-		0, 1, 2, 3, 4, 5, 6,
-		7, 8, 9, 10, 11, 12, 13,
-		14, 15, 16, 17, 18, 19, 20
+	private static final short[] expectedDataBlocks1[] = {
+		{
+			0, 1, 2, 3, 4, 5, 6,
+			7, 8, 9, 10, 11, 12, 13,
+			14, 15, 16, 17, 18, 19, 20
+		},
+		{
+			32, 33, 34, 35, 36, 37, 38,
+			40, 41, 42, 43, 44, 45, 46,
+			50, 51, 52, 53, 54, 55, 56
+		}
 	};
 	
 	private static final short[][] expectedSubBlocks1 = {
@@ -64,6 +75,22 @@ public class EnviInputFormatTest {
 		{
 			18, 19, 20, -1,
 			-1, -1, -1, -1
+		},
+		{
+			32, 33, 34, 35,
+			40, 41, 42, 43,
+		},
+		{
+			36, 37, 38, -1,
+			44, 45, 46, -1
+		},
+		{
+			50, 51, 52, 53,
+			-1, -1, -1, -1
+		},
+		{
+			54, 55, 56, -1,
+			-1, -1, -1, -1
 		}
 	};
 
@@ -74,7 +101,7 @@ public class EnviInputFormatTest {
 			"lines = 3\n" +
 			"data type = 2\n" +
 			"interleave=bsq\n" +
-			"bands = 1\n" +
+			"bands = 2\n" +
 			"data ignore value = -1\n" +
 			"upperleftcornerlatlong = {\n" +
 			"-4.835949, -56.076531}\n" +
@@ -149,19 +176,11 @@ public class EnviInputFormatTest {
 		config.setLong(EnviInputFormat.PARAM_YSIZE, 3);
 		eif.configure(config);
 		
-		EnviInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
-		Assert.assertEquals("One split generated", 1, splits.length);
-		EnviInputFormat.EnviInputSplit split = splits[0];
-		eif.open(split);
-		Tile tile = new Tile();
-		eif.nextRecord(tile);
-		eif.close();
-		
-		Assert.assertArrayEquals(expectedDataBlock1, tile.getS16Tile());
+		checkResult(eif, expectedDataBlocks1);
 	}
 	
 	@Test
-	public void testFourBlocks() throws IOException {
+	public void testSubBlocks() throws IOException {
 		Path path = prepareInput(dataBlock1, header1);
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
@@ -171,15 +190,18 @@ public class EnviInputFormatTest {
 		config.setLong(EnviInputFormat.PARAM_YSIZE, 2);
 		eif.configure(config);
 		
+		checkResult(eif, expectedSubBlocks1);
+	}
+
+	private void checkResult(EnviInputFormat<Tile> eif, short[][] result) throws IOException {
 		EnviInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
-		Assert.assertEquals("Four splits generated", 4, splits.length);
+		Assert.assertEquals("Sub splits generated", result.length, splits.length);
 		for(EnviInputFormat.EnviInputSplit split: splits) {
 			eif.open(split);
 			Tile tile = new Tile();
 			eif.nextRecord(tile);
 			eif.close();
-			Assert.assertArrayEquals(expectedSubBlocks1[split.getSplitNumber()], tile.getS16Tile());
+			Assert.assertArrayEquals(result[split.getSplitNumber()], tile.getS16Tile());
 		}
 	}
-
 }

@@ -217,4 +217,29 @@ public class TileInfo implements Serializable {
 	public int getMissingValue() {
 		return getInteger("data ignore value");
 	}
+
+	public int getNumBands() {
+		return getInteger("bands");
+	}
+	
+	/**
+	 * Return the size of each pixel in bytes.
+	 */
+	public int getPixelSize() {
+		switch(getDataType()) {
+		case BYTE:
+			return 1;
+		case INT:
+		case UINT:
+			return 2;
+		case LONG:
+		case ULONG:
+			return 4;
+		case LONG64:
+		case ULONG64:
+			return 8;
+		default:
+			throw new RuntimeException("Unsupported data format: " + getDataType());
+		}
+	}
 }

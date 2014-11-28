@@ -44,6 +44,8 @@ import org.apache.flink.util.StringUtils;
  * An input format to parse ENVI files into Tile objects.
  * Every input file is split into adjacent tiles of the given size.
  * Missing pixels are filled with the missing value specified in the ENVI file.
+ * 
+ * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
  */
 public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
@@ -56,6 +58,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	public static final String PARAM_YSIZE = "input.ysize";
 
 	private int xsize = -1, ysize = -1;
+	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
 	
 	private TileInfo info;
 	private EnviTilePosition pos;
@@ -111,18 +114,16 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 				throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
 						+ " File: " + file.getPath());
 			}
-			int data_size = 2; // 2 bytes per entry
-			
+			int data_size = info.getPixelSize();
+			int numBands = info.getNumBands();
+			int numRows = info.getPixelRows();
+			int numColumns = info.getPixelColumns();
 			/*
 			 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 			 *  pixels.
 			 */
-			int numRows = info.getPixelRows();
-			int numColumns = info.getPixelColumns();
 			int xsplits = (numColumns + xsize - 1) / xsize;
 			int ysplits = (numRows + ysize - 1) / ysize;
-			LOG.info("Splitting " + info.getPixelColumns() + "x" + info.getPixelRows() + " image into " +
-					xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + ": " + file.getPath());
 			
 			// Real coordinates of this image + coordinate differences:
 			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
@@ -132,12 +133,12 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
 					1.0 * ysize / info.getPixelRows());
 
-			// TODO:
-			int numBands = 1;
 			
+			LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
+					xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + " for " + numBands + " bands: " + file.getPath());
+	
 			for(int band = 0; band < numBands; band++) {
-				// TODO: Add logic for multiple bands
-
+				long bandOffset = band * numRows * numColumns;
 				for(int y = 0; y < ysplits; y++) {
 					// Calculate pixel coordinate of tile:
 					int pystart = y *  ysize; // inclusive
@@ -154,13 +155,13 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, x + 1, y + 1);
 						
 						// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
-						long startPos = 1L * pystart * numColumns + pxstart;
+						long startPos = bandOffset + 1L * pystart * numColumns + pxstart;
 						/*
 						 *  Pixel position after last pixel in this tile.
 						 *  If the next block is in the same row (pxnext >= pxstart), the next start position is not below this block,
 						 *  but in the last row of the current block. Thus, decrement pynext in this case.
 						 */
-						long nextStartPos = 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
+						long nextStartPos = bandOffset + 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
 						long numPixels = nextStartPos - startPos;
 						
 						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + x + "x" + y + " startPos: " + startPos +" next: " + nextStartPos); }
@@ -280,21 +281,23 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		if (files.isEmpty()) {
 			return null;
 		}
-
+		final FileSystem fs = this.filePath.getFileSystem();
 		long totalCount = 0;
 		long totalWidth = 0;
 		for (FileStatus file : files) {
-			// TODO: This is quite coarse, get info from header file
-			int columns = 8000, rows = 7000;
-			long datasize = 2; // bytes per pixel
-			int bands = 6;
+			// Read header file:
+			FSDataInputStream fdis = fs.open(file.getPath());
+			TileInfo info = new TileInfo(fdis);
+			fdis.close();
+	
+			// Calculate the number of splits, as done above:
+			int xsplits = (info.getPixelColumns() + xsize - 1) / xsize;
+			int ysplits = (info.getPixelRows() + ysize - 1) / ysize;
 			
-			int xsplits = (columns + xsize - 1) / xsize;
-			int ysplits = (rows + ysize - 1) / ysize;
-			
-			int tileCount = xsplits * ysplits * bands;
+			// Count the tiles and calculate the size of each tile in bytes (virtual size):
+			int tileCount = xsplits * ysplits * info.getNumBands();
 			totalCount += tileCount;
-			totalWidth += 1L * datasize * tileCount * xsize * ysize;
+			totalWidth += 1L * info.getPixelSize() * tileCount * xsize * ysize;
 		}
 
 		final float avgWidth = totalCount == 0 ? 0 : 1.0f * totalWidth / totalCount;
@@ -363,7 +366,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			record.setS16Tile(values);
 		}
 		short missingData = (short) info.getMissingValue();
-		int data_size = 2; // TODO: This is only valid for format INT
+		int data_size = info.getPixelSize();
 		
 		//LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
 		
@@ -433,7 +436,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 
 	public void setLimitRectangle(Coordinate leftUpperLimit,
 			Coordinate rightLowerLimit) {
-		// TODO
-		throw new RuntimeException("TODO: limiting is currently unsupported.");
+		this.leftUpperLimit = leftUpperLimit;
+		this.rightLowerLimit = rightLowerLimit;
 	}
 }
