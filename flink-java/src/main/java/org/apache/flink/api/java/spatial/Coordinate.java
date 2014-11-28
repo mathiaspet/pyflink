@@ -61,4 +61,9 @@ public class Coordinate implements Serializable {
 	public Coordinate addScaled(Coordinate diff, double scaleLat, double scaleLon) {
 		return new Coordinate(this.lat + diff.lat * scaleLat, this.lon + diff.lon * scaleLon);
 	}
+	
+	@Override
+	public String toString() {
+		return "(" + this.lat + ", " + this.lon + ")";
+	}
 }

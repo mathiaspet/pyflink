@@ -69,14 +69,14 @@ public class TileInfoTest {
 	public void testParseHeader() {
 		TileInfo info = new TileInfo(testHeader);
 		Assert.assertEquals("String property", "ENVI Standard", info.getString("file type"));
-		Assert.assertEquals("Integer property", info.getPixelColumns(), 8002);
-		Assert.assertEquals("Image dimensions", info.getPixelRows(), 7232);
-		Assert.assertEquals("Data ignore value", info.getMissingValue(), -9999);
-		Assert.assertEquals("Interleave type", info.getInterleaveType(), "bsq");
+		Assert.assertEquals("Integer property", 8002, info.getPixelColumns());
+		Assert.assertEquals("Image dimensions", 7232, info.getPixelRows());
+		Assert.assertEquals("Data ignore value", -9999, info.getMissingValue());
+		Assert.assertEquals("Interleave type", "bsq", info.getInterleaveType());
 		Assert.assertEquals("Coordinate construction",
-				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"),
-				new Coordinate(-4.829621, -56.076667));
-		Assert.assertEquals("named coordinates as pairs", info.getUpperLeftCoordinate(), new Coordinate(-4.835949, -56.076531));
-		Assert.assertEquals("data type", info.getDataType(), TileInfo.DataTypes.INT);
+				new Coordinate(-4.829621, -56.076667),
+				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"));
+		Assert.assertEquals("named coordinates as pairs", new Coordinate(-4.835949, -56.076531), info.getUpperLeftCoordinate());
+		Assert.assertEquals("data type", TileInfo.DataTypes.INT, info.getDataType());
 	}
 }

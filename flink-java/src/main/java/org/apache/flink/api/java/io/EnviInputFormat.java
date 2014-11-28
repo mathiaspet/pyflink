@@ -84,6 +84,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		List<FileStatus> files = this.getFiles();
 		final FileSystem fs = this.filePath.getFileSystem();
 
+		if(minNumSplits < 1) { minNumSplits = 1; }
+		
 		final List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(minNumSplits);
 		for (FileStatus file : files) {
 			// Read header file:
@@ -124,7 +126,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			// Real coordinates of this image + coordinate differences:
 			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
 			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
-			Coordinate realDiff = upperLeftCorner.diff(realLowerRightCorner);
+			Coordinate realDiff = realLowerRightCorner.diff(upperLeftCorner);
 			// Distance between upper left corner and virtual lower right corner of the last tile, including empty pixels:
 			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
 					1.0 * ysize / info.getPixelRows());
@@ -146,8 +148,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						int pxnext = (x + 1) *  xsize; // EXCLUSIVE
 						
 						// Calculate coordinate of leftmost and rightmost pixels
-						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, xsplits, ysplits);
-						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, xsplits + 1, ysplits + 1);
+						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, x, y);
+						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, x + 1, y + 1);
 						
 						// Determine start and end position of the pixel block
 						long startPos = 1L * pystart * xsize + pxstart;
@@ -170,10 +172,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						
 						LOG.info("Tile " + x + "x" + y + " at offset " + offset +" +" + length + " bytes");
 						// Determine list of FS blocks that contain the given block
-						final BlockLocation[] blocks = fs.getFileBlockLocations(file, offset, length);
+						final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
 						Arrays.sort(blocks);
 						
-						inputSplits.add(new EnviInputSplit(inputSplits.size(), file.getPath(), offset, length,
+						inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
 								blocks[0].getHosts(), info, 
 								new EnviTilePosition(pxstart, pxnext, pystart, pynext, tileUpperLeft, tileLowerRight)));
 					}
@@ -184,11 +186,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		if (inputSplits.size() < minNumSplits) {
 			LOG.warn("WARNING: Too few splits generated (" + inputSplits.size() +"), adding dummy splits.");
 			for (int index = files.size(); index < minNumSplits; index++) {
-				inputSplits.add(new FileInputSplit(index, null, 0, 0, null));
+				inputSplits.add(new EnviInputSplit(index, null, 0, 0, null, null, null));
 			}
 		}
 
-		return inputSplits.toArray(new FileInputSplit[0]);
+		return inputSplits.toArray(new EnviInputSplit[0]);
 	}
 
 	protected List<FileStatus> getFiles() throws IOException {
@@ -320,6 +322,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		this.info = ((EnviInputSplit) split).info;
 		this.pos = ((EnviInputSplit) split).pos;
 
+		LOG.info("Opened ENVI file " + split.getPath() + " with positions: " + pos);
+		
 		this.readRecords = 0;
 	}
 
@@ -344,17 +348,18 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		int width = this.pos.xnext - this.pos.xstart;
 		int height = this.pos.ynext - this.pos.ystart;
 		
-		if(width != xsize || height != ysize)
+		if(width != xsize || height != ysize) {
 			throw new RuntimeException("Height and width disagree between input split and configuration.");
+		}
 		
 		/*
 		 * Determine how may pixels to read from the file.
 		 * All remaining pixels are filled with missing values
 		 */
 		int xread = this.info.getPixelColumns() - this.pos.xstart;
-		if(xread > width) xread = width;
+		if(xread > width) { xread = width; }
 		int yread = this.info.getPixelRows() - this.pos.ystart;
-		if(yread > height) yread = height;
+		if(yread > height) { yread = height; }
 		
 		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, width, height);
 		short[] values = record.getS16Tile();
@@ -363,7 +368,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			record.setS16Tile(values);
 		}
 		short missingData = (short) info.getMissingValue();
-
+		
+		
+		LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
+		
 		// Fill pixel array pixel by pixel (please optimise this!):
 		int pos = 0;
 		for(int y = 0; y < yread; y++) {
@@ -385,8 +393,9 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		if(pos % xsize > 0) {
 			throw new RuntimeException("DEBUG: oops, X misalignment after rows");
 		}
-		if(pos != values.length && yread != height)
+		if(pos != values.length && yread != height) {
 			throw new RuntimeException("DEBUG: oops, misalignment on full record");
+		}
 		// Fill with empty rows:
 		while(pos < values.length) {
 			values[pos++] = missingData;
@@ -408,6 +417,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			this.ynext = ynext;
 			this.leftUpperCorner = leftUpperCorner;
 			this.rightLowerCorner = rightLowerCorner;
+		}
+		
+		@Override
+		public String toString() {
+			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner;
 		}
 	}
 	

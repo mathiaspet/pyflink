@@ -6,6 +6,8 @@ import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 
+import org.apache.flink.util.StringUtils;
+
 public class TileInfo implements Serializable {
 	private static final long serialVersionUID = 5579375867489556640L;
 	
@@ -49,7 +51,7 @@ public class TileInfo implements Serializable {
 				buf = buf2;
 			}
 		}
-		parseInfo(new String(buf, Charset.forName("UTF-8")));
+		parseInfo(new String(buf, 0, offset, Charset.forName("UTF-8")));
 	}
 
 	public TileInfo(String tileHeader) {
@@ -61,6 +63,7 @@ public class TileInfo implements Serializable {
 		String value = null;
 		int braceImbalance = 0;
 		int lineNo = 0;
+
 		for(String line: tileHeader.split("\r?\n")) {
 			lineNo++;
 			// Parse header:
@@ -73,6 +76,11 @@ public class TileInfo implements Serializable {
 				}
 			}
 
+			// Skip empty lines:
+			if(line.length() == 0 || (line.length() < 2 && (line.equals("\n") || line.equals("\r\n")))) {
+				continue;
+			}
+			
 			// Continue the previous line:
 			if(braceImbalance > 0) {
 				braceImbalance -= countOccurences(line, '}');
@@ -84,7 +92,7 @@ public class TileInfo implements Serializable {
 					continue;
 				} else {
 					throw new RuntimeException("Line " + lineNo
-							+ " contains no '=': " + line);
+							+ " contains no '=': " + StringUtils.showControlCharacters(line));
 				}
 			} else {
 				// Or parse a new line:
