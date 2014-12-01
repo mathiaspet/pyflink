@@ -114,4 +114,12 @@ public class Tile implements Serializable {
 	public void setTileInfo(TileInfo tileInfo) {
 		this.tileInfo = tileInfo;
 	}
+
+	public Long getAqcuisitionDate() {
+		if(this.tileInfo == null) {
+			return new Long(-1);
+		}else{
+			return this.tileInfo.getAqcuisitionDate();
+		}
+	}
 }

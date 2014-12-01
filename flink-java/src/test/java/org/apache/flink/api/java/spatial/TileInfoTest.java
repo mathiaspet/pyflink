@@ -1,5 +1,7 @@
 package org.apache.flink.api.java.spatial;
 
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -78,5 +80,6 @@ public class TileInfoTest {
 				new Coordinate(-4.829621, -56.076667));
 		Assert.assertEquals("named coordinates as pairs", info.getUpperLeftCoordinate(), new Coordinate(-4.835949, -56.076531));
 		Assert.assertEquals("data type", info.getDataType(), TileInfo.DataTypes.INT);
+		MatcherAssert.assertThat(info.getAqcuisitionDate(), Matchers.is(Matchers.not(Matchers.nullValue())));
 	}
 }

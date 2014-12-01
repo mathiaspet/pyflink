@@ -4,6 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.charset.Charset;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 
 public class TileInfo implements Serializable {
@@ -208,5 +212,18 @@ public class TileInfo implements Serializable {
 	
 	public int getMissingValue() {
 		return getInteger("data ignore value");
+	}
+
+	public Long getAqcuisitionDate() {
+		DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS"); 
+		
+		String acqDateString = getString("acquisitiondate");
+		try {
+			Date date = df.parse(acqDateString);
+			return date.getTime();
+		} catch (ParseException e) {
+		}
+		
+		return new Long(-1);
 	}
 }
