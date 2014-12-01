@@ -1,7 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.flink.api.java.spatial;
 
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -71,15 +86,16 @@ public class TileInfoTest {
 	public void testParseHeader() {
 		TileInfo info = new TileInfo(testHeader);
 		Assert.assertEquals("String property", "ENVI Standard", info.getString("file type"));
-		Assert.assertEquals("Integer property", info.getPixelColumns(), 8002);
-		Assert.assertEquals("Image dimensions", info.getPixelRows(), 7232);
-		Assert.assertEquals("Data ignore value", info.getMissingValue(), -9999);
-		Assert.assertEquals("Interleave type", info.getInterleaveType(), "bsq");
+		Assert.assertEquals("Integer property", 8002, info.getPixelColumns());
+		Assert.assertEquals("Image dimensions", 7232, info.getPixelRows());
+		Assert.assertEquals("Data ignore value", -9999, info.getMissingValue());
+		Assert.assertEquals("Interleave type", "bsq", info.getInterleaveType());
 		Assert.assertEquals("Coordinate construction",
-				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"),
-				new Coordinate(-4.829621, -56.076667));
-		Assert.assertEquals("named coordinates as pairs", info.getUpperLeftCoordinate(), new Coordinate(-4.835949, -56.076531));
-		Assert.assertEquals("data type", info.getDataType(), TileInfo.DataTypes.INT);
-		MatcherAssert.assertThat(info.getAqcuisitionDate(), Matchers.is(Matchers.not(Matchers.nullValue())));
+				new Coordinate(-4.829621, -56.076667),
+				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"));
+		Assert.assertEquals("named coordinates as pairs", new Coordinate(-4.835949, -56.076531), info.getUpperLeftCoordinate());
+		Assert.assertEquals("data type", TileInfo.DataTypes.INT, info.getDataType());
+		Assert.assertEquals("number of bands", 6, info.getNumBands());
+
 	}
 }

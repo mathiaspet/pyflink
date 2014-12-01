@@ -19,7 +19,6 @@ package org.apache.flink.examples.java.spatial;
 
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 
@@ -48,14 +47,14 @@ public class TileAccess {
 		
 		DataSet<Tile> tileSet = readTileDataSet(env); 
 			
-		tileSet.map(mapper)	
+//		tileSet.map(mapper)	
 		
 		
 	}
 
 	private static DataSet<Tile> readTileDataSet(ExecutionEnvironment env) {
 		
-		EnviReader readEnviFile = env.readEnviFile(path);
+//		EnviReader readEnviFile = env.readEnviFile(path);
 //		readEnviFile.
 		
 		return null;
@@ -74,8 +73,8 @@ public class TileAccess {
 			}
 			dop = Integer.parseInt(arguments[0]);
 			
-			path = Integer.parseInt(arguments[1]);
-			row = Integer.parseInt(arguments[2]);
+//			path = Integer.parseInt(arguments[1]);
+//			row = Integer.parseInt(arguments[2]);
 			
 			double upperLat = Double.parseDouble(arguments[3]);
 			double upperLong = Double.parseDouble(arguments[4]);
