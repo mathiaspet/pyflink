@@ -36,7 +36,7 @@ public class Coordinate implements Serializable {
 		this.lon = Double.NaN;
 	}
 
-	public Coordinate(double lat, double lon) {
+	public Coordinate(double lon, double lat) {
 		this.lat = lat;
 		this.lon = lon;
 	}
@@ -81,6 +81,6 @@ public class Coordinate implements Serializable {
 	
 	@Override
 	public String toString() {
-		return "(" + this.lat + ", " + this.lon + ")";
+		return "(" + this.lon + ", " + this.lat + ")";
 	}
 }

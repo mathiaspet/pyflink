@@ -38,8 +38,11 @@ public class Tile implements Serializable {
 	 */
 	private short[] s16Tile = null;
 	
-	// Coordinates of left upper and right lower edge
+	// Coordinates of left upper and right lower edge (according to the map info)
 	private Coordinate luCord = null, rlCord = null;
+	
+	//x- and y-width of a pixel
+	private double xPixelWith = -1.0, yPixelWidth = -1.0;
 
 	private TileInfo tileInfo = null;
 	

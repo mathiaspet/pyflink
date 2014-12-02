@@ -18,6 +18,10 @@
 
 package org.apache.flink.api.java.io;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -120,6 +124,7 @@ public class EnviInputFormatTest {
 			"lines = 3\n" +
 			"data type = 2\n" +
 			"interleave=bsq\n" +
+			"map info = {South_America_Albers_Equal_Area_Conic, 1.0000, 1.0000, 430404.0572, 3120036.4653, 3.000000e+001, 3.000000e+001, South American 1969 mean, units=Meters}\n" +
 			"bands = 2\n" +
 			"data ignore value = -1\n" +
 			"upperleftcornerlatlong = {\n" +
@@ -190,7 +195,17 @@ public class EnviInputFormatTest {
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
 		eif.setTileSize(7, 3);
-		checkResult(eif, expectedDataBlocks1);
+		Coordinate[][] expectedCoords = new Coordinate[2][2];
+		Coordinate[] firstRow = new Coordinate[2];
+		Coordinate leftUpper1 = new Coordinate(430404.0572, 3120036.4653);
+		Coordinate rightLower1 = new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 + 2 * 30.0);
+		firstRow[0] = leftUpper1;
+		firstRow[1] = rightLower1;
+		//same coordinates since these are different bands
+		expectedCoords[0] = firstRow;
+		expectedCoords[1] = firstRow;
+		
+		checkResult(eif, expectedDataBlocks1, expectedCoords);
 	}
 	
 	@Test
@@ -199,7 +214,42 @@ public class EnviInputFormatTest {
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
 		eif.setTileSize(4, 2);
-		checkResult(eif, expectedSubBlocks1);
+		
+		Coordinate[][] expectedCoords = new Coordinate[8][2];
+		Coordinate[] firstRow = new Coordinate[2];
+		Coordinate leftUpper1 = new Coordinate(430404.0572, 3120036.4653);
+		Coordinate rightLower1 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 + 1 * 30.0);
+		firstRow[0] = leftUpper1;
+		firstRow[1] = rightLower1;
+		expectedCoords[0] = firstRow;
+		
+		Coordinate[] secondRow = new Coordinate[2];
+		Coordinate leftUpper2 = new Coordinate(430404.0572 + 4 * 30.0, 3120036.4653);
+		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 1 * 30.0);
+		secondRow[0] = leftUpper2;
+		secondRow[1] = rightLower2;
+		expectedCoords[1] = secondRow;
+		
+		Coordinate[] thirdRow = new Coordinate[2];
+		Coordinate leftUpper3 = new Coordinate(430404.0572, 3120036.4653 + 2 * 30.0);
+		Coordinate rightLower3 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 + 3 * 30.0);
+		thirdRow[0] = leftUpper3;
+		thirdRow[1] = rightLower3;
+		expectedCoords[2] = thirdRow;
+		
+		Coordinate[] fourthRow = new Coordinate[2];
+		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 + 2 * 30.0);
+		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 3 * 30.0);
+		fourthRow[0] = leftUpper4;
+		fourthRow[1] = rightLower4;
+		expectedCoords[3] = fourthRow;
+		
+		expectedCoords[4] = firstRow;
+		expectedCoords[5] = secondRow;
+		expectedCoords[6] = thirdRow;
+		expectedCoords[7] = fourthRow;
+		
+		checkResult(eif, expectedSubBlocks1, expectedCoords);
 	}
 
 	@Test
@@ -208,11 +258,33 @@ public class EnviInputFormatTest {
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
 		eif.setTileSize(4, 2);
-		eif.setLimitRectangle(new Coordinate(20, -54), new Coordinate(-8, -30));
-		checkResult(eif, expectedIntersectBlocks);
+		eif.setLimitRectangle(new Coordinate(430404.0572 + 5 * 30.0, 3120036.4653 + 1 * 30.0), 
+				new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 + 2 * 30.0));
+		
+		Coordinate[][] expectedCoords = new Coordinate[4][2];
+		
+		Coordinate[] secondRow = new Coordinate[2];
+		Coordinate leftUpper2 = new Coordinate(430404.0572 + 4 * 30.0, 3120036.4653);
+		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 1 * 30.0);
+		secondRow[0] = leftUpper2;
+		secondRow[1] = rightLower2;
+		expectedCoords[0] = secondRow;
+		
+		Coordinate[] fourthRow = new Coordinate[2];
+		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 + 2 * 30.0);
+		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 3 * 30.0);
+		fourthRow[0] = leftUpper4;
+		fourthRow[1] = rightLower4;
+		expectedCoords[1] = fourthRow;
+		
+		expectedCoords[2] = secondRow;
+		expectedCoords[3] = fourthRow;
+
+		
+		checkResult(eif, expectedIntersectBlocks, expectedCoords);
 	}
 
-	private void checkResult(EnviInputFormat<Tile> eif, short[][] result) throws IOException {
+	private void checkResult(EnviInputFormat<Tile> eif, short[][] result, Coordinate[][] expectedCoords) throws IOException {
 		EnviInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
 		Assert.assertEquals("Sub splits generated", result.length, splits.length);
 		int i = 0;
@@ -222,6 +294,10 @@ public class EnviInputFormatTest {
 			eif.nextRecord(tile);
 			eif.close();
 			Assert.assertArrayEquals(result[split.getSplitNumber()], tile.getS16Tile());
+			Coordinate leftUpper = expectedCoords[i][0];
+			assertThat(tile.getNWCoord(), is(equalTo(leftUpper)));
+			Coordinate rightLower = expectedCoords[i][1];
+			assertThat(tile.getSECoord(), is(equalTo(rightLower)));
 			Assert.assertEquals("Band is correct for split " + i, i >= result.length / 2 ? 1 : 0, tile.getBand());
 			i++;
 		}

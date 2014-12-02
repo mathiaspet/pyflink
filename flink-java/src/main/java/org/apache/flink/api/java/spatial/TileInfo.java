@@ -193,20 +193,39 @@ public class TileInfo implements Serializable {
 		return new Coordinate(lat, lon);
 	}
 
+	/**
+	 * Parse the header date given by this.info and compute the 
+	 * upper left coordinate given by map info.
+	 * @return a {@link Coordinate} yielding the geographical position of the upper left corner
+	 */
 	public Coordinate getUpperLeftCoordinate() {
-		String[] args = getStringArray("upperleftcornerlatlong");
-		if(args == null || args.length != 2) {
+		String[] args = getStringArray("map info");
+		//TODO: find out what the minimum number of map info elements is
+		if(args == null || args.length != 9) {
 			return null;
 		}
-		return parseCoordinate(args[0], args[1]);
+		return parseCoordinate(args[3], args[4]);
 	}
 
+	/**
+	 * Since map info does not have a lower right coordinate we calculate it 
+	 * by adding the number of pixels times the width/height of a pixel to 
+	 * get to easting/northing of the lower right corner.
+	 * TODO: cache this value
+	 *  
+	 * @return a {@link Coordinate} yielding the geographical position of the lower right corner
+	 */
 	public Coordinate getLowerRightCoordinate() {
-		String[] args = getStringArray("lowerrightcornerlatlong");
-		if(args == null || args.length != 2) {
-			return null;
-		}
-		return parseCoordinate(args[0], args[1]);
+		Coordinate upperLeft = getUpperLeftCoordinate();
+		int lines = getInteger("lines");
+		int samples = getInteger("samples");
+		double pixelWidth = getPixelWidth();
+		double pixelHeight = getPixelHeight();
+		
+		double lowerRightEasting = upperLeft.lon + (samples-1) * pixelWidth;
+		double lowerRightNorthing = upperLeft.lat + (lines-1) * pixelHeight;
+		
+		return new Coordinate(lowerRightEasting, lowerRightNorthing);
 	}
 
 	public String[] getStringArray(String name) {
@@ -258,6 +277,20 @@ public class TileInfo implements Serializable {
 	}
 	
 	/**
+	 * TODO: fix for different coordinate systems.
+	 * @return
+	 */
+	public Coordinate getMapInfoUpperLeft() {
+		String[] mapInfo = getStringArray("map info");
+		
+		String northing = mapInfo[3];
+		String easting = mapInfo[4];
+		
+		
+		return new Coordinate(Double.parseDouble(northing), Double.parseDouble(easting));
+	}
+	
+	/**
 	 * Return the size of each pixel in bytes.
 	 */
 	public int getPixelSize() {
@@ -276,5 +309,16 @@ public class TileInfo implements Serializable {
 		default:
 			throw new RuntimeException("Unsupported data format: " + getDataType());
 		}
+	}
+
+	public double getPixelWidth() {
+		String witdh = getStringArray("map info")[5];
+		
+		return Double.parseDouble(witdh);
+	}
+
+	public double getPixelHeight() {
+		String height = getStringArray("map info")[6];
+		return Double.parseDouble(height);
 	}	
 }

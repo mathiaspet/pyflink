@@ -53,6 +53,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private int xsize = -1, ysize = -1;
 	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
 	
+	private double pixelWidth = -1.0, pixelHeight = -1.0;
+	
 	private TileInfo info;
 	private EnviTilePosition pos;
 	
@@ -97,6 +99,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			int numBands = info.getNumBands();
 			int numRows = info.getPixelRows();
 			int numColumns = info.getPixelColumns();
+			this.pixelHeight = info.getPixelHeight();
+			this.pixelWidth = info.getPixelWidth();
+			
+			
 			/*
 			 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 			 *  pixels.
@@ -118,24 +124,23 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 			for(int band = 0; band < numBands; band++) {
 				long bandOffset = band * numRows * numColumns;
-				for(int y = 0; y < ysplits; y++) {
+				for(int currentYSplit = 0; currentYSplit < ysplits; currentYSplit++) {
 					// Calculate pixel coordinate of tile:
-					int pystart = y *  ysize; // inclusive
-					int pynext = (y + 1) *  ysize; // EXCLUSIVE
+					int pystart = currentYSplit *  ysize; // inclusive
+					int pynext = (currentYSplit + 1) *  ysize; // EXCLUSIVE
 	
-					for(int x = 0; x < xsplits; x++) {
+					for(int currentXSplit = 0; currentXSplit < xsplits; currentXSplit++) {
 						// Calculate pixel coordinate of tile:
-						int pxstart = x *  xsize; // inclusive
-						int pxnext = ((x + 1) % xsplits) *  xsize; // EXCLUSIVE
-						int pxnextNoWrapped = (x + 1) *  xsize; // EXCLUSIVE
+						int pxstart = currentXSplit *  xsize; // inclusive
+						int pxnext = ((currentXSplit + 1) % xsplits) *  xsize; // EXCLUSIVE
+						int pxnextNoWrapped = (currentXSplit + 1) *  xsize; // EXCLUSIVE
 						
-						// Calculate coordinate of leftmost and rightmost pixels
-						Coordinate tileUpperLeft = upperLeftCorner.addScaled(diff, y, x);
-						Coordinate tileLowerRight = upperLeftCorner.addScaled(diff, y + 1, x + 1);
+						Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat + currentYSplit * ysize * pixelHeight);
+						Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat + (ysize-1) * pixelHeight);
 						
 						// Filter this tile if no pixel is contained in the selected region:
 						if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
-							if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + x + "x" + y + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); } 
+							if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); } 
 							continue;
 						}
 						
@@ -149,7 +154,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						long nextStartPos = bandOffset + 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
 						long numPixels = nextStartPos - startPos;
 						
-						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + x + "x" + y + " startPos: " + startPos +" next: " + nextStartPos); }
+						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " startPos: " + startPos +" next: " + nextStartPos); }
 						
 						long offset = startPos * data_size;
 						long length = numPixels * data_size;
@@ -158,7 +163,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 							length = dataFileStatus.getLen() - offset;
 						}
 						
-						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + x + "x" + y + " at offset " + offset +" +" + length + " bytes"); }
+						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " at offset " + offset +" +" + length + " bytes"); }
 						// Determine list of FS blocks that contain the given block
 						final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
 						Arrays.sort(blocks);
@@ -380,7 +385,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		
 		//LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
 		
-		// Fill pixel array pixel by pixel (please optimise this!):
+		// Fill pixel array pixel by pixel (please optimize this!):
 		int pos = 0;
 		for(int y = 0; y < yread; y++) {
 			// Seek to the beginning of the current line of real data:
@@ -456,4 +461,5 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		this.xsize = xpixels;
 		this.ysize = ypixels;
 	}
+
 }
