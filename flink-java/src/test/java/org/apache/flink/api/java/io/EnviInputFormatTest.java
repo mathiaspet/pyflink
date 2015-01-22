@@ -125,6 +125,8 @@ public class EnviInputFormatTest {
 			"data type = 2\n" +
 			"interleave=bsq\n" +
 			"map info = {South_America_Albers_Equal_Area_Conic, 1.0000, 1.0000, 430404.0572, 3120036.4653, 3.000000e+001, 3.000000e+001, South American 1969 mean, units=Meters}\n" +
+			"projection info = {9, 6378160.0, 6356774.7, -32.000000, -60.000000, 0.0, 0.0, -5.000000, -42.000000, South American 1969 mean, South_America_Albers_Equal_Area_Conic, units=Meters}\n" +  
+			"coordinate system string = {PROJCS[\"South_America_Albers_Equal_Area_Conic\",GEOGCS[\"GCS_South_American_1969\",DATUM[\"D_South_American_1969\",SPHEROID[\"GRS_1967_Truncated\",6378160.0,298.25]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Albers\"],PARAMETER[\"False_Easting\",0.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"central_meridian\",-60.0],PARAMETER[\"Standard_Parallel_1\",-5.0],PARAMETER[\"Standard_Parallel_2\",-42.0],PARAMETER[\"latitude_of_origin\",-32.0],UNIT[\"Meter\",1.0]]}\n" + 
 			"bands = 2\n" +
 			"data ignore value = -1\n" +
 			"upperleftcornerlatlong = {\n" +
@@ -169,7 +171,7 @@ public class EnviInputFormatTest {
 	}
 	
 	Path prepareInput(byte[] data, String header) throws IOException {
-		String name = "blob";
+		String name = "227064_00020212_blob";
 
 		// create temporary file with 3 blocks
 		if(tempDir == null) {
@@ -198,7 +200,7 @@ public class EnviInputFormatTest {
 		Coordinate[][] expectedCoords = new Coordinate[2][2];
 		Coordinate[] firstRow = new Coordinate[2];
 		Coordinate leftUpper1 = new Coordinate(430404.0572, 3120036.4653);
-		Coordinate rightLower1 = new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 + 2 * 30.0);
+		Coordinate rightLower1 = new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 - 2 * 30.0);
 		firstRow[0] = leftUpper1;
 		firstRow[1] = rightLower1;
 		//same coordinates since these are different bands
@@ -218,28 +220,28 @@ public class EnviInputFormatTest {
 		Coordinate[][] expectedCoords = new Coordinate[8][2];
 		Coordinate[] firstRow = new Coordinate[2];
 		Coordinate leftUpper1 = new Coordinate(430404.0572, 3120036.4653);
-		Coordinate rightLower1 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 + 1 * 30.0);
+		Coordinate rightLower1 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 - 1 * 30.0);
 		firstRow[0] = leftUpper1;
 		firstRow[1] = rightLower1;
 		expectedCoords[0] = firstRow;
 		
 		Coordinate[] secondRow = new Coordinate[2];
 		Coordinate leftUpper2 = new Coordinate(430404.0572 + 4 * 30.0, 3120036.4653);
-		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 1 * 30.0);
+		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 - 1 * 30.0);
 		secondRow[0] = leftUpper2;
 		secondRow[1] = rightLower2;
 		expectedCoords[1] = secondRow;
 		
 		Coordinate[] thirdRow = new Coordinate[2];
-		Coordinate leftUpper3 = new Coordinate(430404.0572, 3120036.4653 + 2 * 30.0);
-		Coordinate rightLower3 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 + 3 * 30.0);
+		Coordinate leftUpper3 = new Coordinate(430404.0572, 3120036.4653 - 2 * 30.0);
+		Coordinate rightLower3 = new Coordinate(430404.0572 + 3 * 30.0, 3120036.4653 - 3 * 30.0);
 		thirdRow[0] = leftUpper3;
 		thirdRow[1] = rightLower3;
 		expectedCoords[2] = thirdRow;
 		
 		Coordinate[] fourthRow = new Coordinate[2];
-		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 + 2 * 30.0);
-		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 3 * 30.0);
+		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 - 2 * 30.0);
+		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 - 3 * 30.0);
 		fourthRow[0] = leftUpper4;
 		fourthRow[1] = rightLower4;
 		expectedCoords[3] = fourthRow;
@@ -258,21 +260,21 @@ public class EnviInputFormatTest {
 		
 		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
 		eif.setTileSize(4, 2);
-		eif.setLimitRectangle(new Coordinate(430404.0572 + 5 * 30.0, 3120036.4653 + 1 * 30.0), 
-				new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 + 2 * 30.0));
+		eif.setLimitRectangle(new Coordinate(430404.0572 + 5 * 30.0, 3120036.4653 - 1 * 30.0), 
+				new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 - 2 * 30.0));
 		
 		Coordinate[][] expectedCoords = new Coordinate[4][2];
 		
 		Coordinate[] secondRow = new Coordinate[2];
 		Coordinate leftUpper2 = new Coordinate(430404.0572 + 4 * 30.0, 3120036.4653);
-		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 1 * 30.0);
+		Coordinate rightLower2 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 - 1 * 30.0);
 		secondRow[0] = leftUpper2;
 		secondRow[1] = rightLower2;
 		expectedCoords[0] = secondRow;
 		
 		Coordinate[] fourthRow = new Coordinate[2];
-		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 + 2 * 30.0);
-		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 + 3 * 30.0);
+		Coordinate leftUpper4 = new Coordinate(430404.0572  + 4 * 30.0, 3120036.4653 - 2 * 30.0);
+		Coordinate rightLower4 = new Coordinate(430404.0572 + 7 * 30.0, 3120036.4653 - 3 * 30.0);
 		fourthRow[0] = leftUpper4;
 		fourthRow[1] = rightLower4;
 		expectedCoords[1] = fourthRow;
@@ -293,6 +295,7 @@ public class EnviInputFormatTest {
 			Tile tile = new Tile();
 			eif.nextRecord(tile);
 			eif.close();
+			
 			Assert.assertArrayEquals(result[split.getSplitNumber()], tile.getS16Tile());
 			Coordinate leftUpper = expectedCoords[i][0];
 			assertThat(tile.getNWCoord(), is(equalTo(leftUpper)));

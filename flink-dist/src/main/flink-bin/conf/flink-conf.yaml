@@ -29,7 +29,7 @@ jobmanager.heap.mb: 256
 
 taskmanager.heap.mb: 512
 
-taskmanager.numberOfTaskSlots: -1
+taskmanager.numberOfTaskSlots: 4 
 
 parallelization.degree.default: 1
 

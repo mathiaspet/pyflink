@@ -38,6 +38,7 @@ import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.functions.SelectByMaxFunction;
 import org.apache.flink.api.java.functions.SelectByMinFunction;
 import org.apache.flink.api.java.io.CsvOutputFormat;
+import org.apache.flink.api.java.io.EnviOutputFormat;
 import org.apache.flink.api.java.io.PrintingOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat.TextFormatter;
@@ -1132,6 +1133,18 @@ public abstract class DataSet<T> {
 			of.setWriteMode(wm);
 		}
 		return output((OutputFormat<T>) of);
+	}
+	
+	/**
+	 * TODO: additional config params
+	 * @param filePath
+	 * @return
+	 */
+	public DataSink<T> writeAsEnvi(String filePath, WriteMode writeMode) {
+		EnviOutputFormat enviOutputFormat = new EnviOutputFormat(new Path(filePath));
+		enviOutputFormat.setWriteMode(writeMode);
+		
+		return output((OutputFormat<T>) enviOutputFormat);
 	}
 	
 	/**

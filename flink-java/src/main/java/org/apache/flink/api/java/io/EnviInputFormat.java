@@ -20,6 +20,8 @@ package org.apache.flink.api.java.io;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -37,6 +39,8 @@ import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
 
 /**
@@ -68,22 +72,23 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	public FileInputSplit[] createInputSplits(int minNumSplits) throws IOException {
 		List<FileStatus> files = this.getFiles();
 		final FileSystem fs = this.filePath.getFileSystem();
-
+		
 		if(minNumSplits < 1) { minNumSplits = 1; }
 		
 		final List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(minNumSplits);
 		for (FileStatus file : files) {
 			// Read header file:
 			FSDataInputStream fdis = fs.open(file.getPath());
-			TileInfo info = new TileInfo(fdis);
+			try{
+				TileInfo info = new TileInfo(fdis);
 			fdis.close();
 
 			// Determine data file associated with this header:
-			String interleaveType = info.getInterleaveType();
-			if(!interleaveType.equals("bsq")) {
+			int interleaveType = info.getInterleave();
+			if(interleaveType != 0) {
 				throw new RuntimeException("Interleave type " + interleaveType + " unsupported, use bsq.");
 			}
-			Path dataFile = new Path(file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + interleaveType));
+			Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + TileInfo.InterleaveTypes.values()[interleaveType]));
 			FileStatus dataFileStatus;
 			try {
 				dataFileStatus = fs.getFileStatus(dataFile);
@@ -96,13 +101,17 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						+ " File: " + file.getPath());
 			}
 			int data_size = info.getPixelSize();
-			int numBands = info.getNumBands();
-			int numRows = info.getPixelRows();
-			int numColumns = info.getPixelColumns();
+			int numBands = info.getBands();
+			int numRows = info.getLines();
+			int numColumns = info.getSamples();
 			this.pixelHeight = info.getPixelHeight();
 			this.pixelWidth = info.getPixelWidth();
-			
-			
+			String filePath = file.getPath().toString();
+			int lastIndexOf = filePath.lastIndexOf("/");
+			filePath = filePath.substring(lastIndexOf + 1);
+			String[] split = filePath.split("_");
+			String pathRow = split[0];
+			String aqcDate = split[1];
 			/*
 			 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 			 *  pixels.
@@ -112,11 +121,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			
 			// Real coordinates of this image + coordinate differences:
 			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
-			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
-			Coordinate realDiff = realLowerRightCorner.diff(upperLeftCorner);
+//			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
+//			Coordinate realDiff = realLowerRightCorner.diff(upperLeftCorner);
 			// Distance between upper left corner and virtual lower right corner of the last tile, including empty pixels:
-			Coordinate diff = realDiff.scale(1.0 * xsize / info.getPixelColumns(),
-					1.0 * ysize / info.getPixelRows());
+//			Coordinate diff = realDiff.scale(1.0 * xsize / info.getSamples(),
+//					1.0 * ysize / info.getLines());
 
 			
 			LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
@@ -135,8 +144,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						int pxnext = ((currentXSplit + 1) % xsplits) *  xsize; // EXCLUSIVE
 						int pxnextNoWrapped = (currentXSplit + 1) *  xsize; // EXCLUSIVE
 						
-						Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat + currentYSplit * ysize * pixelHeight);
-						Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat + (ysize-1) * pixelHeight);
+						Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat - currentYSplit * ysize * pixelHeight);
+						Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
 						
 						// Filter this tile if no pixel is contained in the selected region:
 						if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
@@ -170,10 +179,16 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 						
 						inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
 								blocks[0].getHosts(), info, 
-								new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight)));
+								new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, aqcDate)));
 					}
 				}
 			}
+			
+			}catch (RuntimeException ex) {
+				LOG.warn(ex.getMessage(), ex);
+				continue;
+			}
+			
 		}
 
 		if (inputSplits.size() < minNumSplits) {
@@ -306,11 +321,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			fdis.close();
 	
 			// Calculate the number of splits, as done above:
-			int xsplits = (info.getPixelColumns() + xsize - 1) / xsize;
-			int ysplits = (info.getPixelRows() + ysize - 1) / ysize;
+			int xsplits = (info.getSamples() + xsize - 1) / xsize;
+			int ysplits = (info.getLines() + ysize - 1) / ysize;
 			
 			// Count the tiles and calculate the size of each tile in bytes (virtual size):
-			int tileCount = xsplits * ysplits * info.getNumBands();
+			int tileCount = xsplits * ysplits * info.getBands();
 			totalCount += tileCount;
 			totalWidth += 1L * info.getPixelSize() * tileCount * xsize * ysize;
 		}
@@ -368,45 +383,57 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		 * Determine how may pixels to read from the file.
 		 * All remaining pixels are filled with missing values
 		 */
-		int lineWidth = this.info.getPixelColumns();
+		int lineWidth = this.info.getSamples();
+		double pixelWidth = this.info.getPixelWidth();
+		double pixelHeight = this.info.getPixelHeight();
 		int xread = lineWidth - this.pos.xstart;
 		if(xread > xsize) { xread = xsize; }
-		int yread = this.info.getPixelRows() - this.pos.ystart;
+		int yread = this.info.getLines() - this.pos.ystart;
 		if(yread > ysize) { yread = ysize; }
 		
-		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band);
+		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			values = new short[xsize * ysize];
 			record.setS16Tile(values);
 		}
-		short missingData = (short) info.getMissingValue();
+		short dataIgnoreValue = (short) info.getDataIgnoreValue();
 		int data_size = info.getPixelSize();
-		
-		//LOG.info("Reading " + xread + "x" + yread + " pixels from file into " + xsize + "x" + ysize + " tile");
 		
 		// Fill pixel array pixel by pixel (please optimize this!):
 		int pos = 0;
+		
+		byte[] buffer = new byte[xread * 2];
+		short[] shortBuffer = new short[xread];
+		
 		for(int y = 0; y < yread; y++) {
 			// Seek to the beginning of the current line of real data:
 			stream.seek(y * lineWidth * data_size + this.splitStart);
 			// Fill in pixels (little endian):
-			for(int x = 0; x < xread; x++) {
-				int b0 = stream.read();
-				int b1 = stream.read();
-				short val = (short)(b0 | (b1 << 8));
-				values[pos++] = val;
+//			for(int x = 0; x < xread; x++) {
+//				int b0 = stream.read();
+//				int b1 = stream.read();
+//				short val = (short)(b0 | (b1 << 8));
+//				values[pos++] = val;
+//			}
+//			
+			int read = stream.read(buffer);
+			if(read < xread) {
+				LOG.warn("Should've read " + xread + " pixel, but read only " + read);
 			}
+			ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shortBuffer);
+			System.arraycopy(shortBuffer, 0, values, pos, xread);
+			pos = pos + xread;
+			
 			// Fill with empty columns:
 			for(int x = xread; x < xsize; x++) {
-				values[pos++] = missingData;
+				values[pos++] = dataIgnoreValue;
 			}
 		}
 		// Fill missing rows with empty data:
 		while(pos < values.length) {
-			values[pos++] = missingData;
+			values[pos++] = dataIgnoreValue;
 		}
-
 		return record;
 	}
 	
@@ -416,8 +443,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		public final int xstart, xnext;
 		public final int ystart, ynext;
 		public final Coordinate leftUpperCorner, rightLowerCorner;
+		public final String pathRow;
+		public final String aqcDate;
 		
-		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner) {
+		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
 			this.band = band;
 			this.xstart = xstart;
 			this.xnext = xnext;
@@ -425,6 +454,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			this.ynext = ynext;
 			this.leftUpperCorner = leftUpperCorner;
 			this.rightLowerCorner = rightLowerCorner;
+			this.pathRow = pathRow;
+			this.aqcDate = aqcDate;
 		}
 		
 		@Override
@@ -435,8 +466,8 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 	public static final class EnviInputSplit extends FileInputSplit {
 		private static final long serialVersionUID = -9205048860784884871L;
-		public final TileInfo info;
-		public final EnviTilePosition pos;
+		public TileInfo info;
+		public EnviTilePosition pos;
 
 		public EnviInputSplit() {
 			super();
@@ -448,6 +479,44 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			super(num, file, start, length, hosts);
 			this.info = info;
 			this.pos = pos;
+		}
+		
+		@Override
+		public void read(DataInputView in) throws IOException {
+			this.info = new TileInfo();
+			this.info.deserialize(in);
+			
+			String aqcDate = in.readUTF();
+			int band = in.readInt();
+			Coordinate leftUpper = new Coordinate();
+			leftUpper.deserialize(in);
+			String pathRow = in.readUTF();
+			Coordinate rightLower = new Coordinate();
+			rightLower.deserialize(in);
+			int xnext = in.readInt();
+			int xstart = in.readInt();
+			int ynext = in.readInt();
+			int ystart = in.readInt();
+			this.pos = new EnviTilePosition(band, xstart, xnext, ystart, ynext, leftUpper, rightLower, pathRow, aqcDate);
+			
+			super.read(in);
+		}
+		
+		@Override
+		public void write(DataOutputView out) throws IOException {
+			this.info.serialize(out);
+			
+			out.writeUTF(this.pos.aqcDate);
+			out.writeInt(this.pos.band);
+			this.pos.leftUpperCorner.serialize(out);
+			out.writeUTF(this.pos.pathRow);
+			this.pos.rightLowerCorner.serialize(out);
+			out.writeInt(this.pos.xnext);
+			out.writeInt(this.pos.xstart);
+			out.writeInt(this.pos.ynext);
+			out.writeInt(this.pos.ystart);
+			
+			super.write(out);
 		}
 	}
 

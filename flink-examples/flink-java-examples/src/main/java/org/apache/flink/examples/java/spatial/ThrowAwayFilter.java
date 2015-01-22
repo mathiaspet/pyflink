@@ -15,19 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.api.java.spatial;
+package org.apache.flink.examples.java.spatial;
 
-import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.java.spatial.Tile;
 
-/**
- * Extracts the aquisition time for a {@link Tile} and returns it as 
- * timestamp.
- * 
- * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
- *
- * @param <Key>
- */
-public class TileTimeKeySelector<Key> implements KeySelector<Tile, Long>{
+public class ThrowAwayFilter implements FilterFunction<Tile> {
 
 	/**
 	 * 
@@ -35,8 +28,9 @@ public class TileTimeKeySelector<Key> implements KeySelector<Tile, Long>{
 	private static final long serialVersionUID = 1L;
 
 	@Override
-	public Long getKey(Tile value) throws Exception {
-		return value.getAqcuisitionDateAsLong();
+	public boolean filter(Tile value) throws Exception {
+		// TODO Auto-generated method stub
+		return false;
 	}
 
 }

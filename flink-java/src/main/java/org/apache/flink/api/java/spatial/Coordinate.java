@@ -17,7 +17,11 @@
  */
 package org.apache.flink.api.java.spatial;
 
+import java.io.IOException;
 import java.io.Serializable;
+
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataOutputView;
 
 /**
  * A representation of a 2-dimensional coordinate.
@@ -28,8 +32,9 @@ import java.io.Serializable;
 public class Coordinate implements Serializable {
 	private static final long serialVersionUID = -6428372453643359884L;
 
-	public final double lat;
-	public final double lon;
+	//TODO: figure out de-/serialization and make lat an dlon final again
+	public double lat;
+	public double lon;
 
 	public Coordinate() {
 		this.lat = Double.NaN;
@@ -39,6 +44,11 @@ public class Coordinate implements Serializable {
 	public Coordinate(double lon, double lat) {
 		this.lat = lat;
 		this.lon = lon;
+	}
+	
+	public Coordinate(Coordinate copy) {
+		this.lon = copy.lon;
+		this.lat = copy.lat;
 	}
 
 	@Override
@@ -82,5 +92,19 @@ public class Coordinate implements Serializable {
 	@Override
 	public String toString() {
 		return "(" + this.lon + ", " + this.lat + ")";
+	}
+
+	public Coordinate copy() {
+		return new Coordinate(this.lon, this.lat);
+	}
+
+	public void serialize(DataOutputView target) throws IOException {
+		target.writeDouble(this.lon);
+		target.writeDouble(this.lat);
+	}
+	
+	public void deserialize(DataInputView source) throws IOException {
+		this.lon = source.readDouble();
+		this.lat = source.readDouble();
 	}
 }

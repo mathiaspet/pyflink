@@ -17,26 +17,49 @@
  */
 package org.apache.flink.api.java.spatial;
 
-import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 
 /**
- * Extracts the aquisition time for a {@link Tile} and returns it as 
- * timestamp.
  * 
- * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
- *
- * @param <Key>
+ * Type information for the {@link Tile} API.
+ * 
  */
-public class TileTimeKeySelector<Key> implements KeySelector<Tile, Long>{
-
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
+public class TileTypeInformation extends TypeInformation<Tile> {
 
 	@Override
-	public Long getKey(Tile value) throws Exception {
-		return value.getAqcuisitionDateAsLong();
+	public boolean isBasicType() {
+		return false;
+	}
+
+	@Override
+	public boolean isTupleType() {
+		return false;
+	}
+
+	@Override
+	public int getArity() {
+		return 1;
+	}
+
+	@Override
+	public Class<Tile> getTypeClass() {
+		return Tile.class;
+	}
+
+	@Override
+	public boolean isKeyType() {
+		return false;
+	}
+
+	@Override
+	public TypeSerializer<Tile> createSerializer() {
+		return TileTypeSerializer.get();
+	}
+
+	@Override
+	public int getTotalFields() {
+		return 11;
 	}
 
 }

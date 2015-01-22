@@ -87,21 +87,17 @@ public class TileInfoTest {
 	@Test
 	public void testParseHeader() {
 		TileInfo info = new TileInfo(testHeader);
-		Assert.assertEquals("String property", "ENVI Standard", info.getString("file type"));
-		Assert.assertEquals("Integer property", 8002, info.getPixelColumns());
-		Assert.assertEquals("Image dimensions", 7232, info.getPixelRows());
-		Assert.assertEquals("Data ignore value", -9999, info.getMissingValue());
-		Assert.assertEquals("Interleave type", "bsq", info.getInterleaveType());
-		Assert.assertEquals("Coordinate construction",
-				new Coordinate(-4.829621, -56.076667),
-				info.getCoordinate("northboundingcoordinate", "westboundingcoordinate"));
+		Assert.assertEquals("Integer property", 8002, info.getSamples());
+		Assert.assertEquals("Image dimensions", 7232, info.getLines());
+		Assert.assertEquals("Data ignore value", -9999, info.getDataIgnoreValue());
+		Assert.assertEquals("Interleave type", 0, info.getInterleave());
 		Assert.assertEquals("named coordinates as pairs", new Coordinate(430404.0572, 3120036.4653), info.getUpperLeftCoordinate());
 		Assert.assertEquals("data type", TileInfo.DataTypes.INT, info.getDataType());
-		Assert.assertEquals("number of bands", 6, info.getNumBands());
+		Assert.assertEquals("number of bands", 6, info.getBands());
 
 		Coordinate upperLeftMapInfo = info.getMapInfoUpperLeft();
-		MatcherAssert.assertThat(upperLeftMapInfo.lat, Matchers.is(Matchers.equalTo(430404.0572)));
-		MatcherAssert.assertThat(upperLeftMapInfo.lon, Matchers.is(Matchers.equalTo(3120036.4653)));
+		MatcherAssert.assertThat(upperLeftMapInfo.lon, Matchers.is(Matchers.equalTo(430404.0572)));
+		MatcherAssert.assertThat(upperLeftMapInfo.lat, Matchers.is(Matchers.equalTo(3120036.4653)));
 		
 	}
 }

@@ -24,6 +24,7 @@ import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.spatial.TileTypeInformation;
 import org.apache.flink.core.fs.Path;
 
 /**
@@ -94,6 +95,6 @@ public class EnviReader {
 	public DataSource<Tile> build() {
 		EnviInputFormat<Tile> inputFormat = new EnviInputFormat<Tile>(path);
 		configureInputFormat(inputFormat);
-		return new DataSource<Tile>(executionContext, inputFormat, null, Utils.getCallLocationName());
+		return new DataSource<Tile>(executionContext, inputFormat, new TileTypeInformation(), Utils.getCallLocationName());
 	}
 }
