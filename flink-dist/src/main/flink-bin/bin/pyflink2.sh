@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 ################################################################################
 #  Licensed to the Apache Software Foundation (ASF) under one
 #  or more contributor license agreements.  See the NOTICE file
@@ -20,36 +20,6 @@
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-# get flink config
 . "$bin"/config.sh
 
-if [ "$FLINK_IDENT_STRING" = "" ]; then
-        FLINK_IDENT_STRING="$USER"
-fi
-
-
-# auxiliary function to construct a lightweight classpath for the
-# Flink CLI client
-constructCLIClientClassPath() {
-
-	for jarfile in $FLINK_LIB_DIR/*.jar ; do
-		if [[ $CC_CLASSPATH = "" ]]; then
-			CC_CLASSPATH=$jarfile;
-		else
-			CC_CLASSPATH=$CC_CLASSPATH:$jarfile
-		fi
-	done
-
-	echo $CC_CLASSPATH
-}
-
-CC_CLASSPATH=`manglePathList $(constructCLIClientClassPath)`
-
-log=$FLINK_LOG_DIR/flink-$FLINK_IDENT_STRING-flink-client-$HOSTNAME.log
-log_setting="-Dlog.file="$log" -Dlog4j.configuration=file:"$FLINK_CONF_DIR"/log4j-cli.properties -Dlogback.configurationFile=file:"$FLINK_CONF_DIR"/logback.xml"
-
-export FLINK_ROOT_DIR
-export FLINK_CONF_DIR
-
-# Add HADOOP_CLASSPATH to allow the usage of Hadoop file systems
-$JAVA_RUN $JVM_ARGS $log_setting -classpath $CC_CLASSPATH:$INTERNAL_HADOOP_CLASSPATHS org.apache.flink.client.CliFrontend $*
+"$FLINK_BIN_DIR"/flink run -v "$FLINK_ROOT_DIR"/lib/flink-python-0.9-SNAPSHOT.jar "2" "$@"
