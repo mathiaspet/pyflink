@@ -13,25 +13,41 @@
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
-# limitations under the License.
+#  limitations under the License.
 ################################################################################
 from flink.functions import Function
+from flink.utilities import concat
 
 
-class JoinFunction(Function.Function):
-    def __init__(self):
-        super(JoinFunction, self).__init__()
-        self._discard_key1 = False
-        self._discard_key2 = False
+class KeySelectorFunction(Function.Function):
+    def __init__(self, pair=True):
+        super(KeySelectorFunction, self).__init__()
+        self._pair = pair
+
+    def _configure(self, input_file, output_file, port):
+        super(KeySelectorFunction, self)._configure(input_file, output_file, port)
+        if not self._pair:
+            self._run = self._run_append
+            self.collect = self._collect_append
 
     def _run(self):
         collector = self._collector
-        function = self.join
-        discard1 = self._discard_key1
-        discard2 = self._discard_key2
         for value in self._iterator:
-            collector.collect(function(value[0][1] if discard1 else value[0], value[1][1] if discard2 else value[1]))
+            collector.collect((self.get_key(value), value))
         collector._close()
 
-    def join(self, value1, value2):
+    def _run_append(self):
+        collector = self._collector
+        for value in self._iterator:
+            collector.collect(concat(self.get_key(value), value))
+        collector._close()
+
+    def collect(self, value):
+        self._collector.collect((self.get_key(value), value))
+
+    def _collect_append(self, value):
+        self._collector.collect(concat(self.get_key(value), value))
+
+
+    def get_key(self, value):
         pass

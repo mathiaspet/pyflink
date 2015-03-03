@@ -17,6 +17,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.HashMap;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
@@ -25,6 +27,8 @@ import org.apache.flink.api.java.operators.CoGroupRawOperator;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import static org.apache.flink.api.java.typeutils.TypeExtractor.getForObject;
 import org.apache.flink.configuration.GlobalConfiguration;
 import org.apache.flink.core.fs.FileSystem;
@@ -245,6 +249,8 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 		protected boolean combine;
 		protected byte[] combineOperator;
 		protected String name;
+		protected boolean discard1;
+		protected boolean discard2;
 
 		@Override
 		public String toString() {
@@ -258,9 +264,11 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 			sb.append("Types: ").append(types).append("\n");
 			sb.append("Combine: ").append(combine).append("\n");
 			sb.append("CombineOP: ").append(combineOperator == null ? null : "<combineop>").append("\n");
-			sb.append("Keys1: ").append(Arrays.toString(keys1)).append("\n");
-			sb.append("Keys2: ").append(Arrays.toString(keys2)).append("\n");
+			sb.append("Keys1: ").append(keys1).append("\n");
+			sb.append("Keys2: ").append(keys2).append("\n");
 			sb.append("Projections: ").append(Arrays.toString(projections)).append("\n");
+			sb.append("Discard1: ").append(discard1).append("\n");
+			sb.append("Discard2: ").append(discard2).append("\n");
 			return sb.toString();
 		}
 
@@ -271,8 +279,8 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 			switch (identifier) {
 				case COGROUP:
 					otherID = (Integer) receiver.getRecord(true);
-					keys1 = tupleToIntArray((Tuple) receiver.getRecord(true));
-					keys2 = tupleToIntArray((Tuple) receiver.getRecord(true));
+					keys1 = normalizeKeys(receiver.getRecord(true));
+					keys2 = normalizeKeys(receiver.getRecord(true));
 					operator = (byte[]) receiver.getRecord();
 					meta = (String) receiver.getRecord();
 					tmpType = receiver.getRecord();
@@ -291,7 +299,7 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 					projections = new ProjectionEntry[cProjectCount];
 					for (int x = 0; x < cProjectCount; x++) {
 						String side = (String) receiver.getRecord();
-						int[] keys = tupleToIntArray((Tuple) receiver.getRecord(true));
+						int[] keys = toIntArray((Tuple) receiver.getRecord(true));
 						projections[x] = new ProjectionEntry(ProjectionSide.valueOf(side.toUpperCase()), keys);
 					}
 					name = (String) receiver.getRecord();
@@ -309,18 +317,20 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 				case JOIN:
 				case JOIN_H:
 				case JOIN_T:
-					keys1 = tupleToIntArray((Tuple) receiver.getRecord(true));
-					keys2 = tupleToIntArray((Tuple) receiver.getRecord(true));
+					keys1 = normalizeKeys(receiver.getRecord(true));
+					keys2 = normalizeKeys(receiver.getRecord(true));
 					otherID = (Integer) receiver.getRecord(true);
 					operator = (byte[]) receiver.getRecord();
 					meta = (String) receiver.getRecord();
 					tmpType = receiver.getRecord();
 					types = tmpType == null ? null : getForObject(tmpType);
+					discard1 = (Boolean) receiver.getRecord();
+					discard2 = (Boolean) receiver.getRecord();
 					int jProjectCount = (Integer) receiver.getRecord(true);
 					projections = new ProjectionEntry[jProjectCount];
 					for (int x = 0; x < jProjectCount; x++) {
 						String side = (String) receiver.getRecord();
-						int[] keys = tupleToIntArray((Tuple) receiver.getRecord(true));
+						int[] keys = toIntArray((Tuple) receiver.getRecord(true));
 						projections[x] = new ProjectionEntry(ProjectionSide.valueOf(side.toUpperCase()), keys);
 					}
 					name = (String) receiver.getRecord();
@@ -347,7 +357,7 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 	}
 
 	@Override
-	protected DataSet applyCoGroupOperation(DataSet op1, DataSet op2, int[] firstKeys, int[] secondKeys, PythonOperationInfo info) {
+	protected DataSet applyCoGroupOperation(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, PythonOperationInfo info) {
 		return new CoGroupRawOperator(
 				op1,
 				op2,
@@ -430,19 +440,39 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 	}
 
 	@Override
-	protected DataSet applyJoinOperation(DataSet op1, DataSet op2, int[] firstKeys, int[] secondKeys, DatasizeHint mode, PythonOperationInfo info) {
-		switch (mode) {
-			case NONE:
-				return op1.join(op2).where(firstKeys).equalTo(secondKeys).name("PythonJoinPreStep")
-						.mapPartition(new PythonMapPartition(info.setID, info.operator, info.types, info.meta)).name(info.name);
-			case HUGE:
-				return op1.joinWithHuge(op2).where(firstKeys).equalTo(secondKeys).name("PythonJoinPreStep")
-						.mapPartition(new PythonMapPartition(info.setID, info.operator, info.types, info.meta)).name(info.name);
-			case TINY:
-				return op1.joinWithTiny(op2).where(firstKeys).equalTo(secondKeys).name("PythonJoinPreStep")
-						.mapPartition(new PythonMapPartition(info.setID, info.operator, info.types, info.meta)).name(info.name);
-			default:
-				throw new IllegalArgumentException("Invalid join mode specified.");
+	protected DataSet applyJoinOperation(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, DatasizeHint mode, PythonOperationInfo info) {
+		if (info.operator == null) { //default-Join
+			if (info.discard1 || info.discard2) { //with key-selector
+				return createDefaultJoin(op1, op2, firstKeys, secondKeys, mode, info).name("DefaultJoin")
+						.map(new DefaultJoinKeyDiscarder(info.discard1, info.discard2, info.types)).name("DefaultJoinPostStep");
+			} else { //without key-selector
+				return createDefaultJoin(op1, op2, firstKeys, secondKeys, mode, info).name("DefaultJoin");
+			}
+		} else {
+			return createDefaultJoin(op1, op2, firstKeys, secondKeys, mode, info).name("PythonJoinPreStep")
+					.mapPartition(new PythonMapPartition(info.setID, info.operator, info.types, info.meta)).name(info.name);
+		}
+	}
+
+	public static class DefaultJoinKeyDiscarder<IN extends Tuple2<Tuple2, Tuple2>, OUT extends Tuple2> implements MapFunction<IN, OUT>, ResultTypeQueryable {
+		private transient final TypeInformation type;
+		private final boolean discard1;
+		private final boolean discard2;
+
+		public DefaultJoinKeyDiscarder(boolean discard1, boolean discard2, TypeInformation type) {
+			this.type = type;
+			this.discard1 = discard1;
+			this.discard2 = discard2;
+		}
+
+		@Override
+		public OUT map(IN value) throws Exception {
+			return (OUT) new Tuple2(discard1 ? value.f0.f1 : value.f0, discard2 ? value.f1.f1 : value.f1);
+		}
+
+		@Override
+		public TypeInformation getProducedType() {
+			return type;
 		}
 	}
 

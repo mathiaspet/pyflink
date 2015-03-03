@@ -17,6 +17,13 @@
 ################################################################################
 
 
+def concat(x, y):
+    if isinstance(y, tuple):
+        return (x,) + y
+    if isinstance(y, list):
+        return [x] + y
+
+
 class Switch(object):
     def __init__(self, value):
         self.value = value

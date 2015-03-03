@@ -386,7 +386,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		sets.put(info.setID, applyCoGroupOperation(op1, op2, info.keys1, info.keys2, info));
 	}
 
-	protected abstract DataSet applyCoGroupOperation(DataSet op1, DataSet op2, int[] firstKeys, int[] secondKeys, INFO info);
+	protected abstract DataSet applyCoGroupOperation(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, INFO info);
 
 	private void createCrossOperation(DatasizeHint mode, INFO info) {
 		DataSet op1 = (DataSet) sets.get(info.parentID);
@@ -434,14 +434,10 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		int setID = (Integer) receiver.getRecord(true);
 		int parentID = (Integer) receiver.getRecord(true);
 		Object keysArrayOrTuple = receiver.getRecord(true);
-		int[] keys;
-		if (keysArrayOrTuple instanceof Tuple) {
-			keys = tupleToIntArray((Tuple) keysArrayOrTuple);
-		} else {
-			keys = (int[]) keysArrayOrTuple;
-		}
+
+		String[] keys = normalizeKeys(keysArrayOrTuple);
 		DataSet op = (DataSet) sets.get(parentID);
-		sets.put(setID, (keys.length == 0 ? op.distinct() : op.distinct(keys)).name("Distinct"));
+		sets.put(setID, op.distinct(keys).name("Distinct"));
 	}
 
 	private void createFilterOperation(INFO info) {
@@ -470,12 +466,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		int setID = (Integer) receiver.getRecord(true);
 		int parentID = (Integer) receiver.getRecord(true);
 		Object keysArrayOrTuple = receiver.getRecord(true);
-		int[] keys;
-		if (keysArrayOrTuple instanceof Tuple) {
-			keys = tupleToIntArray((Tuple) keysArrayOrTuple);
-		} else {
-			keys = (int[]) keysArrayOrTuple;
-		}
+		String[] keys = normalizeKeys(keysArrayOrTuple);
 		DataSet op1 = (DataSet) sets.get(parentID);
 		sets.put(setID, op1.groupBy(keys));
 	}
@@ -505,15 +496,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		int setID = (Integer) receiver.getRecord(true);
 		int parentID = (Integer) receiver.getRecord(true);
 		Object keysArrayOrTuple = receiver.getRecord(true);
-		int[] keys;
-		if (keysArrayOrTuple instanceof Tuple) {
-			keys = tupleToIntArray((Tuple) keysArrayOrTuple);
-		} else {
-			keys = (int[]) keysArrayOrTuple;
-		}
+		String[] keys = normalizeKeys(keysArrayOrTuple);
 		DataSet op1 = (DataSet) sets.get(parentID);
 		sets.put(setID, op1.partitionByHash(keys));
-
 	}
 
 	private void createJoinOperation(DatasizeHint mode, INFO info) {
@@ -523,20 +508,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		if (info.types != null && (info.projections == null || info.projections.length == 0)) {
 			sets.put(info.setID, applyJoinOperation(op1, op2, info.keys1, info.keys2, mode, info));
 		} else {
-			DefaultJoin defaultResult;
-			switch (mode) {
-				case NONE:
-					defaultResult = op1.join(op2).where(info.keys1).equalTo(info.keys2);
-					break;
-				case HUGE:
-					defaultResult = op1.joinWithHuge(op2).where(info.keys1).equalTo(info.keys2);
-					break;
-				case TINY:
-					defaultResult = op1.joinWithTiny(op2).where(info.keys1).equalTo(info.keys2);
-					break;
-				default:
-					throw new IllegalArgumentException("Invalid join mode specified.");
-			}
+			DefaultJoin defaultResult = createDefaultJoin(op1, op2, info.keys1, info.keys2, mode, info);
 			if (info.projections.length == 0) {
 				sets.put(info.setID, defaultResult.name("DefaultJoin"));
 			} else {
@@ -556,7 +528,20 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		}
 	}
 
-	protected abstract DataSet applyJoinOperation(DataSet op1, DataSet op2, int[] firstKeys, int[] secondKeys, DatasizeHint mode, INFO info);
+	protected DefaultJoin createDefaultJoin(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, DatasizeHint mode, INFO info) {
+		switch (mode) {
+			case NONE:
+				return op1.join(op2).where(firstKeys).equalTo(secondKeys);
+			case HUGE:
+				return op1.joinWithHuge(op2).where(firstKeys).equalTo(secondKeys);
+			case TINY:
+				return op1.joinWithTiny(op2).where(firstKeys).equalTo(secondKeys);
+			default:
+				throw new IllegalArgumentException("Invalid join mode specified.");
+		}
+	}
+
+	protected abstract DataSet applyJoinOperation(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, DatasizeHint mode, INFO info);
 
 	private void createMapOperation(INFO info) {
 		DataSet op1 = (DataSet) sets.get(info.parentID);
@@ -576,12 +561,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		int setID = (Integer) receiver.getRecord(true);
 		int parentID = (Integer) receiver.getRecord(true);
 		Object keysArrayOrTuple = receiver.getRecord(true);
-		int[] keys;
-		if (keysArrayOrTuple instanceof Tuple) {
-			keys = tupleToIntArray((Tuple) keysArrayOrTuple);
-		} else {
-			keys = (int[]) keysArrayOrTuple;
-		}
+		int[] keys = toIntArray(keysArrayOrTuple);
 		DataSet op1 = (DataSet) sets.get(parentID);
 		sets.put(setID, op1.project(keys).name("Projection"));
 	}
@@ -651,10 +631,54 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	}
 
 	//====Utility=======================================================================================================
-	protected int[] tupleToIntArray(Tuple tuple) {
-		int[] keys = new int[tuple.getArity()];
+	protected String[] normalizeKeys(Object keys) {
+		if (keys instanceof Tuple) {
+			Tuple tupleKeys = (Tuple) keys;
+			if (tupleKeys.getArity() == 0) {
+				return new String[0];
+			}
+			if (tupleKeys.getField(0) instanceof Integer) {
+				String[] stringKeys = new String[tupleKeys.getArity()];
+				for (int x = 0; x < stringKeys.length; x++) {
+					stringKeys[x] = "f" + (Integer) tupleKeys.getField(x);
+				}
+				return stringKeys;
+			}
+			if (tupleKeys.getField(0) instanceof String) {
+				return tupleToStringArray(tupleKeys);
+			}
+			throw new RuntimeException("Key argument contains field that is neither an int nor a String.");
+		}
+		if (keys instanceof int[]) {
+			int[] intKeys = (int[]) keys;
+			String[] stringKeys = new String[intKeys.length];
+			for (int x = 0; x < stringKeys.length; x++) {
+				stringKeys[x] = "f" + intKeys[x];
+			}
+			return stringKeys;
+		}
+		throw new RuntimeException("Key argument is neither an int[] nor a Tuple.");
+	}
+
+	protected int[] toIntArray(Object key) {
+		if (key instanceof Tuple) {
+			Tuple tuple = (Tuple) key;
+			int[] keys = new int[tuple.getArity()];
+			for (int y = 0; y < tuple.getArity(); y++) {
+				keys[y] = (Integer) tuple.getField(y);
+			}
+			return keys;
+		}
+		if (key instanceof int[]) {
+			return (int[]) key;
+		}
+		throw new RuntimeException("Key argument is neither an int[] nor a Tuple.");
+	}
+
+	protected String[] tupleToStringArray(Tuple tuple) {
+		String[] keys = new String[tuple.getArity()];
 		for (int y = 0; y < tuple.getArity(); y++) {
-			keys[y] = (Integer) tuple.getField(y);
+			keys[y] = (String) tuple.getField(y);
 		}
 		return keys;
 	}

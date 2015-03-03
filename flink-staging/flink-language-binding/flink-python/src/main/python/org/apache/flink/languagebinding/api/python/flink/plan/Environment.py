@@ -20,6 +20,7 @@ from flink.connection import Connection
 from flink.connection import Collector
 from flink.plan.DataSet import DataSet
 from flink.plan.Constants import _Fields, _Identifier
+from flink.plan.OperationInfo import OperationInfo
 from flink.utilities import Switch
 import dill
 import copy
@@ -64,7 +65,7 @@ class Environment(object):
         :param types: Specifies the types for the CSV fields.
         :return:A CsvReader that can be used to configure the CSV input.
         """
-        child = dict()
+        child = OperationInfo(self)
         child_set = DataSet(self, child)
         child[_Fields.IDENTIFIER] = _Identifier.SOURCE_CSV
         child[_Fields.DELIMITER_LINE] = line_delimiter
@@ -83,7 +84,7 @@ class Environment(object):
         :param path: The path of the file, as a URI (e.g., "file:///some/local/file" or "hdfs://host:port/file/path").
         :return: A DataSet that represents the data read from the given file as text lines.
         """
-        child = dict()
+        child = OperationInfo(self)
         child_set = DataSet(self, child)
         child[_Fields.IDENTIFIER] = _Identifier.SOURCE_TEXT
         child[_Fields.PATH] = path
@@ -100,7 +101,7 @@ class Environment(object):
         :param elements: The elements to make up the data set.
         :return: A DataSet representing the given list of elements.
         """
-        child = dict()
+        child = OperationInfo(self)
         child_set = DataSet(self, child)
         child[_Fields.IDENTIFIER] = _Identifier.SOURCE_VALUE
         child[_Fields.VALUES] = elements
@@ -288,6 +289,8 @@ class Environment(object):
                         collectBytes(_dump(set[_Fields.OPERATOR]))
                     collect(set[_Fields.META])
                     collect(set[_Fields.TYPES])
+                    collect(set[_Fields.DISCARD1])
+                    collect(set[_Fields.DISCARD2])
                     collect(len(set[_Fields.PROJECTIONS]))
                     for p in set[_Fields.PROJECTIONS]:
                         collect(p[0])

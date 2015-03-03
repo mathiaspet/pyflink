@@ -33,17 +33,21 @@ class Collector(object):
     def __init__(self, con):
         self._connection = con
         self._serializer = None
+        self._key = None
 
     def _close(self):
         self._connection.send_end_signal()
 
     def collect(self, value):
-        self._serializer = _get_serializer(self._connection.write, value)
-        self.collect = self._collect
+        self._serializer = _get_serializer(self._connection.write, value if self._key is None else (self._key, value))
+        self.collect = self._collect if self._key is None else self._collect_with_key
         self.collect(value)
 
     def _collect(self, value):
         self._connection.write(self._serializer.serialize(value))
+
+    def _collect_with_key(self, value):
+        self._connection.write(self._serializer.serialize((self._key, value)))
 
 
 def _get_serializer(write, value):

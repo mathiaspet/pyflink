@@ -58,6 +58,8 @@ class _Fields(object):
     KEY1 = "key1"
     KEY2 = "key2"
     TYPES = "types"
+    TYPE1 = "type1"
+    TYPE2 = "type2"
     OPERATOR = "operator"
     META = "meta"
     NAME = "name"
@@ -73,6 +75,8 @@ class _Fields(object):
     PROJECTIONS = "projections"
     ID = "id"
     TO_ERR = "to_error"
+    DISCARD1 = "discard1"
+    DISCARD2 = "discard2"
 
 
 class WriteMode(object):

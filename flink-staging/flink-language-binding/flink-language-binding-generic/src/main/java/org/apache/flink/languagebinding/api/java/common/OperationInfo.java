@@ -24,12 +24,12 @@ public abstract class OperationInfo {
 	public int parentID; //DataSet that an operation is applied on
 	public int otherID; //secondary DataSet
 	public int setID; //ID for new DataSet
-	public int[] keys1; //join/cogroup keys
-	public int[] keys2; //join/cogroup keys
+	public String[] keys1; //join/cogroup keys
+	public String[] keys2; //join/cogroup keys
 	public TypeInformation<?> types; //typeinformation about output type
 	public ProjectionEntry[] projections; //projectFirst/projectSecond
 
-	public class ProjectionEntry {
+	public static class ProjectionEntry {
 		public ProjectionSide side;
 		public int[] keys;
 

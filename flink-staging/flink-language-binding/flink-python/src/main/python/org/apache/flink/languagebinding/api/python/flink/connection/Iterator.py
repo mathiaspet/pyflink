@@ -45,7 +45,7 @@ class ListIterator(defIter.Iterator):
 
 
 class GroupIterator(defIter.Iterator):
-    def __init__(self, iterator, keys=None):
+    def __init__(self, iterator, keys=None, discard_key=False):
         super(GroupIterator, self).__init__()
         self.iterator = iterator
         self.key = None
@@ -54,6 +54,7 @@ class GroupIterator(defIter.Iterator):
             self._extract_keys = self._extract_keys_id
         self.cur = None
         self.empty = False
+        self._discard_key = discard_key
 
     def _init(self):
         if self.iterator.has_next():
@@ -76,7 +77,10 @@ class GroupIterator(defIter.Iterator):
             else:
                 self.cur = None
                 self.empty = True
-            return tmp
+            if self._discard_key:
+                return tmp[1]
+            else:
+                return tmp
         else:
             raise StopIteration
 
@@ -106,9 +110,9 @@ class CoGroupIterator(object):
     FIRST_EMPTY = 4
     SECOND_EMPTY = 5
 
-    def __init__(self, c1, c2, k1, k2):
-        self.i1 = GroupIterator(c1, k1)
-        self.i2 = GroupIterator(c2, k2)
+    def __init__(self, c1, c2, k1, k2, d1, d2):
+        self.i1 = GroupIterator(c1, k1, d1)
+        self.i2 = GroupIterator(c2, k2, d2)
         self.p1 = None
         self.p2 = None
         self.match = None
@@ -168,12 +172,14 @@ class CoGroupIterator(object):
 
 
 class Iterator(defIter.Iterator):
-    def __init__(self, con, group=0):
+    def __init__(self, con, group=0, discard_key=False, collector=None):
         super(Iterator, self).__init__()
         self._connection = con
         self._init = True
         self._group = group
         self._deserializer = None
+        self._discard_key = discard_key
+        self._collector = collector
 
     def __next__(self):
         return self.next()
@@ -182,7 +188,12 @@ class Iterator(defIter.Iterator):
         if self.has_next():
             if self._deserializer is None:
                 self._deserializer = _get_deserializer(self._group, self._connection.read)
-            return self._deserializer.deserialize()
+            value = self._deserializer.deserialize()
+            if self._discard_key:
+                self._collector._key = value[1]
+                return value[1]
+            else:
+                return value
         else:
             raise StopIteration
 

@@ -24,12 +24,14 @@ class CoGroupFunction(Function.Function):
         super(CoGroupFunction, self).__init__()
         self._keys1 = None
         self._keys2 = None
+        self._discard_key1 = False
+        self._discard_key2 = False
 
     def _configure(self, input_file, output_file, port):
         self._connection = Connection.TwinBufferingUDPMappedFileConnection(input_file, output_file, port)
         self._iterator = Iterator.Iterator(self._connection, 0)
         self._iterator2 = Iterator.Iterator(self._connection, 1)
-        self._cgiter = Iterator.CoGroupIterator(self._iterator, self._iterator2, self._keys1, self._keys2)
+        self._cgiter = Iterator.CoGroupIterator(self._iterator, self._iterator2, self._keys1, self._keys2, self._discard_key1, self._discard_key2)
         self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)
         self._configure_chain(Collector.Collector(self._connection))
 

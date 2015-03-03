@@ -20,6 +20,7 @@ import copy
 import types as TYPES
 
 from flink.plan.Constants import _Fields, _Identifier, WriteMode, STRING
+from flink.plan.OperationInfo import OperationInfo
 from flink.functions.CoGroupFunction import CoGroupFunction
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
@@ -29,6 +30,9 @@ from flink.functions.JoinFunction import JoinFunction
 from flink.functions.MapFunction import MapFunction
 from flink.functions.MapPartitionFunction import MapPartitionFunction
 from flink.functions.ReduceFunction import ReduceFunction
+from flink.functions.KeySelectorFunction import KeySelectorFunction
+from flink.utilities import concat
+
 
 
 def deduct_output_type(dataset):
@@ -76,22 +80,15 @@ def deduct_output_type(dataset):
 
 
 class Set(object):
-    def __init__(self, env, info, copy_set=False):
+    def __init__(self, env, info):
         self._env = env
         self._info = info
-        if not copy_set:
-            self._info[_Fields.ID] = env._counter
-            self._info[_Fields.BCVARS] = []
-            self._info[_Fields.CHILDREN] = []
-            self._info[_Fields.SINKS] = []
-            self._info[_Fields.NAME] = None
-            env._counter += 1
 
     def output(self, to_error=False):
         """
         Writes a DataSet to the standard output stream (stdout).
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child[_Fields.IDENTIFIER] = _Identifier.SINK_PRINT
         child[_Fields.PARENT] = self._info
         child[_Fields.TO_ERR] = to_error
@@ -105,7 +102,7 @@ class Set(object):
         :param path: he path pointing to the location the text file is written to.
         :param write_mode: OutputFormat.WriteMode value, indicating whether files should be overwritten
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child[_Fields.IDENTIFIER] = _Identifier.SINK_TEXT
         child[_Fields.PARENT] = self._info
         child[_Fields.PATH] = path
@@ -121,7 +118,7 @@ class Set(object):
         :param path: The path pointing to the location the CSV file is written to.
         :param write_mode: OutputFormat.WriteMode value, indicating whether files should be overwritten
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child[_Fields.IDENTIFIER] = _Identifier.SINK_CSV
         child[_Fields.PATH] = path
         child[_Fields.PARENT] = self._info
@@ -148,7 +145,7 @@ class Set(object):
             f = operator
             operator = GroupReduceFunction()
             operator.reduce = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.GROUPREDUCE
         child[_Fields.PARENT] = self._info
@@ -166,10 +163,8 @@ class Set(object):
 
 
 class ReduceSet(Set):
-    def __init__(self, env, info, copy_set=False):
-        super(ReduceSet, self).__init__(env, info, copy_set)
-        if not copy_set:
-            self._is_chained = False
+    def __init__(self, env, info):
+        super(ReduceSet, self).__init__(env, info)
 
     def reduce(self, operator):
         """
@@ -185,7 +180,7 @@ class ReduceSet(Set):
             f = operator
             operator = ReduceFunction()
             operator.reduce = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.REDUCE
         child[_Fields.PARENT] = self._info
@@ -201,8 +196,8 @@ class ReduceSet(Set):
 
 
 class DataSet(ReduceSet):
-    def __init__(self, env, info, copy_set=False):
-        super(DataSet, self).__init__(env, info, copy_set)
+    def __init__(self, env, info):
+        super(DataSet, self).__init__(env, info)
 
     def project(self, *fields):
         """
@@ -216,7 +211,7 @@ class DataSet(ReduceSet):
         :return: The projected DataSet.
 
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = DataSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.PROJECTION
         child[_Fields.PARENT] = self._info
@@ -238,16 +233,27 @@ class DataSet(ReduceSet):
         :param keys: One or more field positions on which the DataSet will be grouped.
         :return:A Grouping on which a transformation needs to be applied to obtain a transformed DataSet.
         """
-        child = dict()
-        child_chain = []
-        child_set = UnsortedGrouping(self._env, child, child_chain)
-        child[_Fields.IDENTIFIER] = _Identifier.GROUP
-        child[_Fields.PARENT] = self._info
-        child[_Fields.KEYS] = keys
-        child_chain.append(child)
-        self._info[_Fields.CHILDREN].append(child)
-        self._env._sets.append(child)
-        return child_set
+        if isinstance(keys[0], (KeySelectorFunction, TYPES.FunctionType)):
+            if isinstance(keys[0], TYPES.FunctionType):
+                selector = KeySelectorFunction()
+                selector.get_key = keys[0]
+            else:
+                selector = keys[0]
+            grouping = self.map(selector, (keys[1], deduct_output_type(self._info))).group_by(0)
+            grouping._info[_Fields.TYPE1] = True
+            return grouping
+        else:
+            child = OperationInfo(self._env)
+            child_chain = []
+            child_set = UnsortedGrouping(self._env, child, child_chain)
+            child[_Fields.IDENTIFIER] = _Identifier.GROUP
+            child[_Fields.PARENT] = self._info
+            child[_Fields.KEYS] = keys
+            child[_Fields.TYPE1] = None
+            child_chain.append(child)
+            self._info[_Fields.CHILDREN].append(child)
+            self._env._sets.append(child)
+            return child_set
 
     def co_group(self, other_set):
         """
@@ -262,13 +268,11 @@ class DataSet(ReduceSet):
         :param other_set: The other DataSet of the CoGroup transformation.
         :return:A CoGroupOperator to continue the definition of the CoGroup transformation.
         """
-        child = dict()
-        other_set._info[_Fields.CHILDREN].append(child)
-        child_set = CoGroupOperatorWhere(self._env, child)
+        child = OperationInfo(self._env)
+        child_set = CoGroupOperatorWhere((self, other_set), self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.COGROUP
         child[_Fields.PARENT] = self._info
         child[_Fields.OTHER] = other_set._info
-        self._info[_Fields.CHILDREN].append(child)
         return child_set
 
     def cross(self, other_set):
@@ -309,14 +313,11 @@ class DataSet(ReduceSet):
         return self._cross(other_set, _Identifier.CROSST)
 
     def _cross(self, other_set, identifier):
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = CrossOperator(self._env, child)
         child[_Fields.IDENTIFIER] = identifier
         child[_Fields.PARENT] = self._info
         child[_Fields.OTHER] = other_set._info
-        child[_Fields.PROJECTIONS] = []
-        child[_Fields.OPERATOR] = None
-        child[_Fields.META] = None
         self._info[_Fields.CHILDREN].append(child)
         other_set._info[_Fields.CHILDREN].append(child)
         self._env._sets.append(child)
@@ -336,7 +337,7 @@ class DataSet(ReduceSet):
             f = operator
             operator = FilterFunction()
             operator.filter = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.FILTER
         child[_Fields.PARENT] = self._info
@@ -363,7 +364,7 @@ class DataSet(ReduceSet):
             f = operator
             operator = FlatMapFunction()
             operator.flat_map = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.FLATMAP
         child[_Fields.PARENT] = self._info
@@ -413,17 +414,11 @@ class DataSet(ReduceSet):
         return self._join(other_set, _Identifier.JOINT)
 
     def _join(self, other_set, identifier):
-        child = dict()
-        child_set = JoinOperatorWhere(self._env, child)
+        child = OperationInfo(self._env)
+        child_set = JoinOperatorWhere((self, other_set), self._env, child)
         child[_Fields.IDENTIFIER] = identifier
         child[_Fields.PARENT] = self._info
         child[_Fields.OTHER] = other_set._info
-        child[_Fields.OPERATOR] = None
-        child[_Fields.META] = None
-        child[_Fields.PROJECTIONS] = []
-        self._info[_Fields.CHILDREN].append(child)
-        other_set._info[_Fields.CHILDREN].append(child)
-        self._env._sets.append(child)
         return child_set
 
     def map(self, operator, types):
@@ -441,7 +436,7 @@ class DataSet(ReduceSet):
             f = operator
             operator = MapFunction()
             operator.map = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.MAP
         child[_Fields.PARENT] = self._info
@@ -472,7 +467,7 @@ class DataSet(ReduceSet):
             f = operator
             operator = MapPartitionFunction()
             operator.map_partition = f
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.MAPPARTITION
         child[_Fields.PARENT] = self._info
@@ -493,7 +488,7 @@ class DataSet(ReduceSet):
         :param other_set: The other DataSet which is unioned with the current DataSet.
         :return:The resulting DataSet.
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = DataSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.UNION
         child[_Fields.PARENT] = self._info
@@ -505,11 +500,11 @@ class DataSet(ReduceSet):
 
 
 class OperatorSet(DataSet):
-    def __init__(self, env, info, copy_set=False):
-        super(OperatorSet, self).__init__(env, info, copy_set)
+    def __init__(self, env, info):
+        super(OperatorSet, self).__init__(env, info)
 
     def with_broadcast_set(self, name, set):
-        child = dict()
+        child = OperationInfo(self._env)
         child[_Fields.PARENT] = self._info
         child[_Fields.OTHER] = set._info
         child[_Fields.NAME] = name
@@ -524,10 +519,6 @@ class Grouping(object):
         self._env = env
         self._child_chain = child_chain
         self._info = info
-        info[_Fields.ID] = env._counter
-        info[_Fields.CHILDREN] = []
-        info[_Fields.SINKS] = []
-        env._counter += 1
 
     def reduce_group(self, operator, types, combinable=False):
         """
@@ -546,9 +537,11 @@ class Grouping(object):
             f = operator
             operator = GroupReduceFunction()
             operator.reduce = f
-        operator._set_grouping_keys(self._child_chain[0][_Fields.KEYS])
+        grouping = self._child_chain[0]
+        operator._discard_key = grouping[_Fields.TYPE1] is not None
+        operator._set_grouping_keys(grouping[_Fields.KEYS])
         operator._set_sort_ops([(x[_Fields.FIELD], x[_Fields.ORDER]) for x in self._child_chain[1:]])
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.GROUPREDUCE
         child[_Fields.PARENT] = self._info
@@ -576,7 +569,7 @@ class Grouping(object):
         :param order: The Order in which the specified Tuple field is sorted. See DataSet.Order.
         :return:A SortedGrouping with specified order of group element.
         """
-        child = dict()
+        child = OperationInfo(self._env)
         child_set = SortedGrouping(self._env, child, self._child_chain)
         child[_Fields.IDENTIFIER] = _Identifier.SORT
         child[_Fields.PARENT] = self._info
@@ -602,10 +595,10 @@ class UnsortedGrouping(Grouping):
         :param operator:The ReduceFunction that is applied on the DataSet.
         :return:A ReduceOperator that represents the reduced DataSet.
         """
-        operator._set_grouping_keys(self._child_chain[0][_Fields.KEYS])
-        for i in self._child_chain:
-            self._env._sets.append(i)
-        child = dict()
+        grouping = self._child_chain[0]
+        operator._set_grouping_keys(grouping[_Fields.KEYS])
+        operator._discard_key = grouping[_Fields.TYPE1] is not None
+        child = OperationInfo(self._env)
         child_set = OperatorSet(self._env, child)
         child[_Fields.IDENTIFIER] = _Identifier.REDUCE
         child[_Fields.PARENT] = self._info
@@ -616,10 +609,9 @@ class UnsortedGrouping(Grouping):
         child[_Fields.COMBINEOP] = operator
         child[_Fields.COMBINEOP]._combine = True
         child[_Fields.NAME] = "PythonReduce"
-        child[_Fields.TYPES] = deduct_output_type(self._info)
+        child[_Fields.TYPES] = deduct_output_type(self._info) if grouping[_Fields.TYPE1] is None else deduct_output_type(self._info)[1]
         self._info[_Fields.CHILDREN].append(child)
         self._env._sets.append(child)
-
         return child_set
 
 
@@ -629,9 +621,10 @@ class SortedGrouping(Grouping):
 
 
 class CoGroupOperatorWhere(object):
-    def __init__(self, env, info):
+    def __init__(self, parent, env, info):
         self._env = env
         self._info = info
+        self._parent = parent
 
     def where(self, *fields):
         """
@@ -643,14 +636,20 @@ class CoGroupOperatorWhere(object):
         :param fields: The indexes of the Tuple fields of the first co-grouped DataSets that should be used as keys.
         :return: An incomplete CoGroup transformation.
         """
-        self._info[_Fields.KEY1] = fields
-        return CoGroupOperatorTo(self._env, self._info)
+        if isinstance(fields[0], (KeySelectorFunction, TYPES.FunctionType)):
+            self._info[_Fields.KEY1] = fields[0]
+            self._info[_Fields.TYPE1] = fields[1]
+        else:
+            self._info[_Fields.KEY1] = fields
+            self._info[_Fields.TYPE1] = None
+        return CoGroupOperatorTo(self._parent, self._env, self._info)
 
 
 class CoGroupOperatorTo(object):
-    def __init__(self, env, info):
+    def __init__(self, parent, env, info):
         self._env = env
         self._info = info
+        self._parent = parent
 
     def equal_to(self, *fields):
         """
@@ -662,14 +661,20 @@ class CoGroupOperatorTo(object):
         :param fields: The indexes of the Tuple fields of the second co-grouped DataSet that should be used as keys.
         :return: An incomplete CoGroup transformation.
         """
-        self._info[_Fields.KEY2] = fields
-        return CoGroupOperatorUsing(self._env, self._info)
+        if isinstance(fields[0], (KeySelectorFunction, TYPES.FunctionType)):
+            self._info[_Fields.KEY2] = fields[0]
+            self._info[_Fields.TYPE2] = fields[1]
+        else:
+            self._info[_Fields.KEY2] = fields
+            self._info[_Fields.TYPE2] = None
+        return CoGroupOperatorUsing(self._parent, self._env, self._info)
 
 
 class CoGroupOperatorUsing(object):
-    def __init__(self, env, info):
+    def __init__(self, parent, env, info):
         self._env = env
         self._info = info
+        self._parent = parent
 
     def using(self, operator, types):
         """
@@ -686,21 +691,55 @@ class CoGroupOperatorUsing(object):
             f = operator
             operator = CoGroupFunction()
             operator.co_group = f
-        new_set = OperatorSet(self._env, self._info)
-        operator._keys1 = self._info[_Fields.KEY1]
-        operator._keys2 = self._info[_Fields.KEY2]
-        self._info[_Fields.OPERATOR] = operator
-        self._info[_Fields.META] = str(inspect.getmodule(operator)) + "|" + str(operator.__class__.__name__)
-        self._info[_Fields.TYPES] = types
-        self._info[_Fields.NAME] = "PythonCoGroup"
-        self._env._sets.append(self._info)
-        return new_set
+        tmp1 = self._parent[0]
+        tmp2 = self._parent[1]
+        key1 = self._info[_Fields.KEY1]
+        key2 = self._info[_Fields.KEY2]
+        use_key_selector = False
+
+        if isinstance(key1, (KeySelectorFunction, TYPES.FunctionType)):
+            if isinstance(key1, KeySelectorFunction):
+                f1 = key1
+            else:
+                f1 = KeySelectorFunction()
+                f1.get_key = key1
+            tmp1 = self._parent[0].map(f1, (self._info[_Fields.TYPE1], deduct_output_type(self._parent[0]._info)))
+            use_key_selector = True
+            operator._discard_key1 = True
+            key1 = (0,)
+
+        if isinstance(key2, (KeySelectorFunction, TYPES.FunctionType)):
+            if isinstance(key2, KeySelectorFunction):
+                f2 = key2
+            else:
+                f2 = KeySelectorFunction()
+                f2.get_key = key2
+            tmp2 = self._parent[1].map(f2, (self._info[_Fields.TYPE2], deduct_output_type(self._parent[1]._info)))
+            use_key_selector = True
+            operator._discard_key2 = True
+            key2 = (0,)
+
+        if use_key_selector:
+            return tmp1.co_group(tmp2).where(*key1).equal_to(*key2).using(operator, types)
+        else:
+            new_set = OperatorSet(self._env, self._info)
+            operator._keys1 = self._info[_Fields.KEY1]
+            operator._keys2 = self._info[_Fields.KEY2]
+            self._info[_Fields.OPERATOR] = operator
+            self._info[_Fields.META] = str(inspect.getmodule(operator)) + "|" + str(operator.__class__.__name__)
+            self._info[_Fields.TYPES] = types
+            self._info[_Fields.NAME] = "PythonCoGroup"
+            self._info[_Fields.PARENT][_Fields.CHILDREN].append(self._info)
+            self._info[_Fields.OTHER][_Fields.CHILDREN].append(self._info)
+            self._env._sets.append(self._info)
+            return new_set
 
 
 class JoinOperatorWhere(object):
-    def __init__(self, env, info):
+    def __init__(self, parent, env, info):
         self._env = env
         self._info = info
+        self._parent = parent
 
     def where(self, *fields):
         """
@@ -713,14 +752,19 @@ class JoinOperatorWhere(object):
         :return:An incomplete Join transformation.
 
         """
-        self._info[_Fields.KEY1] = fields
-        return JoinOperatorTo(self._env, self._info)
+        if isinstance(fields[0], (KeySelectorFunction, TYPES.FunctionType)):
+            self._info[_Fields.KEY1] = fields[0]
+            self._info[_Fields.TYPE1] = fields[1]
+        else:
+            self._info[_Fields.KEY1] = fields
+        return JoinOperatorTo(self._parent, self._env, self._info)
 
 
 class JoinOperatorTo(object):
-    def __init__(self, env, info):
+    def __init__(self, parent, env, info):
         self._env = env
         self._info = info
+        self._parent = parent
 
     def equal_to(self, *fields):
         """
@@ -732,8 +776,56 @@ class JoinOperatorTo(object):
         :param fields:The indexes of the Tuple fields of the second join DataSet that should be used as keys.
         :return:An incomplete Join Transformation.
         """
-        self._info[_Fields.KEY2] = fields
-        return JoinOperator(self._env, self._info)
+        if isinstance(fields[0], (KeySelectorFunction, TYPES.FunctionType)):
+            self._info[_Fields.KEY2] = fields[0]
+            self._info[_Fields.TYPE2] = fields[1]
+        else:
+            self._info[_Fields.KEY2] = fields
+
+        tmp1 = self._parent[0]
+        tmp2 = self._parent[1]
+        key1 = self._info[_Fields.KEY1]
+        key2 = self._info[_Fields.KEY2]
+        use_key_selector = False
+
+        if isinstance(key1, (KeySelectorFunction, TYPES.FunctionType)):
+            if isinstance(key1, KeySelectorFunction):
+                f1 = key1
+            else:
+                f1 = KeySelectorFunction()
+                f1.get_key = key1
+            tmp1 = self._parent[0].map(f1, (self._info[_Fields.TYPE1], deduct_output_type(self._parent[0]._info)))
+            use_key_selector = True
+            key1 = (0,)
+
+        if isinstance(key2, (KeySelectorFunction, TYPES.FunctionType)):
+            if isinstance(key2, KeySelectorFunction):
+                f2 = key2
+            else:
+                f2 = KeySelectorFunction()
+                f2.get_key = key2
+            tmp2 = self._parent[1].map(f2, (self._info[_Fields.TYPE2], deduct_output_type(self._parent[1]._info)))
+            use_key_selector = True
+            key2 = (0,)
+
+
+        if use_key_selector:
+            if self._info[_Fields.IDENTIFIER] == _Identifier.JOIN:
+                tmp = tmp1.join(tmp2)
+            elif self._info[_Fields.IDENTIFIER] == _Identifier.JOINH:
+                tmp = tmp1.join_with_huge(tmp2)
+            else:
+                tmp = tmp1.join_with_tiny(tmp2)
+
+            tmp._info[_Fields.DISCARD1] = self._info[_Fields.TYPE1] is not None
+            tmp._info[_Fields.DISCARD2] = self._info[_Fields.TYPE2] is not None
+
+            tmp = tmp.where(*key1).equal_to(*key2)
+            return tmp
+        else:
+            self._info[_Fields.PARENT][_Fields.CHILDREN].append(self._info)
+            self._info[_Fields.OTHER][_Fields.CHILDREN].append(self._info)
+            return JoinOperator(self._env, self._info)
 
 
 class JoinOperatorProjection(DataSet):
@@ -751,6 +843,14 @@ class JoinOperatorProjection(DataSet):
         :param fields: The indexes of the selected fields.
         :return: An incomplete JoinProjection.
         """
+        if self._info[_Fields.DISCARD1]:#key-selector used
+            self._info[_Fields.PARENT][_Fields.OPERATOR]._pair = False
+            type = self._info[_Fields.PARENT][_Fields.TYPES]
+            self._info[_Fields.PARENT][_Fields.TYPES] = concat(type[0], type[1])
+            if len(fields) == 0:#adjust index
+                return self.project_first(1)
+            else:
+                fields = tuple(map(lambda x: x+1, fields))
         self._info[_Fields.PROJECTIONS].append(("first", fields))
         return self
 
@@ -765,6 +865,14 @@ class JoinOperatorProjection(DataSet):
         :param fields: The indexes of the selected fields.
         :return: An incomplete JoinProjection.
         """
+        if self._info[_Fields.DISCARD2]:#key-selector usedused
+            self._info[_Fields.OTHER][_Fields.OPERATOR]._pair = False
+            type = self._info[_Fields.OTHER][_Fields.TYPES]
+            self._info[_Fields.OTHER][_Fields.TYPES] = concat(type[0], type[1])
+            if len(fields) == 0:#adjust index
+                return self.project_second(1)
+            else:
+                fields = tuple(map(lambda x: x+1, fields))
         self._info[_Fields.PROJECTIONS].append(("second", fields))
         return self
 
@@ -772,7 +880,14 @@ class JoinOperatorProjection(DataSet):
 class JoinOperator(DataSet):
     def __init__(self, env, info):
         super(JoinOperator, self).__init__(env, info)
-        self._info[_Fields.TYPES] = None
+        out = deduct_output_type(self._info)
+        out1 = out[0][1] if self._info[_Fields.DISCARD1] else out[0]
+        out2 = out[1][1] if self._info[_Fields.DISCARD2] else out[1]
+        keyselector_used = self._info[_Fields.DISCARD1] or self._info[_Fields.DISCARD2]
+        self._info[_Fields.TYPES] = (out1, out2) if keyselector_used else None #not None to disable generic default join handling
+        self._info[_Fields.PARENT][_Fields.CHILDREN].append(self._info)
+        self._info[_Fields.OTHER][_Fields.CHILDREN].append(self._info)
+        self._env._sets.append(self._info)
 
     def project_first(self, *fields):
         """
@@ -785,6 +900,7 @@ class JoinOperator(DataSet):
         :param fields: The indexes of the selected fields.
         :return: An incomplete JoinProjection.
         """
+        self._info[_Fields.TYPES] = None
         return JoinOperatorProjection(self._env, self._info).project_first(*fields)
 
     def project_second(self, *fields):
@@ -798,6 +914,7 @@ class JoinOperator(DataSet):
         :param fields: The indexes of the selected fields.
         :return: An incomplete JoinProjection.
         """
+        self._info[_Fields.TYPES] = None
         return JoinOperatorProjection(self._env, self._info).project_second(*fields)
 
     def using(self, operator, types):
@@ -818,8 +935,12 @@ class JoinOperator(DataSet):
         self._info[_Fields.META] = str(inspect.getmodule(operator)) + "|" + str(operator.__class__.__name__)
         self._info[_Fields.TYPES] = types
         self._info[_Fields.NAME] = "PythonJoin"
+        if self._info[_Fields.DISCARD1]:
+            operator._discard_key1 = True
+        if self._info[_Fields.DISCARD2]:
+            operator._discard_key2 = True
         self._env._sets.append(self._info)
-        return OperatorSet(self._env, self._info, copy_set=True)
+        return OperatorSet(self._env, OperationInfo(self._env, self._info))
 
 
 class CrossOperatorProjection(DataSet):
@@ -904,4 +1025,4 @@ class CrossOperator(DataSet):
         self._info[_Fields.META] = str(inspect.getmodule(operator)) + "|" + str(operator.__class__.__name__)
         self._info[_Fields.TYPES] = types
         self._info[_Fields.NAME] = "PythonCross"
-        return OperatorSet(self._env, self._info, copy_set=True)
+        return OperatorSet(self._env, OperationInfo(self._env, self._info))

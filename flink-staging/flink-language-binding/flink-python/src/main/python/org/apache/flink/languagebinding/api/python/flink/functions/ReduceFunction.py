@@ -26,6 +26,7 @@ class ReduceFunction(Function.Function):
         self._keys = None
         self._combine = False
         self._values = []
+        self._discard_key = False
 
     def _configure(self, input_file, output_file, port):
         if self._combine:
@@ -55,13 +56,14 @@ class ReduceFunction(Function.Function):
         collector = self._collector
         function = self.reduce
         iterator = self._group_iterator
+        discard = self._discard_key
         iterator._init()
         while iterator.has_group():
             iterator.next_group()
             if iterator.has_next():
-                base = iterator.next()
+                base = iterator.next()[1] if discard else iterator.next()
                 for value in iterator:
-                    base = function(base, value)
+                    base = function(base, value[1] if discard else value)
             collector.collect(base)
         collector._close()
 
@@ -81,14 +83,26 @@ class ReduceFunction(Function.Function):
         collector = self._collector
         function = self.combine
         iterator = self._iterator
-        while 1:
-            if iterator.has_next():
-                base = iterator.next()
-                while iterator.has_next():
-                    base = function(base, iterator.next())
-            collector.collect(base)
-            connection.send_end_signal()
-            connection.reset()
+        discard = self._discard_key
+        key = None
+        if discard:
+            while 1:
+                if iterator.has_next():
+                    key, base = iterator.next()
+                    while iterator.has_next():
+                        base = function(base, iterator.next()[1])
+                collector.collect((key, base))
+                connection.send_end_signal()
+                connection.reset()
+        else:
+            while 1:
+                if iterator.has_next():
+                    base = iterator.next()
+                    while iterator.has_next():
+                        base = function(base,iterator.next())
+                collector.collect(base)
+                connection.send_end_signal()
+                connection.reset()
 
     def collect(self, value):#chained combine
         self._values.append(value)
@@ -101,16 +115,25 @@ class ReduceFunction(Function.Function):
         collector = self._collector
         extractor = self._extract_keys
         grouping = defaultdict(list)
+        discard = self._discard_key
         for value in values:
             grouping[extractor(value)].append(value)
         keys = list(grouping.keys())
         keys.sort()
-        for key in keys:
-            iterator = Iterator.ListIterator(grouping[key])
-            base = iterator.next()
-            while iterator.has_next():
-                base = function(base, iterator.next())
-            collector.collect(base)
+        if discard:
+            for key in keys:
+                iterator = Iterator.ListIterator(grouping[key])
+                tmp_key, base = iterator.next()
+                while iterator.has_next():
+                    base = function(base, iterator.next()[1])
+                collector.collect((tmp_key, base))
+        else:
+            for key in keys:
+                iterator = Iterator.ListIterator(grouping[key])
+                base = iterator.next()
+                while iterator.has_next():
+                    base = function(base, iterator.next())
+                collector.collect(base)
         self._values = []
 
     def _extract_keys(self, x):

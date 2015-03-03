@@ -28,18 +28,19 @@ class GroupReduceFunction(Function.Function):
         self._sort_ops = []
         self._combine = False
         self._values = []
+        self._discard_key = False
 
     def _configure(self, input_file, output_file, port):
         if self._combine:
             self._connection = Connection.BufferingUDPMappedFileConnection(input_file, output_file, port)
-            self._iterator = Iterator.Iterator(self._connection)
+            self._iterator = Iterator.Iterator(self._connection, discard_key=self._discard_key, collector=self._collector)
             self._collector = Collector.Collector(self._connection)
             self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)
             self._run = self._run_combine
         else:
             self._connection = Connection.BufferingUDPMappedFileConnection(input_file, output_file, port)
             self._iterator = Iterator.Iterator(self._connection)
-            self._group_iterator = Iterator.GroupIterator(self._iterator, self._keys)
+            self._group_iterator = Iterator.GroupIterator(self._iterator, self._keys, discard_key=self._discard_key)
             self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)
             self._configure_chain(Collector.Collector(self._connection))
         self._open()
@@ -97,14 +98,20 @@ class GroupReduceFunction(Function.Function):
         collector = self._collector
         extractor = self._extract_keys
         grouping = defaultdict(list)
+        discard = self._discard_key
         for value in values:
-            grouping[extractor(value)].append(value)
+            if discard:
+                grouping[value[0]].append(value[1])
+            else:
+                grouping[extractor(value)].append(value)
         keys = list(grouping.keys())
         keys.sort()
         for key in keys:
+            if discard:
+                collector._key = key
             values = grouping[key]
             for op in reversed(self._sort_ops):
-                values.sort(key=lambda x:x[op[0]], reverse = op[1] == Order.DESCENDING)
+                values.sort(key=lambda x: x[op[0]], reverse=op[1] == Order.DESCENDING)
             result = function(Iterator.ListIterator(values), collector)
             if result is not None:
                 for res in result:
