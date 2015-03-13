@@ -190,6 +190,8 @@ public abstract class Streamer implements Serializable {
 							if (i.hasNext() || sender.hasRemaining(0)) {
 								size = sender.sendBuffer(i, 0);
 								sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
+							} else {
+								throw new RuntimeException("External process requested data even though none is available.");
 							}
 							break;
 						case SIGNAL_FINISHED:
