@@ -71,7 +71,7 @@ public abstract class Streamer implements Serializable {
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
 		}
-		socket.setSoTimeout(300000);
+		socket.setSoTimeout(600000);
 	}
 
 	/**
