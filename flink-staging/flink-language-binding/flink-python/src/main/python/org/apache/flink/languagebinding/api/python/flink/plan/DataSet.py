@@ -34,7 +34,6 @@ from flink.functions.KeySelectorFunction import KeySelectorFunction
 from flink.utilities import concat
 
 
-
 def deduct_output_type(dataset):
     skip = set([_Identifier.GROUP, _Identifier.SORT, _Identifier.UNION])
     source = set([_Identifier.SOURCE_CSV, _Identifier.SOURCE_TEXT, _Identifier.SOURCE_VALUE])
