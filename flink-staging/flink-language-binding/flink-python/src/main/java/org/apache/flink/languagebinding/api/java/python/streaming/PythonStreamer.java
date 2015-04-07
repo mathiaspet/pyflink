@@ -13,6 +13,7 @@
 package org.apache.flink.languagebinding.api.java.python.streaming;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.DatagramPacket;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.DEBUG;
@@ -168,7 +169,21 @@ public class PythonStreamer extends Streamer {
 			try {
 				process.exitValue();
 			} catch (IllegalThreadStateException ise) { //process still active
-				process.destroy();
+				if (process.getClass().getName().equals("java.lang.UNIXProcess")) {
+					int pid;
+					try {
+						Field f = process.getClass().getDeclaredField("pid");
+						f.setAccessible(true);
+						pid = f.getInt(process);
+					} catch (Throwable e) {
+						process.destroy();
+						return;
+					}
+					String[] args = new String[]{"kill", "-9", "" + pid};
+					Runtime.getRuntime().exec(args);
+				} else {
+					process.destroy();
+				}
 			}
 		}
 	}
