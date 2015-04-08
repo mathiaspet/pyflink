@@ -109,6 +109,17 @@ public class PythonStreamer extends Streamer {
 			new StreamPrinter(process.getInputStream()).start();
 			new StreamPrinter(process.getErrorStream(), true, msg).start();
 		}
+
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				try {
+					destroyProcess();
+				} catch (IOException ex) {
+				}
+			}
+		});
+
 		byte[] executorPort = new byte[4];
 		socket.receive(new DatagramPacket(executorPort, 0, 4));
 		int exPort = getInt(executorPort, 0);
@@ -166,24 +177,28 @@ public class PythonStreamer extends Streamer {
 			LOG.error("Exception occurred while closing Streamer. :" + e.getMessage());
 		}
 		if (!debug) {
-			try {
-				process.exitValue();
-			} catch (IllegalThreadStateException ise) { //process still active
-				if (process.getClass().getName().equals("java.lang.UNIXProcess")) {
-					int pid;
-					try {
-						Field f = process.getClass().getDeclaredField("pid");
-						f.setAccessible(true);
-						pid = f.getInt(process);
-					} catch (Throwable e) {
-						process.destroy();
-						return;
-					}
-					String[] args = new String[]{"kill", "-9", "" + pid};
-					Runtime.getRuntime().exec(args);
-				} else {
+			destroyProcess();
+		}
+	}
+
+	private void destroyProcess() throws IOException {
+		try {
+			process.exitValue();
+		} catch (IllegalThreadStateException ise) { //process still active
+			if (process.getClass().getName().equals("java.lang.UNIXProcess")) {
+				int pid;
+				try {
+					Field f = process.getClass().getDeclaredField("pid");
+					f.setAccessible(true);
+					pid = f.getInt(process);
+				} catch (Throwable e) {
 					process.destroy();
+					return;
 				}
+				String[] args = new String[]{"kill", "-9", "" + pid};
+				Runtime.getRuntime().exec(args);
+			} else {
+				process.destroy();
 			}
 		}
 	}
