@@ -39,6 +39,15 @@ public class PythonStreamer extends Streamer {
 	private final int id;
 	private final boolean usePython3;
 	private final boolean debug;
+	private final Thread shutdownThread = new Thread() {
+			@Override
+			public void run() {
+				try {
+					destroyProcess();
+				} catch (IOException ex) {
+				}
+			}
+		};
 
 	private String inputFilePath;
 	private String outputFilePath;
@@ -110,15 +119,7 @@ public class PythonStreamer extends Streamer {
 			new StreamPrinter(process.getErrorStream(), true, msg).start();
 		}
 
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-			@Override
-			public void run() {
-				try {
-					destroyProcess();
-				} catch (IOException ex) {
-				}
-			}
-		});
+		Runtime.getRuntime().addShutdownHook(shutdownThread);
 
 		byte[] executorPort = new byte[4];
 		socket.receive(new DatagramPacket(executorPort, 0, 4));
@@ -179,6 +180,7 @@ public class PythonStreamer extends Streamer {
 		if (!debug) {
 			destroyProcess();
 		}
+		Runtime.getRuntime().removeShutdownHook(shutdownThread);
 	}
 
 	private void destroyProcess() throws IOException {
