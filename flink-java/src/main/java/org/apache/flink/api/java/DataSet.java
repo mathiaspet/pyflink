@@ -50,6 +50,7 @@ import org.apache.flink.api.java.io.DiscardingOutputFormat;
 import org.apache.flink.api.java.io.PrintingOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat.TextFormatter;
+import org.apache.flink.api.java.io.EnviOutputFormat;
 import org.apache.flink.api.java.operators.AggregateOperator;
 import org.apache.flink.api.java.operators.CoGroupOperator;
 import org.apache.flink.api.java.operators.CoGroupOperator.CoGroupOperatorSets;
@@ -1536,6 +1537,18 @@ public abstract class DataSet<T> {
 	 */
 	public DataSink<T> printOnTaskManager(String prefix) {
 		return output(new PrintingOutputFormat<T>(prefix, false));
+	}
+
+	/**
+	 * TODO: additional config params
+	 * @param filePath
+	 * @return
+	 */
+	public DataSink<T> writeAsEnvi(String filePath, WriteMode writeMode) {
+		EnviOutputFormat enviOutputFormat = new EnviOutputFormat(new Path(filePath));
+		enviOutputFormat.setWriteMode(writeMode);
+		
+		return output((OutputFormat<T>) enviOutputFormat);
 	}
 	
 	/**

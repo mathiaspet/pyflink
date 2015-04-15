@@ -292,6 +292,51 @@ under the License.
 							</includes>
 						</configuration>
 					</execution>
+
+					<!-- DataCubeCreation -->
+					<execution>
+						<id>DataCubeCreation</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>DataCubeCreation</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.examples.java.spatial.DataCubeCreation</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>**/java/spatial/*.class</include>
+							</includes>
+						</configuration>
+					</execution>
+
+					<!-- ReadCompleteScenes -->
+					<execution>
+						<id>ReadCompleteScenes</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>ReadCompleteScenes</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.examples.java.spatial.ReadCompleteScenes</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>**/java/spatial/*.class</include>
+							</includes>
+						</configuration>
+					</execution>
+
 				</executions>
 			</plugin>
 

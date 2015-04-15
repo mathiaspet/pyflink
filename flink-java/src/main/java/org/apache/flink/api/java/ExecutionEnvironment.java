@@ -42,6 +42,7 @@ import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.java.hadoop.mapred.HadoopInputFormat;
 import org.apache.flink.api.java.io.CollectionInputFormat;
 import org.apache.flink.api.java.io.CsvReader;
+import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.io.IteratorInputFormat;
 import org.apache.flink.api.java.io.ParallelIteratorInputFormat;
 import org.apache.flink.api.java.io.PrimitiveInputFormat;
@@ -458,6 +459,15 @@ public abstract class ExecutionEnvironment {
 	 */
 	public CsvReader readCsvFile(String filePath) {
 		return new CsvReader(filePath, this);
+	}
+
+	/**
+	 * Creates an ENVI reader that parses ENVI files and returns a data set of tiles.
+	 * Please supply a directory or a single header file.
+	 * The given pixel numbers represent the size of each tile that a file is cut into.
+	 */
+	public EnviReader readEnviFile(String filePath, int xpixels, int ypixels) {
+		return new EnviReader(filePath, xpixels, ypixels, this);
 	}
 
 	// ------------------------------------ File Input Format -----------------------------------------
