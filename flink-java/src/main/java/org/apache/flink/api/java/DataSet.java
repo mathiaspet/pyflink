@@ -85,6 +85,7 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.util.AbstractID;
 
 import com.google.common.base.Preconditions;
+import org.apache.flink.api.java.io.EnviOutputFormat;
 
 /**
  * A DataSet represents a collection of elements of the same type.<br/>
@@ -1301,6 +1302,18 @@ public abstract class DataSet<T> {
 			of.setWriteMode(wm);
 		}
 		return output((OutputFormat<T>) of);
+	}
+	
+	/**
+	 * TODO: additional config params
+	 * @param filePath
+	 * @return
+	 */
+	public DataSink<T> writeAsEnvi(String filePath, WriteMode writeMode) {
+		EnviOutputFormat enviOutputFormat = new EnviOutputFormat(new Path(filePath));
+		enviOutputFormat.setWriteMode(writeMode);
+		
+		return output((OutputFormat<T>) enviOutputFormat);
 	}
 	
 	/**

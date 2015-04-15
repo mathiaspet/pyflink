@@ -127,6 +127,15 @@ class Set(object):
         self._info[_Fields.SINKS].append(child)
         self._env._sinks.append(child)
 
+    def write_envi(self, path, write_mode=WriteMode.OVERWRITE):
+        child = OperationInfo(self._env)
+        child[_Fields.IDENTIFIER] = _Identifier.SINK_ENVI
+        child[_Fields.PARENT] = self._info
+        child[_Fields.PATH] = path
+        child[_Fields.WRITE_MODE] = write_mode
+        self._info[_Fields.SINKS].append(child)
+        self._env._sinks.append(child)
+
     def reduce_group(self, operator, types, combinable=False):
         """
         Applies a GroupReduce transformation.

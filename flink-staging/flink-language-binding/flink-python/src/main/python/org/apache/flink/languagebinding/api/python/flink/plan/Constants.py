@@ -41,9 +41,11 @@ class _Identifier(object):
     SOURCE_CSV = "source_csv"
     SOURCE_TEXT = "source_text"
     SOURCE_VALUE = "source_value"
+    SOURCE_ENVI = "source_envi"
     SINK_CSV = "sink_csv"
     SINK_TEXT = "sink_text"
     SINK_PRINT = "sink_print"
+    SINK_ENVI = "sink_envi"
     BROADCAST = "broadcast"
 
 
@@ -90,6 +92,25 @@ class Order(object):
     DESCENDING = 2
     ANY = 3
 
+class Tile(object):
+    """
+    Represents an envi tile (a blocked sub matrix of a scene in bsq)
+    TODO: find out whether init has to done this way
+    """
+    def __init__(self):
+        self._aquisitionDate = ""
+        self._pathRow = ""
+        self._leftUpperLat = 0.0
+        self._leftUpperLon = 0.0
+        self._rightLowerLat = 0.0
+        self._rightLowerLon = 0.0
+        self._width = -1
+        self._height = -1
+        self._band = -1
+        self._xPixelWidth = 0.0
+        self._yPixelWidth = 0.0
+        self._content = bytearray()
+
 import sys
 
 PY2 = sys.version_info[0] == 2
@@ -102,9 +123,11 @@ if PY2:
     FLOAT = 2.5
     STRING = "type"
     BYTES = bytearray(b"byte")
+    TILE = Tile()
 elif PY3:
     BOOL = True
     INT = 1
     FLOAT = 2.5
     STRING = "type"
     BYTES = bytearray(b"byte")
+    TILE = Tile()

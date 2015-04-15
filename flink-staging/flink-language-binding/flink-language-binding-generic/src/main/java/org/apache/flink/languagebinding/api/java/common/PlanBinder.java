@@ -19,6 +19,7 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.aggregation.Aggregations;
 import org.apache.flink.api.java.io.CsvInputFormat;
+import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.operators.AggregateOperator;
 import org.apache.flink.api.java.operators.CrossOperator.DefaultCross;
 import org.apache.flink.api.java.operators.CrossOperator.ProjectCross;
@@ -28,6 +29,7 @@ import org.apache.flink.api.java.operators.JoinOperator.ProjectJoin;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UdfOperator;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
+import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.tuple.Tuple;
 import static org.apache.flink.api.java.typeutils.TypeExtractor.getForObject;
 import org.apache.flink.configuration.Configuration;
@@ -109,8 +111,8 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	 * This enum contains the identifiers for all supported non-UDF DataSet operations.
 	 */
 	private enum Operation {
-		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SINK_CSV, SINK_TEXT, SINK_PRINT,
-		PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
+		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_ENVI, SOURCE_SEQ, SINK_CSV, SINK_TEXT, SINK_PRINT,
+		SINK_ENVI, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST
 	}
@@ -151,6 +153,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 					case SOURCE_SEQ:
 						createSequenceSource();
 						break;
+					case SOURCE_ENVI:
+						createEnviSource();
+						break;
 					case SINK_CSV:
 						createCsvSink();
 						break;
@@ -159,6 +164,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 						break;
 					case SINK_PRINT:
 						createPrintSink();
+						break;
+					case SINK_ENVI:
+						createEnviSink();
 						break;
 					case BROADCAST:
 						createBroadcastVariable();
@@ -238,6 +246,25 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		}
 	}
 
+	private void createEnviSource() throws IOException {
+		int id = (Integer) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		//TODO: this stinks but otherwise
+		double leftLong = Double.parseDouble((String)receiver.getRecord());
+		double leftLat = Double.parseDouble((String)receiver.getRecord());
+		int blockSize = Integer.parseInt((String)receiver.getRecord());
+		int pixelSize = Integer.parseInt((String)receiver.getRecord());
+
+		Coordinate leftUpper = new Coordinate(leftLong,	leftLat);
+		double rightLong = leftLong + blockSize * pixelSize;
+		double rightLat = leftLat - blockSize * pixelSize;
+		Coordinate rightLower = new Coordinate(rightLong, rightLat);
+
+		EnviReader enviReader = env.readEnviFile(path, blockSize, blockSize);
+		sets.put(id, enviReader.restrictTo(leftUpper, rightLower).build());
+	}
+
+
 	private void createCsvSource() throws IOException {
 		int id = (Integer) receiver.getRecord(true);
 		String path = (String) receiver.getRecord();
@@ -273,6 +300,15 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		long from = (Long) receiver.getRecord();
 		long to = (Long) receiver.getRecord();
 		sets.put(id, env.generateSequence(from, to).name("SequenceSource"));
+	}
+	private void createEnviSink() throws IOException {
+		int parentID = (Integer) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		WriteMode writeMode = ((Integer) receiver.getRecord()) == 1
+				? WriteMode.OVERWRITE
+				: WriteMode.NO_OVERWRITE;
+		DataSet parent = (DataSet) sets.get(parentID);
+		parent.writeAsEnvi(path, writeMode).name("EnviSink");
 	}
 
 	private void createCsvSink() throws IOException {
