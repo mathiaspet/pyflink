@@ -86,6 +86,63 @@ class Order(object):
     DESCENDING = 2
     ANY = 3
 
+
+class Tile(object):
+    """
+    Represents an envi tile (a blocked sub matrix of a scene in bsq)
+    """
+    def __init__(self):
+        self.acquisitionDate = ""
+        self.pathRow = ""
+        self.leftUpperLat = 0.0
+        self.leftUpperLon = 0.0
+        self.rightLowerLat = 0.0
+        self.rightLowerLon = 0.0
+        self.width = -1
+        self.height = -1
+        self.band = -1
+        self.xPixelWidth = 0.0
+        self.yPixelWidth = 0.0
+        self.content = bytearray()
+
+    def update(self, leftUpper, rightLower, width, height, band,
+               pathRow, acquisitionDate, xPixelWidth, yPixelWidth):
+        leftUpperLat, leftUpperLon = leftUpper
+        rightLowerLat, rightLowerLon = rightLower
+
+        self.acquisitionDate = acquisitionDate
+        self.pathRow = pathRow
+        self.leftUpperLat = leftUpperLat
+        self.leftUpperLon = leftUpperLon
+        self.rightLowerLat = rightLowerLat
+        self.rightLowerLon = rightLowerLon
+        self.width = width
+        self.height = height
+        self.band = band
+        self.xPixelWidthx_width = xPixelWidth
+        self.yPixelWidth = yPixelWidth
+
+    def get_coordinate(self, index):
+        index /= 2
+        x = index % self.width
+        y = index // self.width
+        newLon = self.leftUpperLon + self.xPixelWidth * x
+        newLat = self.leftUpperLat + self.yPixelWidth * y
+        return (newLat, newLon)
+
+    def get_content_index_from_coordinate(self, coord):
+        lat, lon = coord
+        latDiff = int(self.leftUpperLat - lat)
+        lonDiff = int(lon - self.leftUpperLon)
+
+        if latDiff < 0 or lonDiff < 0:
+            return -1
+
+        x = lonDiff // self.xPixelWidth
+        y = latDiff // self.yPixelWidth
+
+        return 2 * (y * self.width + x)
+
 import sys
 
 PY2 = sys.version_info[0] == 2
