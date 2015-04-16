@@ -23,7 +23,7 @@ from flink.plan.Constants import TILE
 from flink.plan.Constants import Tile
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
-from flink.functions.GroupReduceFunction import KeySelectorFunction
+from flink.functions.KeySelectorFunction import KeySelectorFunction
 
 
 NOVAL = b'\xf1\xd8'
