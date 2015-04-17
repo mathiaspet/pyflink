@@ -654,6 +654,7 @@ object JobManager {
     catch {
       case t: Throwable => {
         LOG.error("Failed to run JobManager.", t)
+        System.out.println(t.getStackTraceString)
         System.exit(STARTUP_FAILURE_RETURN_CODE)
       }
     }

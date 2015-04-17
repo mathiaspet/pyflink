@@ -18,10 +18,11 @@
 import sys
 
 from flink.plan.Environment import get_environment
-from flink.plan.Constants import TILE
+from flink.plan.Constants import TILE, STRING
 from flink.plan.Constants import Tile
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
+from flink.functions.KeySelectorFunction import KeySelectorFunction
 
 
 #deprecated
@@ -42,8 +43,11 @@ class CubeCreator(GroupReduceFunction):
         :param collector:
         :return:
         """
+        print("just received data in reduce")
+
 class AcqDateSelector(KeySelectorFunction):
     def get_key(self, value):
+        print("got key selector function")
         return value._aquisitionDate
 
 if __name__ == "__main__":
@@ -63,7 +67,7 @@ if __name__ == "__main__":
     
     
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), (TILE)).reduce_group(CubeCreator(),(TILE))
+    cube = data.group_by(AcqDateSelector(), (STRING, TILE)).reduce_group(CubeCreator(), TILE)
     
     cube.write_envi(outputPath)
     
