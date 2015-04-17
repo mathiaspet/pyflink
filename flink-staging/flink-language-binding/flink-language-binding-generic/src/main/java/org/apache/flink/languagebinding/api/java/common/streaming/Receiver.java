@@ -183,6 +183,8 @@ public class Receiver implements Serializable {
 				return bytebuffer;
 			case TYPE_NULL:
 				return null;
+			case TYPE_TILE:
+				return new TileDeserializer().deserialize();
 			default:
 				throw new IllegalArgumentException("Unknown TypeID encountered: " + type);
 		}
