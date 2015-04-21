@@ -119,7 +119,7 @@ class Tile(object):
         self.width = width
         self.height = height
         self.band = band
-        self.xPixelWidthx_width = xPixelWidth
+        self.xPixelWidth = xPixelWidth
         self.yPixelWidth = yPixelWidth
 
     def get_coordinate(self, index):
