@@ -67,7 +67,7 @@ if __name__ == "__main__":
     
     
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), (STRING, TILE)).reduce_group(CubeCreator(), TILE)
+    cube = data.group_by(AcqDateSelector(), STRING).reduce_group(CubeCreator(), TILE)
     
     cube.write_envi(outputPath)
     
