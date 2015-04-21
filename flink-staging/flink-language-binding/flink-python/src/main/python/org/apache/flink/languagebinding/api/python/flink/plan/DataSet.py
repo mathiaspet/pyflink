@@ -19,7 +19,8 @@ import inspect
 import copy
 import types as TYPES
 
-from flink.plan.Constants import _Fields, _Identifier, WriteMode, STRING
+from flink.plan.Constants import _Fields, _Identifier, WriteMode, STRING, TILE
+from flink.plan.OperationInfo import OperationInfo
 from flink.functions.CoGroupFunction import CoGroupFunction
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
@@ -32,7 +33,7 @@ from flink.functions.ReduceFunction import ReduceFunction
 
 def deduct_output_type(dataset):
     skip = set([_Identifier.GROUP, _Identifier.SORT, _Identifier.UNION])
-    source = set([_Identifier.SOURCE_CSV, _Identifier.SOURCE_TEXT, _Identifier.SOURCE_VALUE])
+    source = set([_Identifier.SOURCE_CSV, _Identifier.SOURCE_TEXT, _Identifier.SOURCE_VALUE, _Identifier.SOURCE_ENVI])
     default = set([_Identifier.CROSS, _Identifier.CROSSH, _Identifier.CROSST, _Identifier.JOINT, _Identifier.JOINH, _Identifier.JOIN])
 
     while True:
@@ -47,6 +48,8 @@ def deduct_output_type(dataset):
                 return dataset[_Fields.VALUES][0]
             if dataset_type == _Identifier.SOURCE_CSV:
                 return dataset[_Fields.TYPES]
+            if dataset_type == _Identifier.SOURCE_ENVI:
+                return TILE
         if dataset_type == _Identifier.PROJECTION:
             return tuple([deduct_output_type(dataset[_Fields.PARENT])[k] for k in dataset[_Fields.KEYS]])
         if dataset_type in default:
