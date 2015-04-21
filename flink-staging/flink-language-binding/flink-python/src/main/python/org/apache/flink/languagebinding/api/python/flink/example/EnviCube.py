@@ -43,11 +43,11 @@ class CubeCreator(GroupReduceFunction):
         :param collector:
         :return:
         """
-        print("just received data in reduce")
+        if(iterator.has_next):
+            collector.collect(iterator.next())
 
 class AcqDateSelector(KeySelectorFunction):
     def get_key(self, value):
-        print("got key selector function")
         return value._aquisitionDate
 
 if __name__ == "__main__":
