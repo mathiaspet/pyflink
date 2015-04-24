@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 
 from flink.plan.Environment import get_environment
-from flink.plan.Constants import TILE
+from flink.plan.Constants import TILE, STRING
 from flink.plan.Constants import Tile
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
@@ -105,7 +105,6 @@ class CubeCreator(GroupReduceFunction):
         print("known_counter", known_counter)
         print("orig not null", orig_not_null_counter)
 
-
 class AcqDateSelector(KeySelectorFunction):
     def get_key(self, value):
         return value.aquisitionDate
@@ -127,8 +126,8 @@ if __name__ == "__main__":
 
 
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), (TILE)).reduce_group(CubeCreator(),(TILE))
-
+    cube = data.group_by(AcqDateSelector(), STRING).reduce_group(CubeCreator(), TILE)
+    
     cube.write_envi(outputPath)
 
     env.set_degree_of_parallelism(1)

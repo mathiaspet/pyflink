@@ -247,7 +247,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	}
 
 	private void createEnviSource() throws IOException {
-		int id = (Integer) receiver.getRecord();
+		Long id = (Long) receiver.getRecord();
 		String path = (String) receiver.getRecord();
 		//TODO: this stinks but otherwise
 		double leftLong = Double.parseDouble((String)receiver.getRecord());
@@ -261,7 +261,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		Coordinate rightLower = new Coordinate(rightLong, rightLat);
 
 		EnviReader enviReader = env.readEnviFile(path, blockSize, blockSize);
-		sets.put(id, enviReader.restrictTo(leftUpper, rightLower).build());
+		sets.put(id.intValue(), enviReader.restrictTo(leftUpper, rightLower).build());
 	}
 
 
@@ -302,12 +302,12 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		sets.put(id, env.generateSequence(from, to).name("SequenceSource"));
 	}
 	private void createEnviSink() throws IOException {
-		int parentID = (Integer) receiver.getRecord();
+		Long parentID = (Long) receiver.getRecord();
 		String path = (String) receiver.getRecord();
-		WriteMode writeMode = ((Integer) receiver.getRecord()) == 1
+		WriteMode writeMode = ((Long) receiver.getRecord()) == 1
 				? WriteMode.OVERWRITE
 				: WriteMode.NO_OVERWRITE;
-		DataSet parent = (DataSet) sets.get(parentID);
+		DataSet parent = (DataSet) sets.get(parentID.intValue());
 		parent.writeAsEnvi(path, writeMode).name("EnviSink");
 	}
 
