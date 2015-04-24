@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 
 from flink.plan.Environment import get_environment
-from flink.plan.Constants import TILE
+from flink.plan.Constants import TILE, STRING
 from flink.plan.Constants import Tile
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
@@ -108,7 +108,7 @@ class CubeCreator(GroupReduceFunction):
 
 class AcqDateSelector(KeySelectorFunction):
     def get_key(self, value):
-        return value.aquisitionDate
+        return value._aquisitionDate
 
 if __name__ == "__main__":
     print("found args length: " + str(len(sys.argv)))
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 8:
         print("Usage: ./bin/pyflink.sh EnviCube - <dop> <input directory> <left-upper-longitude> <left-upper-latitude> <block size> <pixel size> <output path>")
         sys.exit()
-
+    
     dop = int(sys.argv[1])
     path = sys.argv[2]
     leftLong = sys.argv[3]
@@ -124,13 +124,13 @@ if __name__ == "__main__":
     blockSize = sys.argv[5]
     pixelSize = sys.argv[6]
     outputPath = sys.argv[7]
-
-
+    
+    
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), (TILE)).reduce_group(CubeCreator(),(TILE))
-
+    cube = data.group_by(AcqDateSelector(), STRING).reduce_group(CubeCreator(), TILE)
+    
     cube.write_envi(outputPath)
-
+    
     env.set_degree_of_parallelism(1)
 
     env.execute(local=True)

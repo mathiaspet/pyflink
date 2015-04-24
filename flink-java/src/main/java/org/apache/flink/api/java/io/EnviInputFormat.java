@@ -20,6 +20,7 @@ package org.apache.flink.api.java.io;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -438,7 +439,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	}
 	
 	
-	public static final class EnviTilePosition {
+	public static final class EnviTilePosition implements Serializable{
 		public final int band;
 		public final int xstart, xnext;
 		public final int ystart, ynext;
@@ -464,7 +465,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		}
 	}
 	
-	public static final class EnviInputSplit extends FileInputSplit {
+	public static final class EnviInputSplit extends FileInputSplit implements Serializable{
 		private static final long serialVersionUID = -9205048860784884871L;
 		public TileInfo info;
 		public EnviTilePosition pos;

@@ -19,6 +19,7 @@ from struct import pack
 import sys
 
 from flink.connection.Constants import Types
+from flink.plan.Constants import Tile
 
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
@@ -153,5 +154,8 @@ class TypedCollector(object):
             value = bytes(value)
             size = pack(">I", len(value))
             self._connection.write(b"".join([Types.TYPE_BYTES, size, value]))
+        elif isinstance(value, Tile):
+            s_value = TileSerializer(None, None).serialize(value)
+            self._connection.write(b"".join([Types.TYPE_TILE, s_value]))
         else:
             raise Exception("Unsupported Type encountered.")

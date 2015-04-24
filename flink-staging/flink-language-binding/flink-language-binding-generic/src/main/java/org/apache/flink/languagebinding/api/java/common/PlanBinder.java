@@ -280,9 +280,37 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		sets.put(info.setID, env.generateSequence(info.from, info.to).name("SequenceSource"));
 	}
 
+	private void createEnviSource() throws IOException {
+		Long id = (Long) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		//TODO: this stinks but otherwise
+		double leftLong = Double.parseDouble((String)receiver.getRecord());
+		double leftLat = Double.parseDouble((String)receiver.getRecord());
+		int blockSize = Integer.parseInt((String)receiver.getRecord());
+		int pixelSize = Integer.parseInt((String)receiver.getRecord());
+
+		Coordinate leftUpper = new Coordinate(leftLong,	leftLat);
+		double rightLong = leftLong + blockSize * pixelSize;
+		double rightLat = leftLat - blockSize * pixelSize;
+		Coordinate rightLower = new Coordinate(rightLong, rightLat);
+
+		EnviReader enviReader = env.readEnviFile(path, blockSize, blockSize);
+		sets.put(id.intValue(), enviReader.restrictTo(leftUpper, rightLower).build());
+	}
+
 	private void createCsvSink(OperationInfo info) throws IOException {
 		DataSet parent = (DataSet) sets.get(info.parentID);
 		parent.writeAsCsv(info.path, info.lineDelimiter, info.fieldDelimiter, info.writeMode).name("CsvSink");
+	}
+
+	private void createEnviSink() throws IOException {
+		Long parentID = (Long) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		WriteMode writeMode = ((Long) receiver.getRecord()) == 1
+				? WriteMode.OVERWRITE
+				: WriteMode.NO_OVERWRITE;
+		DataSet parent = (DataSet) sets.get(parentID.intValue());
+		parent.writeAsEnvi(path, writeMode).name("EnviSink");
 	}
 
 	private void createTextSink(OperationInfo info) throws IOException {
