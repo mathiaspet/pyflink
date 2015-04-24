@@ -42,10 +42,21 @@ class Tokenizer(FlatMapFunction):
 
 class CubeCreator(GroupReduceFunction):
     def __init__(self):
+        super(CubeCreator, self).__init__()
         self.xSize = 0
         self.ySize = 0
-        self.leftUpper = (0, 0)
-        self.rightLower = (0, 0)
+        self.leftUpperLat = 0
+        self.leftUpperLon = 0
+        self.rightLowerLat = 0
+        self.rightLowerLon = 0
+
+    @property
+    def leftUpper(self):
+        return (self.leftUpperLat, self.leftUpperLon)
+
+    @property
+    def rightLower(self):
+        return (self.rightLowerLat, self.rightLowerLon)
 
     def reduce(self, iterator, collector):
         """
@@ -56,7 +67,7 @@ class CubeCreator(GroupReduceFunction):
         # group tiles by band
         band_to_tiles = defaultdict(set)
         for tile in iterator:
-            band_to_tiles[tile.band].add(tile)
+            band_to_tiles[tile._band].add(tile)
 
         # iterate over bands in order
         bands = sorted(band_to_tiles.keys())
@@ -66,38 +77,40 @@ class CubeCreator(GroupReduceFunction):
         for b in bands:
             result = Tile()
             # Initialize content with -9999 = 0xf1d8
-            # TODO: Does this allocate all values and then copy them?
-            result.content = bytearray(self.x_size * self.y_size * NOVAL)
+            result._content = bytearray(self.xSize * self.ySize)
+            for i in range(0, len(result._content), 2):
+                result._content[i] = '\xf1'
+                result._content[i+1] = '\xd8'
 
             # iterate over tiles for current band
             updated = False
             for t in band_to_tiles[b]:
                 if not updated:
-                    result.update(self.left_upper, self.right_lower, self.x_size,
-                                  self.y_size, b, t.path_row, t.acq_date,
-                                  t.x_px_width, t.y_px_width)
+                    result.update(self.leftUpper, self.rightLower, self.xSize,
+                                  self.ySize, b, t._pathRow, t._aquisitionDate,
+                                  t._xPixelWidth, t._yPixelWidth)
                     updated = True
 
                 # iterate over tile content 2 bytes per iteration
-                for i in range(0, len(t.content), 2):
-                    if t.content[i:i+2] != NOVAL:
+                for i in range(0, len(t._content), 2):
+                    if t._content[i:i+2] != NOVAL:
                         orig_not_null_counter += 1
 
                     # check coordinates of current pixel
-                    px_coord = t.get_coordinate(i)
-                    if (self.left_upper.lat >= px_coord.lat and
-                            px_coord.lat >= self.right_lower.lat and
-                            self.left_upper.lon <= px_coord.lon and
-                            px_coord.lon <= self.right_lower.lon):
+                    px_coord_lat, px_coord_lon = t.get_coordinate(i)
+                    if (self.leftUpperLat >= px_coord_lat and
+                            px_coord_lat >= self.rightLowerLat and
+                            self.leftUpperLon <= px_coord_lon and
+                            px_coord_lon <= self.rightLowerLon):
                         # get index in result tile for current pixel
-                        index = result.get_content_index_from_coordinate(px_coord)
-                        if index >= 0 and index < len(result.content):
+                        index = result.get_content_index_from_coordinate((px_coord_lat, px_coord_lon))
+                        if index >= 0 and index < len(result._content):
                             inside_counter += 1
-                            px_value = t.content[i:i+2]
+                            px_value = t._content[i:i+2]
                             if px_value != NOVAL:
                                 known_counter += 1
-                            result.content[index] = px_value[0]
-                            result.content[index+1] = px_value[1]
+                            result._content[index] = px_value[0]
+                            result._content[index+1] = px_value[1]
 
                 collector.collect(result)
 
