@@ -141,7 +141,7 @@ class Tile(object):
         x = lonDiff // self._xPixelWidth
         y = latDiff // self._yPixelWidth
 
-        return 2 * (y * self._width + x)
+        return int(2 * (y * self._width + x))
 
 import sys
 
