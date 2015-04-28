@@ -41,14 +41,12 @@ class Tokenizer(FlatMapFunction):
 
 
 class CubeCreator(GroupReduceFunction):
-    def __init__(self):
+    def __init__(self, leftUpper=(0, 0), rightLower=(0, 0), xSize=0, ySize=0):
         super(CubeCreator, self).__init__()
-        self.xSize = 0
-        self.ySize = 0
-        self.leftUpperLat = 0
-        self.leftUpperLon = 0
-        self.rightLowerLat = 0
-        self.rightLowerLon = 0
+        self.leftUpperLat, self.leftUpperLon = leftUpper
+        self.rightLowerLat, self.rightLowerLon = rightLower
+        self.xSize = xSize
+        self.ySize = ySize
 
     @property
     def leftUpper(self):
@@ -77,10 +75,10 @@ class CubeCreator(GroupReduceFunction):
         for b in bands:
             result = Tile()
             # Initialize content with -9999 = 0xf1d8
-            result._content = bytearray(self.xSize * self.ySize)
+            result._content = bytearray(self.xSize * self.ySize * 2)
             for i in range(0, len(result._content), 2):
-                result._content[i] = '\xf1'
-                result._content[i+1] = '\xd8'
+                result._content[i] = 0xf1
+                result._content[i+1] = 0xd8
 
             # iterate over tiles for current band
             updated = False
@@ -93,6 +91,7 @@ class CubeCreator(GroupReduceFunction):
 
                 # iterate over tile content 2 bytes per iteration
                 for i in range(0, len(t._content), 2):
+                    print(t._content[i:i+2], t._content[i], t._content[i+1])
                     if t._content[i:i+2] != NOVAL:
                         orig_not_null_counter += 1
 
@@ -103,7 +102,7 @@ class CubeCreator(GroupReduceFunction):
                             self.leftUpperLon <= px_coord_lon and
                             px_coord_lon <= self.rightLowerLon):
                         # get index in result tile for current pixel
-                        index = result.get_content_index_from_coordinate((px_coord_lat, px_coord_lon))
+                        index = int(result.get_content_index_from_coordinate((px_coord_lat, px_coord_lon)))
                         if index >= 0 and index < len(result._content):
                             inside_counter += 1
                             px_value = t._content[i:i+2]
@@ -124,7 +123,7 @@ class AcqDateSelector(KeySelectorFunction):
         return value._aquisitionDate
 
 if __name__ == "__main__":
-    print("found args length: " + str(len(sys.argv)))
+    print("found args length:", len(sys.argv))
     env = get_environment()
     if len(sys.argv) != 8:
         print("Usage: ./bin/pyflink.sh EnviCube - <dop> <input directory> <left-upper-longitude> <left-upper-latitude> <block size> <pixel size> <output path>")
@@ -137,13 +136,17 @@ if __name__ == "__main__":
     blockSize = sys.argv[5]
     pixelSize = sys.argv[6]
     outputPath = sys.argv[7]
-    
-    
+
+    leftUpper = (float(leftLat), float(leftLong))
+    rightLower = (float(leftLat) - int(blockSize) * int(pixelSize),
+                  float(leftLong) + int(blockSize) * int(pixelSize))
+
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), STRING).reduce_group(CubeCreator(), TILE)
-    
+    cube = data.group_by(AcqDateSelector(), STRING)\
+        .reduce_group(CubeCreator(leftUpper, rightLower, int(blockSize), int(blockSize)), TILE)
+
     cube.write_envi(outputPath)
-    
-    env.set_degree_of_parallelism(1)
+
+    env.set_degree_of_parallelism(dop)
 
     env.execute(local=True)
