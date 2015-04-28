@@ -66,6 +66,9 @@ class CubeCreator(GroupReduceFunction):
         band_to_tiles = defaultdict(set)
         for tile in iterator:
             band_to_tiles[tile._band].add(tile)
+            print("PY========")
+            for i in range(0, 20, 2):
+                print(tile._content[i], tile._content[i+1])
 
         # iterate over bands in order
         bands = sorted(band_to_tiles.keys())

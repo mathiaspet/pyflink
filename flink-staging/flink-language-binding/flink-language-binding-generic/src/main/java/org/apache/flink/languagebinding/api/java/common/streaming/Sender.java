@@ -408,4 +408,197 @@ public class Sender implements Serializable {
 			buffers.clear();
 		}
 	}
+
+	//TODO: use TileTypeSerializer instead
+	//TODO: refactor the whole serializer logic for tiles and tuples
+	//this screams because of code duplication!!!
+	private class TileSerializer extends Serializer<Tile> {
+
+		//FIXME: fix the reuse of these objects
+		//putting the buffer of each serializer into this.buffer
+		//immediately will help
+		private StringSerializer stringSerializer;
+		private StringSerializer stringSerializer2;
+		private IntSerializer intSerializer;
+		private IntSerializer intSerializer2;
+		private IntSerializer intSerializer3;
+		private IntSerializer intSerializer4;
+
+		private DoubleSerializer doubleSerializer;
+		private DoubleSerializer doubleSerializer2;
+		private DoubleSerializer doubleSerializer3;
+		private DoubleSerializer doubleSerializer4;
+		private DoubleSerializer doubleSerializer5;
+		private DoubleSerializer doubleSerializer6;
+
+		private BytesSerializer bytesSerializer;
+		private BooleanSerializer boolSerializer;
+		private BooleanSerializer boolSerializer2;
+		private BooleanSerializer boolSerializer3;
+
+		private List<ByteBuffer> buffers;
+
+		public TileSerializer() {
+			super(0);
+			this.doubleSerializer = new DoubleSerializer();
+			this.doubleSerializer2 = new DoubleSerializer();
+			this.doubleSerializer3 = new DoubleSerializer();
+			this.doubleSerializer4 = new DoubleSerializer();
+			this.doubleSerializer5 = new DoubleSerializer();
+			this.doubleSerializer6 = new DoubleSerializer();
+
+			this.intSerializer = new IntSerializer();
+			this.intSerializer2 = new IntSerializer();
+			this.intSerializer3 = new IntSerializer();
+			this.intSerializer4 = new IntSerializer();
+
+			this.stringSerializer = new StringSerializer();
+			this.stringSerializer2 = new StringSerializer();
+
+			this.bytesSerializer = new BytesSerializer();
+
+			this.boolSerializer = new BooleanSerializer();
+			this.boolSerializer2 = new BooleanSerializer();
+			this.boolSerializer3 = new BooleanSerializer();
+
+			this.buffers = new ArrayList<ByteBuffer>();
+		}
+
+		@Override
+		public void serializeInternal(Tile value) {
+			int length = 0;
+			//TODO: allocation
+
+
+			if (value.getAqcuisitionDate() != null) {
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(true);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
+
+				String acqDate = value.getAqcuisitionDate();
+				this.stringSerializer.buffer.clear();
+				this.stringSerializer.serializeInternal(acqDate);
+				length+= this.stringSerializer.buffer.position();
+				this.buffers.add(this.stringSerializer.buffer);
+
+			} else {
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(false);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
+			}
+
+			this.intSerializer.buffer.clear();
+			this.intSerializer.serializeInternal(value.getBand());
+			length += this.intSerializer.buffer.position();
+			this.buffers.add(this.intSerializer.buffer);
+
+			this.doubleSerializer.buffer.clear();
+			this.doubleSerializer.serializeInternal(value.getLuCord().lon);
+			length += this.doubleSerializer.buffer.position();
+			this.buffers.add(this.doubleSerializer.buffer);
+
+			this.doubleSerializer2.buffer.clear();
+			this.doubleSerializer2.serializeInternal(value.getLuCord().lat);
+			length += this.doubleSerializer2.buffer.position();
+			this.buffers.add(this.doubleSerializer2.buffer);
+
+			this.doubleSerializer3.buffer.clear();
+			this.doubleSerializer3.serializeInternal(value.getRlCord().lon);
+			length += this.doubleSerializer3.buffer.position();
+			this.buffers.add(this.doubleSerializer3.buffer);
+
+			this.doubleSerializer4.buffer.clear();
+			this.doubleSerializer4.serializeInternal(value.getRlCord().lat);
+			length += this.doubleSerializer4.buffer.position();
+			this.buffers.add(this.doubleSerializer4.buffer);
+
+
+			if (value.getPathRow() != null) {
+				this.boolSerializer2.buffer.clear();
+				this.boolSerializer2.serializeInternal(true);
+				length += this.boolSerializer2.buffer.position();
+				this.buffers.add(this.boolSerializer2.buffer);
+
+				try{
+					this.stringSerializer2.buffer.clear();
+					String pathRow = value.getPathRow();
+					pathRow = new String(pathRow.getBytes(), "UTF-8");
+					this.stringSerializer2.serializeInternal(pathRow);
+					length+= this.stringSerializer2.buffer.position();
+					this.buffers.add(this.stringSerializer2.buffer);
+				}catch(UnsupportedEncodingException ex) {
+					ex.printStackTrace();
+				}
+			} else {
+				this.boolSerializer2.buffer.clear();
+				this.boolSerializer2.serializeInternal(false);
+				length += this.boolSerializer2.buffer.position();
+				this.buffers.add(this.boolSerializer2.buffer);
+			}
+
+			this.intSerializer2.buffer.clear();
+			this.intSerializer2.serializeInternal(value.getTileHeight());
+			length += this.intSerializer2.buffer.position();
+			this.buffers.add(this.intSerializer2.buffer);
+
+			this.intSerializer3.buffer.clear();
+			this.intSerializer3.serializeInternal(value.getTileWidth());
+			length += this.intSerializer3.buffer.position();
+			this.buffers.add(this.intSerializer3.buffer);
+
+			this.doubleSerializer5.buffer.clear();
+			this.doubleSerializer5.serializeInternal(value.getxPixelWith());
+			length += this.doubleSerializer5.buffer.position();
+			this.buffers.add(this.doubleSerializer5.buffer);
+
+			this.doubleSerializer6.buffer.clear();
+			this.doubleSerializer6.serializeInternal(value.getyPixelWidth());
+			length += this.doubleSerializer6.buffer.position();
+			this.buffers.add(this.doubleSerializer6.buffer);
+
+//				this.tileInfo.serialize(fileBuffer);
+
+			if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(true);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
+
+				byte[] byteContent = new byte[value.getS16Tile().length * 2];
+				ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
+						.asShortBuffer().put(value.getS16Tile());
+
+				System.out.println("JAVA==========");
+				for (int i = 0; i < 20; i += 2) {
+					System.out.print(byteContent[i]);
+					System.out.print(" ");
+					System.out.print(byteContent[i+1]);
+					System.out.print(" ");
+					System.out.println(value.getS16Tile()[i]);
+				}
+
+				this.bytesSerializer.buffer.clear();
+				this.bytesSerializer.serializeInternal(byteContent);
+				length += this.bytesSerializer.buffer.position();
+				this.buffers.add(this.bytesSerializer.buffer);
+
+			} else{
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(false);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
+			}
+
+			buffer = ByteBuffer.allocate(length);
+			for (ByteBuffer b : buffers) {
+				b.flip();
+				buffer.put(b);
+			}
+			buffers.clear();
+		}
+
+	}
+
 }
