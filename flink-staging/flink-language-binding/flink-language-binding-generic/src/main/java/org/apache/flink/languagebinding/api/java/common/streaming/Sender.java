@@ -569,16 +569,6 @@ public class Sender implements Serializable {
 				byte[] byteContent = new byte[value.getS16Tile().length * 2];
 				ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
 						.asShortBuffer().put(value.getS16Tile());
-
-				System.out.println("JAVA==========");
-				for (int i = 0; i < 20; i += 2) {
-					System.out.print(byteContent[i]);
-					System.out.print(" ");
-					System.out.print(byteContent[i+1]);
-					System.out.print(" ");
-					System.out.println(value.getS16Tile()[i]);
-				}
-
 				this.bytesSerializer.buffer.clear();
 				this.bytesSerializer.serializeInternal(byteContent);
 				length += this.bytesSerializer.buffer.position();
