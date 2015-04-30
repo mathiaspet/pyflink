@@ -17,6 +17,7 @@
 ################################################################################
 import sys
 from collections import defaultdict
+from struct import pack
 
 from flink.plan.Environment import get_environment
 from flink.plan.Constants import TILE, STRING
@@ -26,7 +27,7 @@ from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.functions.KeySelectorFunction import KeySelectorFunction
 
 
-NOVAL = b'\xf1\xd8'
+NOVAL = pack("<h", -9999)
 
 
 #deprecated
@@ -74,11 +75,11 @@ class CubeCreator(GroupReduceFunction):
         known_counter = 0
         for b in bands:
             result = Tile()
-            # Initialize content with -9999 = 0xf1d8
+            # Initialize content with -9999
             result._content = bytearray(self.xSize * self.ySize * 2)
             for i in range(0, len(result._content), 2):
-                result._content[i] = 0xf1
-                result._content[i+1] = 0xd8
+                result._content[i] = NOVAL[0]
+                result._content[i+1] = NOVAL[1]
 
             # iterate over tiles for current band
             updated = False
@@ -91,7 +92,6 @@ class CubeCreator(GroupReduceFunction):
 
                 # iterate over tile content 2 bytes per iteration
                 for i in range(0, len(t._content), 2):
-                    print(t._content[i:i+2], t._content[i], t._content[i+1])
                     if t._content[i:i+2] != NOVAL:
                         orig_not_null_counter += 1
 
