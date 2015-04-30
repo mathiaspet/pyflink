@@ -123,11 +123,11 @@ class Tile(object):
         self._yPixelWidth = yPixelWidth
 
     def get_coordinate(self, index):
-        index /= 2
+        index = index//2
         x = index % self._width
         y = index // self._width
         newLon = self._leftUpperLon + self._xPixelWidth * x
-        newLat = self._leftUpperLat + self._yPixelWidth * y
+        newLat = self._leftUpperLat - self._yPixelWidth * y
         return (newLat, newLon)
 
     def get_content_index_from_coordinate(self, coord):
