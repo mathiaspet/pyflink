@@ -402,6 +402,10 @@ public class Receiver implements Serializable {
 					.get(data);
 
 			this.reuse.setS16Tile(data);
+
+			byte[] test = this.bytesDes.deserialize();
+			this.reuse.test = test;
+
 			return this.reuse;
 		}
 

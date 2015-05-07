@@ -444,6 +444,8 @@ public class Sender implements Serializable {
 		private DoubleSerializer doubleSerializer6;
 
 		private BytesSerializer bytesSerializer;
+		private BytesSerializer bytesSerializer2;
+
 		private BooleanSerializer boolSerializer;
 		private BooleanSerializer boolSerializer2;
 		private BooleanSerializer boolSerializer3;
@@ -468,6 +470,7 @@ public class Sender implements Serializable {
 			this.stringSerializer2 = new StringSerializer();
 
 			this.bytesSerializer = new BytesSerializer();
+			this.bytesSerializer2 = new BytesSerializer();
 
 			this.boolSerializer = new BooleanSerializer();
 			this.boolSerializer2 = new BooleanSerializer();
@@ -592,6 +595,13 @@ public class Sender implements Serializable {
 				length += this.boolSerializer.buffer.position();
 				this.buffers.add(this.boolSerializer.buffer);
 			}
+
+
+			this.bytesSerializer2.buffer.clear();
+			this.bytesSerializer2.serializeInternal(value.test);
+			length += this.bytesSerializer2.buffer.position();
+			this.buffers.add(this.bytesSerializer2.buffer);
+
 
 			buffer = ByteBuffer.allocate(length);
 			for (ByteBuffer b : buffers) {

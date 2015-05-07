@@ -36,6 +36,8 @@ import org.apache.flink.core.memory.DataOutputView;
 public class Tile implements Serializable {
 	private static final long serialVersionUID = 3999969290376342375L;
 
+	public byte[] test;
+
 	private String pathRow;
 	private String aqcuisitionDate;
 

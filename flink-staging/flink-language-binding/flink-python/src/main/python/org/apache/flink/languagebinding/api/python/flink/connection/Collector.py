@@ -17,6 +17,7 @@
 ################################################################################
 from struct import pack
 import sys
+import pickle
 
 from flink.connection.Constants import Types
 from flink.plan.Constants import Tile
@@ -103,6 +104,7 @@ class TileSerializer(object):
         self._stringSerializer = StringSerializer()
         self._bytesSerializer = ByteArraySerializer()
         self._doubleSerializer = FloatSerializer()
+        self._objectSerializer = ObjectSerializer()
 
     def serialize(self, value):
         bits = []
@@ -119,6 +121,7 @@ class TileSerializer(object):
         bits.append(self._doubleSerializer.serialize(value._xPixelWidth))
         bits.append(self._doubleSerializer.serialize(value._yPixelWidth))
         bits.append(self._bytesSerializer.serialize(value._content))
+        bits.append(self._objectSerializer.serialize(value._test))
         return b"".join(bits)
 
 class FloatSerializer(object):
@@ -146,6 +149,12 @@ class StringSerializer(object):
 class NullSerializer(object):
     def serialize(self, value):
         return b""
+
+
+class ObjectSerializer(object):
+    def serialize(self, value):
+        bs = pickle.dumps(value)
+        pack(">I", len(bs)) + bs
 
 
 class TypedCollector(object):
