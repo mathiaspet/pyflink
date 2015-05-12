@@ -67,6 +67,7 @@ class CubeCreator(GroupReduceFunction):
         band_to_tiles = defaultdict(set)
         for tile in iterator:
             band_to_tiles[tile._band].add(tile)
+            print(tile._test)
 
         # iterate over bands in order
         bands = sorted(band_to_tiles.keys())

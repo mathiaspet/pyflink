@@ -36,7 +36,7 @@ import org.apache.flink.core.memory.DataOutputView;
 public class Tile implements Serializable {
 	private static final long serialVersionUID = 3999969290376342375L;
 
-	public byte[] test;
+	public byte[] test = null;
 
 	private String pathRow;
 	private String aqcuisitionDate;
@@ -90,6 +90,8 @@ public class Tile implements Serializable {
 		this.tileWidth = tile.getTileWidth();
 		this.xPixelWith = tile.xPixelWith;
 		this.yPixelWidth = tile.yPixelWidth;
+
+		this.test = tile.test.clone();
 	}
 
 	public int getBand() {
@@ -265,6 +267,8 @@ public class Tile implements Serializable {
 		target.xPixelWith = this.xPixelWith;
 		target.yPixelWidth = this.yPixelWidth;
 
+		target.test = this.test.clone();
+
 	}
 
 	public void serialize(DataOutputView target) throws IOException {
@@ -310,6 +314,13 @@ public class Tile implements Serializable {
 			target.writeBoolean(false);
 		}
 	
+		if(this.test != null && this.test.length > 0) {
+			target.writeBoolean(true);
+			target.writeInt(this.test.length);
+			target.write(this.test);
+		} else {
+			target.writeBoolean(false);
+		}
 	}
 
 	public void deserialize(DataInputView source) throws IOException {
@@ -348,6 +359,12 @@ public class Tile implements Serializable {
 					.get(s16Tile);
 		} else {
 			this.s16Tile = new short[0];
+		}
+
+		if (source.readBoolean()) {
+			int testLength = source.readInt();
+			this.test = new byte[testLength];
+			source.read(this.test);
 		}
 	}
 

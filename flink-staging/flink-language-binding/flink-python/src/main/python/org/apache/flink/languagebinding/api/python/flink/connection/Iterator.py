@@ -348,7 +348,11 @@ class ObjectDeserializer(object):
 
     def deserialize(self):
         size = unpack(">I", self.read(4, self._group))[0]
-        return pickle.loads(self.read(size, self._group))
+        print("PY: Deserializing object", size)
+        if size:
+            return pickle.loads(self.read(size, self._group))
+        else:
+            return None
 
 
 class TileDeserializer(object):
@@ -389,6 +393,8 @@ class TileDeserializer(object):
         if hasContent > 0:
             tile._content = self._bytesSerializer.deserialize()
 
-        tile._test = self._objectSerializer.deserialize()
+        hasContent = self._boolSerializer.deserialize()
+        if hasContent > 0:
+            tile._test = self._objectSerializer.deserialize()
 
         return tile

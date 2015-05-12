@@ -154,7 +154,8 @@ class NullSerializer(object):
 class ObjectSerializer(object):
     def serialize(self, value):
         bs = pickle.dumps(value)
-        pack(">I", len(bs)) + bs
+        print("PY: Serializing object", len(bs), bs)
+        return pack(">I", len(bs)) + bs
 
 
 class TypedCollector(object):
