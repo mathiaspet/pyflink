@@ -362,7 +362,7 @@ class TileDeserializer(object):
         self._boolSerializer = BooleanDeserializer(read, group)
         self._intSerializer = IntegerDeserializer(read, group)
         self._doubleSerializer = DoubleDeserializer(read, group)
-        self._bytesSerializer = ByteArrayDeserializer(read, group)
+        # self._bytesSerializer = ByteArrayDeserializer(read, group)
         self._objectSerializer = ObjectDeserializer(read, group)
 
     def deserialize(self):
@@ -388,9 +388,9 @@ class TileDeserializer(object):
         tile._xPixelWidth = self._doubleSerializer.deserialize()
         tile._yPixelWidth = self._doubleSerializer.deserialize()
 
-        hasContent = self._boolSerializer.deserialize()
-        if hasContent > 0:
-            tile._content = self._bytesSerializer.deserialize()
+        # hasContent = self._boolSerializer.deserialize()
+        # if hasContent > 0:
+        #     tile._content = self._bytesSerializer.deserialize()
 
         hasContent = self._boolSerializer.deserialize()
         if hasContent > 0:
