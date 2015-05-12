@@ -121,7 +121,7 @@ class TileSerializer(object):
         bits.append(self._doubleSerializer.serialize(value._xPixelWidth))
         bits.append(self._doubleSerializer.serialize(value._yPixelWidth))
         bits.append(self._bytesSerializer.serialize(value._content))
-        bits.append(self._objectSerializer.serialize(value._test))
+        bits.append(self._objectSerializer.serialize(value))
         return b"".join(bits)
 
 class FloatSerializer(object):
@@ -154,7 +154,7 @@ class NullSerializer(object):
 class ObjectSerializer(object):
     def serialize(self, value):
         bs = pickle.dumps(value)
-        print("PY: Serializing object", len(bs), bs)
+        print("PY: Serializing object -", len(bs), "bytes")
         return pack(">I", len(bs)) + bs
 
 

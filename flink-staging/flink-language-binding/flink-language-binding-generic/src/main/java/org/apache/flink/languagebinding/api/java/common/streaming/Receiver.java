@@ -32,8 +32,6 @@ import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
 import org.apache.flink.util.Collector;
 
-import java.util.Arrays;
-
 /**
  * General-purpose class to read data from memory-mapped files.
  */
@@ -406,11 +404,10 @@ public class Receiver implements Serializable {
 			this.reuse.setS16Tile(data);
 
 
-			this.reuse.test = this.bytesDes.deserialize();
+			this.reuse.pickle = this.bytesDes.deserialize();
 
-			System.out.print("JA: Deserializing object ");
-			System.out.print(Arrays.toString(this.reuse.test));
-			System.out.println(this.reuse.test.length);
+			System.out.print("JA: Deserializing object - ");
+			System.out.println(this.reuse.pickle.length);
 
 			return this.reuse;
 		}
