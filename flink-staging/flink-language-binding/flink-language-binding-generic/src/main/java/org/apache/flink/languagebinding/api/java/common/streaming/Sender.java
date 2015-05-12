@@ -596,7 +596,6 @@ public class Sender implements Serializable {
 				this.buffers.add(this.boolSerializer.buffer);
 			}
 
-			System.out.print("JA: Serializing object");
 			if (value.pickle != null) {
 				this.boolSerializer3.buffer.clear();
 				this.boolSerializer3.serializeInternal(true);

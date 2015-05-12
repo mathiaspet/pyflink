@@ -406,9 +406,6 @@ public class Receiver implements Serializable {
 
 			this.reuse.pickle = this.bytesDes.deserialize();
 
-			System.out.print("JA: Deserializing object - ");
-			System.out.println(this.reuse.pickle.length);
-
 			return this.reuse;
 		}
 

@@ -348,7 +348,6 @@ class ObjectDeserializer(object):
 
     def deserialize(self):
         size = unpack(">I", self.read(4, self._group))[0]
-        print("PY: Deserializing object -", size, "bytes")
         if size:
             return pickle.loads(self.read(size, self._group))
         else:
