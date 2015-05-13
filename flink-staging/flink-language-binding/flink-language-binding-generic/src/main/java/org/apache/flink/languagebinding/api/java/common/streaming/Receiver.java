@@ -403,7 +403,6 @@ public class Receiver implements Serializable {
 
 			this.reuse.setS16Tile(data);
 
-
 			this.reuse.pickle = this.bytesDes.deserialize();
 
 			return this.reuse;

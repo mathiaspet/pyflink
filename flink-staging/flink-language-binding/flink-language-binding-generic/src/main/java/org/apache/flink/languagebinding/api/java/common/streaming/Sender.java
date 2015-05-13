@@ -20,7 +20,7 @@ import java.io.Serializable;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-// import java.nio.ByteOrder;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -575,28 +575,34 @@ public class Sender implements Serializable {
 
 //				this.tileInfo.serialize(fileBuffer);
 
-			// if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
-			// 	this.boolSerializer.buffer.clear();
-			// 	this.boolSerializer.serializeInternal(true);
-			// 	length += this.boolSerializer.buffer.position();
-			// 	this.buffers.add(this.boolSerializer.buffer);
+			if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(true);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
 
-			// 	byte[] byteContent = new byte[value.getS16Tile().length * 2];
-			// 	ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-			// 			.asShortBuffer().put(value.getS16Tile());
-			// 	this.bytesSerializer.buffer.clear();
-			// 	this.bytesSerializer.serializeInternal(byteContent);
-			// 	length += this.bytesSerializer.buffer.position();
-			// 	this.buffers.add(this.bytesSerializer.buffer);
+				byte[] byteContent;
+				if (value.pickle == null || value.pickle.length == 0) {
+					byteContent = new byte[value.getS16Tile().length * 2];
+					ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
+							.asShortBuffer().put(value.getS16Tile());
+				}
+				else {
+					byteContent = new byte[1];
+				}
+				this.bytesSerializer.buffer.clear();
+				this.bytesSerializer.serializeInternal(byteContent);
+				length += this.bytesSerializer.buffer.position();
+				this.buffers.add(this.bytesSerializer.buffer);
 
-			// } else{
-			// 	this.boolSerializer.buffer.clear();
-			// 	this.boolSerializer.serializeInternal(false);
-			// 	length += this.boolSerializer.buffer.position();
-			// 	this.buffers.add(this.boolSerializer.buffer);
-			// }
+			} else{
+				this.boolSerializer.buffer.clear();
+				this.boolSerializer.serializeInternal(false);
+				length += this.boolSerializer.buffer.position();
+				this.buffers.add(this.boolSerializer.buffer);
+			}
 
-			if (value.pickle != null) {
+			if (value.pickle != null && value.pickle.length > 0) {
 				this.boolSerializer3.buffer.clear();
 				this.boolSerializer3.serializeInternal(true);
 				length += this.boolSerializer3.buffer.position();

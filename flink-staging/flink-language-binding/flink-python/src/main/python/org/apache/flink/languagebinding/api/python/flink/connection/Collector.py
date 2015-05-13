@@ -97,6 +97,7 @@ class BooleanSerializer(object):
     def serialize(self, value):
         return pack(">?", value)
 
+
 class TileSerializer(object):
     def __init__(self, write, value):
         self._boolSerializer = BooleanSerializer()
@@ -123,6 +124,7 @@ class TileSerializer(object):
         bits.append(self._bytesSerializer.serialize(value._content))
         bits.append(self._objectSerializer.serialize(value))
         return b"".join(bits)
+
 
 class FloatSerializer(object):
     def serialize(self, value):
