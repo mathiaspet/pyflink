@@ -17,8 +17,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
@@ -396,12 +394,7 @@ public class Receiver implements Serializable {
 			this.reuse.setxPixelWith(this.doubleDes.deserialize());
 			this.reuse.setyPixelWidth(this.doubleDes.deserialize());
 
-			byte[] bytes = this.bytesDes.deserialize();
-			short[] data = new short[bytes.length / 2];
-			ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-					.get(data);
-
-			this.reuse.setS16Tile(data);
+			this.reuse.setContent(this.bytesDes.deserialize());
 			return this.reuse;
 		}
 

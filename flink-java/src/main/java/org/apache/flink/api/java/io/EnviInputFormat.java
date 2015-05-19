@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -393,11 +394,14 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		if(yread > ysize) { yread = ysize; }
 		
 		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
-		short[] values = record.getS16Tile();
-		if(values == null) {
-			values = new short[xsize * ysize];
-			record.setS16Tile(values);
+		byte[] bValues = record.getContent();
+		if(bValues == null) {
+			bValues = new byte[xsize * ysize * 2];
+			record.setContent(bValues);
 		}
+
+		ShortBuffer values = ByteBuffer.wrap(bValues).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+
 		short dataIgnoreValue = (short) info.getDataIgnoreValue();
 		int data_size = info.getPixelSize();
 		
@@ -423,17 +427,17 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 				LOG.warn("Should've read " + xread + " pixel, but read only " + read);
 			}
 			ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shortBuffer);
-			System.arraycopy(shortBuffer, 0, values, pos, xread);
+			values.put(shortBuffer);
 			pos = pos + xread;
 			
 			// Fill with empty columns:
 			for(int x = xread; x < xsize; x++) {
-				values[pos++] = dataIgnoreValue;
+				values.put(dataIgnoreValue);
 			}
 		}
 		// Fill missing rows with empty data:
-		while(pos < values.length) {
-			values[pos++] = dataIgnoreValue;
+		while(values.hasRemaining()) {
+			values.put(dataIgnoreValue);
 		}
 		return record;
 	}

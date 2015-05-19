@@ -20,7 +20,7 @@ package org.apache.flink.api.java.spatial;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -44,7 +44,7 @@ public class Tile implements Serializable {
 	/**
 	 * Tile data in 16-bit signed integers. It is organized in rows of pixels.
 	 */
-	private short[] s16Tile = null;
+	private byte[] content = null;
 
 	// Coordinates of left upper and right lower edge (according to the map
 	// info)
@@ -62,11 +62,11 @@ public class Tile implements Serializable {
 	public Tile() {
 	}
 
-	public Tile(Coordinate leftUpper, Coordinate rightLower, short[] content,
+	public Tile(Coordinate leftUpper, Coordinate rightLower, byte[] content,
 			int width, int height) {
 		this.luCord = leftUpper;
 		this.rlCord = rightLower;
-		this.s16Tile = content;
+		this.content = content;
 		this.tileWidth = width;
 		this.tileHeight = height;
 	}
@@ -78,10 +78,7 @@ public class Tile implements Serializable {
 		this.pathRow = tile.getPathRow();
 		this.rlCord = tile.getSECoord().copy();
 
-		short[] content = tile.getS16Tile();
-		short[] newContent = new short[content.length];
-		System.arraycopy(content, 0, newContent, 0, content.length);
-		this.s16Tile = newContent;
+		System.arraycopy(tile.content, 0, this.content, 0, tile.content.length);
 
 		this.tileHeight = tile.getTileHeight();
 		this.tileInfo = tile.getTileInfo().copy();
@@ -101,15 +98,15 @@ public class Tile implements Serializable {
 	 * 
 	 * @return
 	 */
-	public short[] getS16Tile() {
-		return this.s16Tile;
+	public byte[] getContent() {
+		return this.content;
 	}
 
 	/**
 	 * Update the stored tile array to the given one.
 	 */
-	public void setS16Tile(short[] data) {
-		this.s16Tile = data;
+	public void setContent(byte[] data) {
+		this.content = data;
 	}
 
 	/**
@@ -117,7 +114,8 @@ public class Tile implements Serializable {
 	 * Coordinates start at (0, 0).
 	 */
 	public short getPixel(int width, int height) {
-		return this.s16Tile[width + (height * this.tileWidth)];
+		ShortBuffer contentAsShorts = ByteBuffer.wrap(this.content).asShortBuffer();
+		return contentAsShorts.get(width + (height * this.tileWidth));
 	}
 
 	/**
@@ -221,7 +219,7 @@ public class Tile implements Serializable {
 
 	/**
 	 * Given the left upper reference point, the tile and pixel dimensions we
-	 * calculate the actual position in the s16Tile array.
+	 * calculate the actual position in the content array.
 	 * 
 	 * @param coord
 	 * @return
@@ -252,10 +250,7 @@ public class Tile implements Serializable {
 		target.pathRow = this.pathRow;
 		target.rlCord = this.rlCord.copy();
 
-		short[] content = this.s16Tile;
-		short[] newContent = new short[content.length];
-		System.arraycopy(content, 0, newContent, 0, content.length);
-		target.s16Tile = newContent;
+		System.arraycopy(this.content, 0, target.content, 0, this.content.length);
 
 		target.tileHeight = this.tileHeight;
 		target.tileInfo = this.getTileInfo().copy();
@@ -295,15 +290,11 @@ public class Tile implements Serializable {
 		
 		this.tileInfo.serialize(target);
 		
-		if(this.s16Tile != null && this.s16Tile.length > 0) {
+		if(this.content != null && this.content.length > 0) {
 			target.writeBoolean(true);
 			
-			byte[] byteContent = new byte[s16Tile.length * 2];
-	
-			ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-					.asShortBuffer().put(s16Tile);
-			target.writeInt(byteContent.length);
-			target.write(byteContent);
+			target.writeInt(this.content.length);
+			target.write(this.content);
 		} else{
 			target.writeBoolean(false);
 		}
@@ -341,11 +332,9 @@ public class Tile implements Serializable {
 			int contentLength = source.readInt();
 			byte[] content = new byte[contentLength];
 			source.read(content);
-			this.s16Tile = new short[content.length / 2];
-			ByteBuffer.wrap(content).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-					.get(s16Tile);
+			this.content = content;
 		} else {
-			this.s16Tile = new short[0];
+			this.content = new byte[0];
 		}
 	}
 

@@ -20,7 +20,6 @@ import java.io.Serializable;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -572,17 +571,14 @@ public class Sender implements Serializable {
 
 //				this.tileInfo.serialize(fileBuffer);
 
-			if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
+			if(value.getContent() != null && value.getContent().length > 0) {
 				this.boolSerializer.buffer.clear();
 				this.boolSerializer.serializeInternal(true);
 				length += this.boolSerializer.buffer.position();
 				this.buffers.add(this.boolSerializer.buffer);
 
-				byte[] byteContent = new byte[value.getS16Tile().length * 2];
-				ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-						.asShortBuffer().put(value.getS16Tile());
 				this.bytesSerializer.buffer.clear();
-				this.bytesSerializer.serializeInternal(byteContent);
+				this.bytesSerializer.serializeInternal(value.getContent());
 				length += this.bytesSerializer.buffer.position();
 				this.buffers.add(this.bytesSerializer.buffer);
 

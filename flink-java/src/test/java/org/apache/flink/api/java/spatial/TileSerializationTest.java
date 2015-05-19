@@ -113,8 +113,8 @@ public class TileSerializationTest {
 		TileInfo info = new TileInfo(testHeader);
 		out.setTileInfo(info);
 		
-		short[] content = {1, 2, 3, 4, 5 ,6 ,7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-		out.setS16Tile(content);
+		byte[] content = {1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0, 9, 0, 10, 0, 11, 0, 12, 0, 13, 0, 14, 0, 15, 0, 16};
+		out.setContent(content);
 		
 	}
 	
@@ -145,11 +145,11 @@ public class TileSerializationTest {
 		assertThat(outInfo.getPixelSize(), is(equalTo(tileInfo.getPixelSize())));
 		assertThat(outInfo.getSamples(), is(equalTo(tileInfo.getSamples())));
 		
-		short[] s16Tile = this.out.getS16Tile();
-		short[] s16Tile2 = tile.getS16Tile();
-		assertThat(s16Tile.length, is(equalTo(s16Tile2.length)));
+		byte[] content = this.out.getContent();
+		byte[] content2 = tile.getContent();
+		assertThat(content.length, is(equalTo(content2.length)));
 		for(int i = 0; i < 16; i++) {
-			assertThat(s16Tile[i], is(equalTo(s16Tile2[i])));
+			assertThat(content[i], is(equalTo(content2[i])));
 		}
 	}
 

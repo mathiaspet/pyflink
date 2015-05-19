@@ -18,8 +18,6 @@
 package org.apache.flink.api.java.io;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,12 +72,7 @@ public class EnviOutputFormat extends FileOutputFormat<Tile> {
 		String aqcuisitionDate = tile.getAqcuisitionDate();
 		this.bands.add(pathRow + "_" + aqcuisitionDate + "_B" + band);
 
-		short[] s16Tile = tile.getS16Tile();
-		byte[] byteContent = new byte[s16Tile.length * 2];
-
-		ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-				.asShortBuffer().put(s16Tile);
-		this.stream.write(byteContent);
+		this.stream.write(tile.getContent());
 		this.stream.flush();
 
 	}

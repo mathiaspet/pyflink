@@ -30,6 +30,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.ByteBuffer;
 
 import org.junit.Assert;
 import org.apache.flink.api.java.io.EnviInputFormat.EnviInputSplit;
@@ -295,8 +296,10 @@ public class EnviInputFormatTest {
 			Tile tile = new Tile();
 			eif.nextRecord(tile);
 			eif.close();
+
+			short[] content = ByteBuffer.wrap(tile.getContent()).asShortBuffer().array();
 			
-			Assert.assertArrayEquals(result[split.getSplitNumber()], tile.getS16Tile());
+			Assert.assertArrayEquals(result[split.getSplitNumber()], content);
 			Coordinate leftUpper = expectedCoords[i][0];
 			assertThat(tile.getNWCoord(), is(equalTo(leftUpper)));
 			Coordinate rightLower = expectedCoords[i][1];
