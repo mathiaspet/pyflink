@@ -327,11 +327,14 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		long totalCount = 0;
 		long totalWidth = 0;
 		for (FileStatus file : files) {
+			if (file.getPath().toString().endsWith("bsq")) {
+				continue;
+			}
 			// Read header file:
 			FSDataInputStream fdis = fs.open(file.getPath());
 			TileInfo info = new TileInfo(fdis);
 			fdis.close();
-	
+
 			// Calculate the number of splits, as done above:
 			int xsplits = (info.getSamples() + xsize - 1) / xsize;
 			int ysplits = (info.getLines() + ysize - 1) / ysize;
