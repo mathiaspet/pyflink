@@ -31,8 +31,9 @@ import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 
+import org.apache.flink.api.java.spatial.EnviInputFormat;
 import org.junit.Assert;
-import org.apache.flink.api.java.io.EnviInputFormat.EnviInputSplit;
+import org.apache.flink.api.java.spatial.EnviInputFormat.EnviInputSplit;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.core.fs.Path;

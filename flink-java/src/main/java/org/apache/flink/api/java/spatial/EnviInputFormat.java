@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.api.java.io;
+package org.apache.flink.api.java.spatial;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -31,9 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
-import org.apache.flink.api.java.spatial.Coordinate;
-import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.api.java.spatial.TileInfo;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -62,6 +59,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 	private TileInfo info;
 	private EnviTilePosition pos;
+	private boolean completeScene;
 	
 	private int readRecords = 0;
 	
@@ -76,120 +74,65 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		
 		if(minNumSplits < 1) { minNumSplits = 1; }
 		
-		final List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(minNumSplits);
+		List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(minNumSplits);
 		for (FileStatus file : files) {
 			// Read header file:
 			FSDataInputStream fdis = fs.open(file.getPath());
 			try{
 				TileInfo info = new TileInfo(fdis);
-			fdis.close();
+				fdis.close();
 
-			// Determine data file associated with this header:
-			int interleaveType = info.getInterleave();
-			if(interleaveType != 0) {
-				throw new RuntimeException("Interleave type " + interleaveType + " unsupported, use bsq.");
-			}
-			Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + TileInfo.InterleaveTypes.values()[interleaveType]));
-			FileStatus dataFileStatus;
-			try {
-				dataFileStatus = fs.getFileStatus(dataFile);
-			} catch(FileNotFoundException e) {
-				throw new RuntimeException("Data file " + dataFile + " for header " + file + " not found.", e);
-			}
-			
-			if(info.getDataType() != TileInfo.DataTypes.INT) {
-				throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
-						+ " File: " + file.getPath());
-			}
-			int data_size = info.getPixelSize();
-			int numBands = info.getBands();
-			int numRows = info.getLines();
-			int numColumns = info.getSamples();
-			this.pixelHeight = info.getPixelHeight();
-			this.pixelWidth = info.getPixelWidth();
-			String filePath = file.getPath().toString();
-			int lastIndexOf = filePath.lastIndexOf("/");
-			filePath = filePath.substring(lastIndexOf + 1);
-			String[] split = filePath.split("_");
-			String pathRow = split[0];
-			String aqcDate = split[1];
-			/*
-			 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
-			 *  pixels.
-			 */
-			int xsplits = (numColumns + xsize - 1) / xsize;
-			int ysplits = (numRows + ysize - 1) / ysize;
-			
-			// Real coordinates of this image + coordinate differences:
-			Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
-//			Coordinate realLowerRightCorner = info.getLowerRightCoordinate();
-//			Coordinate realDiff = realLowerRightCorner.diff(upperLeftCorner);
-			// Distance between upper left corner and virtual lower right corner of the last tile, including empty pixels:
-//			Coordinate diff = realDiff.scale(1.0 * xsize / info.getSamples(),
-//					1.0 * ysize / info.getLines());
-
-			
-			LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
-					xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + " for " + numBands + " bands: " + file.getPath());
-	
-			for(int band = 0; band < numBands; band++) {
-				long bandOffset = band * numRows * numColumns;
-				for(int currentYSplit = 0; currentYSplit < ysplits; currentYSplit++) {
-					// Calculate pixel coordinate of tile:
-					int pystart = currentYSplit *  ysize; // inclusive
-					int pynext = (currentYSplit + 1) *  ysize; // EXCLUSIVE
-	
-					for(int currentXSplit = 0; currentXSplit < xsplits; currentXSplit++) {
-						// Calculate pixel coordinate of tile:
-						int pxstart = currentXSplit *  xsize; // inclusive
-						int pxnext = ((currentXSplit + 1) % xsplits) *  xsize; // EXCLUSIVE
-						int pxnextNoWrapped = (currentXSplit + 1) *  xsize; // EXCLUSIVE
-						
-						Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat - currentYSplit * ysize * pixelHeight);
-						Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
-						
-						// Filter this tile if no pixel is contained in the selected region:
-						if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
-							if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); } 
-							continue;
-						}
-						
-						// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
-						long startPos = bandOffset + 1L * pystart * numColumns + pxstart;
-						/*
-						 *  Pixel position after last pixel in this tile.
-						 *  If the next block is in the same row (pxnext >= pxstart), the next start position is not below this block,
-						 *  but in the last row of the current block. Thus, decrement pynext in this case.
-						 */
-						long nextStartPos = bandOffset + 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
-						long numPixels = nextStartPos - startPos;
-						
-						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " startPos: " + startPos +" next: " + nextStartPos); }
-						
-						long offset = startPos * data_size;
-						long length = numPixels * data_size;
-						
-						if(offset + length > dataFileStatus.getLen()) { // Don't read over the end of file
-							length = dataFileStatus.getLen() - offset;
-						}
-						
-						if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " at offset " + offset +" +" + length + " bytes"); }
-						// Determine list of FS blocks that contain the given block
-						final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
-						Arrays.sort(blocks);
-						
-						inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
-								blocks[0].getHosts(), info, 
-								new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, aqcDate)));
-					}
+				// Determine data file associated with this header:
+				int interleaveType = info.getInterleave();
+				if(interleaveType != 0) {
+					throw new RuntimeException("Interleave type " + interleaveType + " unsupported, use bsq.");
 				}
-			}
-			
+				Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + TileInfo.InterleaveTypes.values()[interleaveType]));
+				FileStatus dataFileStatus;
+				try {
+					dataFileStatus = fs.getFileStatus(dataFile);
+				} catch(FileNotFoundException e) {
+					throw new RuntimeException("Data file " + dataFile + " for header " + file + " not found.", e);
+				}
+
+				if(info.getDataType() != TileInfo.DataTypes.INT) {
+					throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
+							+ " File: " + file.getPath());
+				}
+				int data_size = info.getPixelSize();
+				int numBands = info.getBands();
+				int numRows = info.getLines();
+				int numColumns = info.getSamples();
+				this.pixelHeight = info.getPixelHeight();
+				this.pixelWidth = info.getPixelWidth();
+				String filePath = file.getPath().toString();
+				int lastIndexOf = filePath.lastIndexOf("/");
+				filePath = filePath.substring(lastIndexOf + 1);
+				String[] split = filePath.split("_");
+				String pathRow = split[0];
+				String aqcDate = split[1];
+
+				if(completeScene) {
+					// Determine list of FS blocks that contain the given block
+					final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, 0, numRows * numColumns);
+					Arrays.sort(blocks);
+
+					//create absolute position that comprises the whole scene
+					EnviTilePosition absolutePosition = new EnviTilePosition(-1, 0, numColumns, 0, numRows, this.leftUpperLimit, this.rightLowerLimit, pathRow, aqcDate);
+
+					EnviInputSplit sceneSplit = new EnviInputSplit(inputSplits.size(), dataFile, 0, data_size,
+							blocks[0].getHosts(), info,
+							absolutePosition);
+					inputSplits.add(sceneSplit);
+				} else {
+					createTiledSplits(fs, inputSplits, file, info, dataFile, dataFileStatus, data_size, numBands, numRows, numColumns, pathRow, aqcDate);
+				}
+
 			}catch (RuntimeException ex) {
 				LOG.warn(ex.getMessage(), ex);
 				continue;
 			}
-			
+
 		}
 
 		if (inputSplits.size() < minNumSplits) {
@@ -200,6 +143,74 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		}
 
 		return inputSplits.toArray(new EnviInputSplit[0]);
+	}
+
+	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfo info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String aqcDate) throws IOException {
+	/*
+	 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
+	 *  pixels.
+	 */
+		int xsplits = (numColumns + xsize - 1) / xsize;
+		int ysplits = (numRows + ysize - 1) / ysize;
+
+		// Real coordinates of this image + coordinate differences:
+		Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
+
+		LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
+				xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + " for " + numBands + " bands: " + file.getPath());
+
+		for(int band = 0; band < numBands; band++) {
+			long bandOffset = band * numRows * numColumns;
+			for(int currentYSplit = 0; currentYSplit < ysplits; currentYSplit++) {
+				// Calculate pixel coordinate of tile:
+				int pystart = currentYSplit *  ysize; // inclusive
+				int pynext = (currentYSplit + 1) *  ysize; // EXCLUSIVE
+
+				for(int currentXSplit = 0; currentXSplit < xsplits; currentXSplit++) {
+					// Calculate pixel coordinate of tile:
+					int pxstart = currentXSplit *  xsize; // inclusive
+					int pxnext = ((currentXSplit + 1) % xsplits) *  xsize; // EXCLUSIVE
+					int pxnextNoWrapped = (currentXSplit + 1) *  xsize; // EXCLUSIVE
+
+					Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat - currentYSplit * ysize * pixelHeight);
+					Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
+
+					// Filter this tile if no pixel is contained in the selected region:
+					if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
+						if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); }
+						continue;
+					}
+
+					// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
+					long startPos = bandOffset + 1L * pystart * numColumns + pxstart;
+					/*
+					 *  Pixel position after last pixel in this tile.
+					 *  If the next block is in the same row (pxnext >= pxstart), the next start position is not below this block,
+					 *  but in the last row of the current block. Thus, decrement pynext in this case.
+					 */
+					long nextStartPos = bandOffset + 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
+					long numPixels = nextStartPos - startPos;
+
+					if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " startPos: " + startPos +" next: " + nextStartPos); }
+
+					long offset = startPos * data_size;
+					long length = numPixels * data_size;
+
+					if(offset + length > dataFileStatus.getLen()) { // Don't read over the end of file
+						length = dataFileStatus.getLen() - offset;
+					}
+
+					if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " at offset " + offset +" +" + length + " bytes"); }
+					// Determine list of FS blocks that contain the given block
+					final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
+					Arrays.sort(blocks);
+
+					inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
+							blocks[0].getHosts(), info,
+							new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, aqcDate)));
+				}
+			}
+		}
 	}
 
 	/**
@@ -381,7 +392,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 
 	private T readEnviTile(T record) throws IOException {
 		/*
-		 * Determine how may pixels to read from the file.
+		 * Determine how many pixels to read from the file.
 		 * All remaining pixels are filled with missing values
 		 */
 		int lineWidth = this.info.getSamples();
@@ -411,13 +422,6 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			// Seek to the beginning of the current line of real data:
 			stream.seek(y * lineWidth * data_size + this.splitStart);
 			// Fill in pixels (little endian):
-//			for(int x = 0; x < xread; x++) {
-//				int b0 = stream.read();
-//				int b1 = stream.read();
-//				short val = (short)(b0 | (b1 << 8));
-//				values[pos++] = val;
-//			}
-//			
 			int read = stream.read(buffer);
 			if(read < xread) {
 				LOG.warn("Should've read " + xread + " pixel, but read only " + read);
@@ -446,7 +450,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		public final Coordinate leftUpperCorner, rightLowerCorner;
 		public final String pathRow;
 		public final String aqcDate;
-		
+
 		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
 			this.band = band;
 			this.xstart = xstart;
@@ -530,6 +534,10 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	public void setTileSize(int xpixels, int ypixels) {
 		this.xsize = xpixels;
 		this.ysize = ypixels;
+	}
+
+	public void setCompleteScene(boolean completeScene) {
+		this.completeScene = completeScene;
 	}
 
 }

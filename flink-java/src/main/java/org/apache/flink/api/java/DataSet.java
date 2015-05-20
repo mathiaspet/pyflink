@@ -50,7 +50,6 @@ import org.apache.flink.api.java.io.DiscardingOutputFormat;
 import org.apache.flink.api.java.io.PrintingOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat.TextFormatter;
-import org.apache.flink.api.java.io.EnviOutputFormat;
 import org.apache.flink.api.java.operators.AggregateOperator;
 import org.apache.flink.api.java.operators.CoGroupOperator;
 import org.apache.flink.api.java.operators.CoGroupOperator.CoGroupOperatorSets;
@@ -91,6 +90,7 @@ import org.apache.flink.util.AbstractID;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.flink.api.java.spatial.EnviOutputFormat;
 
 /**
  * A DataSet represents a collection of elements of the same type.<br>
