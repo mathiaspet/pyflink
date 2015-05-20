@@ -149,6 +149,21 @@ class Tile(object):
 
         return int(2 * (y * self._width + x))
 
+class Cube(object):
+    def __init__(self):
+        """
+
+        :return:
+        """
+
+class TimeSeries(object):
+    def __init__(self):
+        """
+
+        :return:
+        """
+
+
 import sys
 
 PY2 = sys.version_info[0] == 2
@@ -162,6 +177,8 @@ if PY2:
     STRING = "type"
     BYTES = bytearray(b"byte")
     TILE = Tile()
+    CUBE = Cube()
+    TIMESERIES = TimeSeries()
 elif PY3:
     BOOL = True
     INT = 1
@@ -169,3 +186,5 @@ elif PY3:
     STRING = "type"
     BYTES = bytearray(b"byte")
     TILE = Tile()
+    CUBE = Cube()
+    TIMESERIES = TimeSeries()

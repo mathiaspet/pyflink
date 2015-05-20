@@ -85,7 +85,7 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.util.AbstractID;
 
 import com.google.common.base.Preconditions;
-import org.apache.flink.api.java.io.EnviOutputFormat;
+import org.apache.flink.api.java.spatial.EnviOutputFormat;
 
 /**
  * A DataSet represents a collection of elements of the same type.<br/>

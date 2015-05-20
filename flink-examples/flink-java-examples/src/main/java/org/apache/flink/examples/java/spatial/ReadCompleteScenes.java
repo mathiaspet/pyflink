@@ -17,18 +17,19 @@
  */
 package org.apache.flink.examples.java.spatial;
 
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.spatial.EnviInputFormat;
-//import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.api.java.spatial.TileTimeKeySelector;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
+import org.apache.flink.api.java.spatial.EnviInputFormat;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
+
+//import org.apache.flink.api.java.io.EnviReader;
 
 /**
  * Example to select a tile from a time series of scenes and to create a cubic
@@ -39,7 +40,7 @@ import org.apache.flink.core.fs.Path;
  * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
  *
  */
-public class DataCubeCreation {
+public class ReadCompleteScenes {
 
 	private static int dop;
 	private static String filePath;
@@ -59,11 +60,16 @@ public class DataCubeCreation {
 		env.setDegreeOfParallelism(dop);
 		
 		DataSet<Tile> tiles = readTiles(env);
-		DataSet<Tile> stitchedTimeSlices = tiles.groupBy(
-				new TileTimeKeySelector<Tile>()).reduceGroup(
-				new TileStitchReduce().configure(leftUpper, rightLower,
-						blockSize, blockSize));
-		DataSink<Tile> writeAsEnvi = stitchedTimeSlices.writeAsEnvi(outputFilePath, WriteMode.OVERWRITE);
+		tiles.filter(new FilterFunction<Tile>() {
+			int count = 0;
+			@Override
+			public boolean filter(Tile value) throws Exception {
+				count++;
+				System.out.print("counted: " + count);
+				return false;
+			}
+		});
+		DataSink<Tile> writeAsEnvi = tiles.writeAsEnvi(outputFilePath, WriteMode.OVERWRITE);
 		
 		writeAsEnvi.setParallelism(1);
 			
@@ -107,9 +113,6 @@ public class DataCubeCreation {
 	}
 
 	private static DataSet<Tile> readTiles(ExecutionEnvironment env) {
-		//EnviReader enviReader = env
-		//		.readEnviFile(filePath, blockSize, blockSize);
-		//return enviReader.restrictTo(leftUpper, rightLower).build();
 		EnviInputFormat<Tile> enviFormat = new EnviInputFormat<Tile>(new Path(filePath));
 		enviFormat.setLimitRectangle(leftUpper, rightLower);
 		enviFormat.setTileSize(blockSize, blockSize);

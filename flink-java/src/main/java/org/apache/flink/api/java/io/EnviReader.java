@@ -23,6 +23,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.EnviInputFormat;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
 import org.apache.flink.core.fs.Path;
@@ -31,6 +32,7 @@ import org.apache.flink.core.fs.Path;
  * A builder class to instantiate a data source that parses ENVI files.
  * TODO: Describe parameters
  */
+@Deprecated
 public class EnviReader {
 
 	private final Path path;
