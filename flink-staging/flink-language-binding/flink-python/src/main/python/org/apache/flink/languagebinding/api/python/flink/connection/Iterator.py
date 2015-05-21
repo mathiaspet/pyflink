@@ -17,6 +17,7 @@
 ################################################################################
 from struct import unpack
 from collections import deque
+import pickle
 from flink.plan.Constants import Tile
 
 try:
@@ -339,6 +340,24 @@ class NullDeserializer(object):
     def deserialize(self):
         return None
 
+
+class ByteArrayUnpickler(object):
+    def __init__(self, read, group):
+        self.read = read
+        self._group = group
+
+    def deserialize(self):
+        size = unpack(">i", self.read(4, self._group))[0]
+        if size:
+            raw = self.read(size, self._group)
+            try:
+                return pickle.loads(raw)
+            except:
+                return bytearray(raw)
+        else:
+            return bytearray(0)
+
+
 class TileDeserializer(object):
     def __init__(self, read, group):
         self.read = read
@@ -347,7 +366,7 @@ class TileDeserializer(object):
         self._boolSerializer = BooleanDeserializer(read, group)
         self._intSerializer = IntegerDeserializer(read, group)
         self._doubleSerializer = DoubleDeserializer(read, group)
-        self._bytesSerializer = ByteArrayDeserializer(read, group)
+        self._bytesSerializer = ByteArrayUnpickler(read, group)
 
     def deserialize(self):
         tile = Tile()

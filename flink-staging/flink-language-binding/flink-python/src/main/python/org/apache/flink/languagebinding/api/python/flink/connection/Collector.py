@@ -17,6 +17,7 @@
 ################################################################################
 from struct import pack
 import sys
+import pickle
 
 from flink.connection.Constants import Types
 from flink.plan.Constants import Tile
@@ -96,12 +97,13 @@ class BooleanSerializer(object):
     def serialize(self, value):
         return pack(">?", value)
 
+
 class TileSerializer(object):
     def __init__(self, write, value):
         self._boolSerializer = BooleanSerializer()
         self._longSerializer = LongSerializer()
         self._stringSerializer = StringSerializer()
-        self._bytesSerializer = ByteArraySerializer()
+        self._objectSerializer = ObjectSerializer()
         self._doubleSerializer = FloatSerializer()
 
     def serialize(self, value):
@@ -118,8 +120,9 @@ class TileSerializer(object):
         bits.append(self._longSerializer.serialize(value._width))
         bits.append(self._doubleSerializer.serialize(value._xPixelWidth))
         bits.append(self._doubleSerializer.serialize(value._yPixelWidth))
-        bits.append(self._bytesSerializer.serialize(value._content))
+        bits.append(self._objectSerializer.serialize(value._content))
         return b"".join(bits)
+
 
 class FloatSerializer(object):
     def serialize(self, value):
@@ -135,6 +138,12 @@ class ByteArraySerializer(object):
     def serialize(self, value):
         value = bytes(value)
         return pack(">I", len(value)) + value
+
+
+class ObjectSerializer(object):
+    def serialize(self, value):
+        pickled = pickle.dumps(value)
+        return pack(">I", len(pickled)) + pickled
 
 
 class StringSerializer(object):
