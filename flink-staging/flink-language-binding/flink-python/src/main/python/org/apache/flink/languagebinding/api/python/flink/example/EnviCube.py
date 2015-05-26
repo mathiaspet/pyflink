@@ -90,13 +90,10 @@ class CubeCreator(GroupReduceFunction):
                                   t._xPixelWidth, t._yPixelWidth)
                     updated = True
 
-                # iterate over tile content 2 bytes per iteration
-                for i in range(0, len(t._content), 2):
+                for i, (px_coord_lat, px_coord_lon) in coord_iter(t):
                     if t._content[i:i+2] != NOVAL:
                         orig_not_null_counter += 1
 
-                    # check coordinates of current pixel
-                    px_coord_lat, px_coord_lon = t.get_coordinate(i)
                     if (self.leftUpperLat >= px_coord_lat and
                             px_coord_lat >= self.rightLowerLat and
                             self.leftUpperLon <= px_coord_lon and
@@ -121,6 +118,21 @@ class CubeCreator(GroupReduceFunction):
 class AcqDateSelector(KeySelectorFunction):
     def get_key(self, value):
         return value._aquisitionDate
+
+
+def coord_iter(tile):
+    lon = tile._leftUpperLon
+    lat = tile._leftUpperLat
+    yield (0, (lat, lon))
+    if len(tile._content) > 2:
+        for i in range(2, len(tile._content), 2):
+            if i % tile._width == 0:
+                lon = tile._leftUpperLon
+                lat -= tile._yPixelWidth
+            else:
+                lon += tile._xPixelWidth
+            yield (i, (lat, lon))
+
 
 if __name__ == "__main__":
     print("found args length:", len(sys.argv))
