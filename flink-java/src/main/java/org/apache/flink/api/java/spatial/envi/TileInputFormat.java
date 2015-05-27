@@ -27,15 +27,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileInfo;
-import org.apache.flink.api.java.spatial.TileInfo.DataTypes;
-import org.apache.flink.api.java.spatial.TileInfo.InterleaveTypes;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -45,6 +41,8 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An input format to parse ENVI files into Tile objects.

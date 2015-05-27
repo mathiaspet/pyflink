@@ -18,9 +18,6 @@
 package org.apache.flink.api.java.spatial;
 
 import java.io.IOException;
-import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -31,32 +28,12 @@ import org.apache.flink.core.memory.DataOutputView;
  * deserialized, this is very inefficient
  * 
  * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
- *
+ * TODO: refactor the ctor calls to reflect on the 
  */
-public class Tile implements Serializable {
+public class Tile extends SpatialObject{
 	private static final long serialVersionUID = 3999969290376342375L;
 
-	private String pathRow;
-	private String aqcuisitionDate;
-
-	private int band = -1;
-
-	/**
-	 * Tile data in 16-bit signed integers. It is organized in rows of pixels.
-	 */
-	private short[] s16Tile = null;
-
-	// Coordinates of left upper and right lower edge (according to the map
-	// info)
-	private Coordinate luCord = null, rlCord = null;
-
-	// x- and y-width of a pixel
-	private double xPixelWith = -1.0, yPixelWidth = -1.0;
-
-	private TileInfo tileInfo = null;
-
-	// Tile width and height in pixels
-	private int tileWidth = -1, tileHeight = -1;
+	int band = -1;
 
 	// TODO: decide whether to keep this public or not
 	public Tile() {
@@ -93,47 +70,9 @@ public class Tile implements Serializable {
 	public int getBand() {
 		return this.band;
 	}
-
-	/**
-	 * Returns the tile contents as 1-dimensional array of pixels organized in
-	 * rows. The pixels are addressed by converting a coordinate (x, y) starting
-	 * at (0, 0) to the array offset x + (y * this.getTileWidth()).
-	 * 
-	 * @return
-	 */
-	public short[] getS16Tile() {
-		return this.s16Tile;
-	}
-
-	/**
-	 * Update the stored tile array to the given one.
-	 */
-	public void setS16Tile(short[] data) {
-		this.s16Tile = data;
-	}
-
-	/**
-	 * Convenience function to retrieve a single pixel by pixel coordinates.
-	 * Coordinates start at (0, 0).
-	 */
-	public short getPixel(int width, int height) {
-		return this.s16Tile[width + (height * this.tileWidth)];
-	}
-
-	/**
-	 * Returns the width of the tile in pixels, i.e. the number of pixels
-	 * representing one row in the tile array.
-	 */
-	public int getTileWidth() {
-		return this.tileWidth;
-	}
-
-	/**
-	 * Returns the height of the tile in pixels, i.e. the number of rows in the
-	 * tile array.
-	 */
-	public int getTileHeight() {
-		return this.tileHeight;
+	
+	public void setBand(int band) {
+		this.band = band;
 	}
 
 	/**
@@ -148,14 +87,6 @@ public class Tile implements Serializable {
 	 */
 	public Coordinate getSECoord() {
 		return this.rlCord;
-	}
-
-	/**
-	 * Return the header associated with this stream, if present. Otherwise,
-	 * null is returned.
-	 */
-	public TileInfo getTileInfo() {
-		return this.tileInfo;
 	}
 
 	/**
@@ -185,22 +116,6 @@ public class Tile implements Serializable {
 		} else {
 			return this.tileInfo.getAcqDate();
 		}
-	}
-
-	public String getPathRow() {
-		return pathRow;
-	}
-
-	public void setPathRow(String pathRow) {
-		this.pathRow = pathRow;
-	}
-
-	public void setAqcuisitionDate(String aqcuisitionDate) {
-		this.aqcuisitionDate = aqcuisitionDate;
-	}
-
-	public String getAqcuisitionDate() {
-		return aqcuisitionDate;
 	}
 
 	/**
@@ -266,131 +181,16 @@ public class Tile implements Serializable {
 	}
 
 	public void serialize(DataOutputView target) throws IOException {
-		if (this.aqcuisitionDate != null) {
-			target.writeBoolean(true);
-//			writeString(target, aqcuisitionDate);
-			target.writeUTF(this.aqcuisitionDate);
-		} else {
-			target.writeBoolean(false);
-		}
+		super.serialize(target);
 		
 		target.writeInt(this.band);
-		
-		this.luCord.serialize(target);
-		this.rlCord.serialize(target);
-		
-		if (this.pathRow != null) {
-			target.writeBoolean(true);
-//			writeString(target, pathRow);
-			target.writeUTF(this.pathRow);
-		} else {
-			target.writeBoolean(false);
-		}
-		
-
-		target.writeInt(this.tileHeight);
-		target.writeInt(this.tileWidth);
-		target.writeDouble(this.xPixelWith);
-		target.writeDouble(this.yPixelWidth);
-		
-		this.tileInfo.serialize(target);
-		
-		if(this.s16Tile != null && this.s16Tile.length > 0) {
-			target.writeBoolean(true);
-			
-			byte[] byteContent = new byte[s16Tile.length * 2];
-	
-			ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-					.asShortBuffer().put(s16Tile);
-			target.writeInt(byteContent.length);
-			target.write(byteContent);
-		} else{
-			target.writeBoolean(false);
-		}
-	
 	}
 
 	public void deserialize(DataInputView source) throws IOException {
-		if (source.readBoolean()) {
-			this.aqcuisitionDate = source.readUTF();
-		}
+		super.deserialize(source);
+		
 		
 		this.band = source.readInt();
 
-		this.luCord = new Coordinate();
-		this.luCord.deserialize(source);
-		
-		this.rlCord = new Coordinate();
-		this.rlCord.deserialize(source);
-
-		
-		if (source.readBoolean()) {
-			this.pathRow = source.readUTF();
-		}
-		
-		
-		this.tileHeight = source.readInt();
-		this.tileWidth = source.readInt();
-		this.xPixelWith = source.readDouble();
-		this.yPixelWidth = source.readDouble();
-		
-		this.tileInfo = new TileInfo();
-		this.tileInfo.deserialize(source);
-		
-		if(source.readBoolean()) {
-			int contentLength = source.readInt();
-			byte[] content = new byte[contentLength];
-			source.read(content);
-			this.s16Tile = new short[content.length / 2];
-			ByteBuffer.wrap(content).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-					.get(s16Tile);
-		} else {
-			this.s16Tile = new short[0];
-		}
-	}
-
-	
-	public void setTileInfo(TileInfo tileInfo) {
-		this.tileInfo = tileInfo;
-	}
-
-	public void setLuCord(Coordinate luCord) {
-		this.luCord = luCord;
-	}
-
-	public void setRlCord(Coordinate rlCord) {
-		this.rlCord = rlCord;
-	}
-
-	public Coordinate getLuCord() {
-		return luCord;
-	}
-
-	public Coordinate getRlCord() {
-		return rlCord;
-	}
-
-	public void setBand(int band) {
-		this.band = band;
-	}
-
-	public void setTileHeight(int tileHeight) {
-		this.tileHeight = tileHeight;
-	}
-
-	public void setTileWidth(int tileWidth) {
-		this.tileWidth = tileWidth;
-	}
-
-	public void setxPixelWith(Double xPixelWith) {
-		this.xPixelWith = xPixelWith;
-	}
-
-	public void setyPixelWidth(Double yPixelWidth) {
-		this.yPixelWidth = yPixelWidth;
-	}
-
-	public double getxPixelWith() {	return xPixelWith;}
-
-	public double getyPixelWidth() {return yPixelWidth;	}
+			}
 }

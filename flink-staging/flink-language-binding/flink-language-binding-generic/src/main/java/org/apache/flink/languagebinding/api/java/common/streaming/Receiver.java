@@ -21,15 +21,19 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 //CHECKSTYLE.OFF: AvoidStarImport - tuple imports
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.SpatialObject;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.tuple.*;
+
 import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.*;
 //CHECKSTYLE.ON: AvoidStarImport
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
+
 import org.apache.flink.util.Collector;
 
 /**
@@ -364,7 +368,7 @@ public class Receiver implements Serializable {
 		private LongDeserializer intDes;
 		private BytesDeserializer bytesDes;
 		//TODO: check if this is still in line with the serialization approach of Flink
-		Tile reuse;
+		SpatialObject reuse;
 
 		public TileDeserializer() {
 			this.stringDes = new StringDeserializer();
@@ -376,7 +380,7 @@ public class Receiver implements Serializable {
 
 
 		@Override
-		public Tile deserialize() {
+		public SpatialObject deserialize() {
 			this.reuse.setAqcuisitionDate(this.stringDes.deserialize());
 			this.reuse.setBand(this.intDes.deserialize().intValue());
 

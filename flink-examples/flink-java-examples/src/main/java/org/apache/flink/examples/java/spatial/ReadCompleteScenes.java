@@ -22,10 +22,9 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
-import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.api.java.spatial.TileTypeInformation;
+import org.apache.flink.api.java.spatial.Scene;
+import org.apache.flink.api.java.spatial.SceneTypeInformation;
 import org.apache.flink.api.java.spatial.envi.SceneInputFormat;
-import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 
@@ -58,17 +57,17 @@ public class ReadCompleteScenes {
 				.getExecutionEnvironment();
 		env.setDegreeOfParallelism(dop);
 		
-		DataSet<Tile> tiles = readTiles(env);
-		DataSet<Tile> filtered = tiles.filter(new FilterFunction<Tile>() {
+		DataSet<Scene> tiles = readTiles(env);
+		DataSet<Scene> filtered = tiles.filter(new FilterFunction<Scene>() {
 			int count = 0;
 			@Override
-			public boolean filter(Tile value) throws Exception {
+			public boolean filter(Scene value) throws Exception {
 				count++;
 				System.out.print("counted: " + count);
 				return true;
 			}
 		});
-		DataSink<Tile> writeAsEnvi = filtered.writeAsEnvi(outputFilePath, WriteMode.OVERWRITE);
+		DataSink<Scene> writeAsEnvi = filtered.writeAsEnvi(outputFilePath, WriteMode.OVERWRITE);
 		
 		writeAsEnvi.setParallelism(1);
 			
@@ -97,12 +96,11 @@ public class ReadCompleteScenes {
 		return true;
 	}
 
-	private static DataSet<Tile> readTiles(ExecutionEnvironment env) {
-		SceneInputFormat<Tile> enviFormat = new SceneInputFormat<Tile>(new Path(filePath));
-		enviFormat.setCompleteScene(true);
-		enviFormat.setPathRow(pathRow);
+	private static DataSet<Scene> readTiles(ExecutionEnvironment env) {
+		SceneInputFormat<Scene> sceneFormat = new SceneInputFormat<Scene>(new Path(filePath));
+		sceneFormat.setPathRow(pathRow);
 
-		return new DataSource<Tile>(env, enviFormat, new TileTypeInformation(), "enviSource");
+		return new DataSource<Scene>(env, sceneFormat, new SceneTypeInformation(), "sceneSource");
 	}
 
 }

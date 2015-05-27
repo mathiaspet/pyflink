@@ -27,15 +27,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
-import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.spatial.Scene;
 import org.apache.flink.api.java.spatial.TileInfo;
-import org.apache.flink.api.java.spatial.TileInfo.DataTypes;
-import org.apache.flink.api.java.spatial.TileInfo.InterleaveTypes;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -45,16 +41,16 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * An input format to parse ENVI files into Tile objects.
- * Every input file is split into adjacent tiles of the given size.
+ * An input format to parse ENVI files into scene objects.
  * Missing pixels are filled with the missing value specified in the ENVI file.
  * 
- * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
  * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
  */
-public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
+public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
 	private static final Logger LOG = LoggerFactory.getLogger(SceneInputFormat.class);
 
@@ -64,12 +60,8 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private double pixelWidth = -1.0, pixelHeight = -1.0;
 	
 	private TileInfo info;
-	private EnviTilePosition pos;
-	private boolean completeScene;
-
-	//implies completeScenes
 	private String pathRow;
-
+	
 	private int readRecords = 0;
 
 
@@ -97,6 +89,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 				if(interleaveType != 0) {
 					throw new RuntimeException("Interleave type " + interleaveType + " unsupported, use bsq.");
 				}
+				
 				Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + TileInfo.InterleaveTypes.values()[interleaveType]));
 				FileStatus dataFileStatus;
 				try {
@@ -105,26 +98,29 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 					throw new RuntimeException("Data file " + dataFile + " for header " + file + " not found.", e);
 				}
 
+				if(this.pathRow != null && !dataFile.getName().contains(this.pathRow)) {
+					continue;
+				}
+				
 				if(info.getDataType() != TileInfo.DataTypes.INT) {
 					throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
 							+ " File: " + file.getPath());
 				}
 				int data_size = info.getPixelSize();
-				int numBands = info.getBands();
 				int numRows = info.getLines();
 				int numColumns = info.getSamples();
 				this.pixelHeight = info.getPixelHeight();
 				this.pixelWidth = info.getPixelWidth();
-				if(this.completeScene) {
-					this.leftUpperLimit = info.getLeftUpper();
+				
+				this.leftUpperLimit = info.getLeftUpper();
 
-					double rightLong = this.leftUpperLimit.lon + this.pixelWidth * numColumns;
-					double rightLat = this.leftUpperLimit.lat + this.pixelHeight * numRows;
-					this.rightLowerLimit = new Coordinate(rightLong, rightLat);
+				double rightLong = this.leftUpperLimit.lon + this.pixelWidth * numColumns;
+				double rightLat = this.leftUpperLimit.lat + this.pixelHeight * numRows;
+				this.rightLowerLimit = new Coordinate(rightLong, rightLat);
 
-					this.xsize = numColumns;
-					this.ysize = numRows;
-				}
+				this.xsize = numColumns;
+				this.ysize = numRows;
+				
 				String filePath = file.getPath().toString();
 				int lastIndexOf = filePath.lastIndexOf("/");
 				filePath = filePath.substring(lastIndexOf + 1);
@@ -132,21 +128,16 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 				String pathRow = split[0];
 				String aqcDate = split[1];
 
-				if(completeScene) {
-					// Determine list of FS blocks that contain the given block
-					final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, 0, numRows * numColumns);
-					Arrays.sort(blocks);
+				// Determine list of FS blocks that contain the given block
+				final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, 0, numRows * numColumns);
+				Arrays.sort(blocks);
 
-					//create absolute position that comprises the whole scene
-					EnviTilePosition absolutePosition = new EnviTilePosition(-1, 0, numColumns, 0, numRows, this.leftUpperLimit, this.rightLowerLimit, pathRow, aqcDate);
-					EnviInputSplit sceneSplit = new EnviInputSplit(1, dataFile, 0, data_size,
-							blocks[0].getHosts(), info,
-							absolutePosition);
-					inputSplits.add(sceneSplit);
-				} else {
-					createTiledSplits(fs, inputSplits, file, info, dataFile, dataFileStatus, data_size, numBands, numRows, numColumns, pathRow, aqcDate);
-				}
-
+				//create absolute position that comprises the whole scene
+				
+				SceneInputSplit sceneSplit = new SceneInputSplit(1, dataFile, 0, data_size,
+						blocks[0].getHosts(), info);
+				inputSplits.add(sceneSplit);
+				
 			}catch (RuntimeException ex) {
 				LOG.warn(ex.getMessage(), ex);
 				continue;
@@ -157,112 +148,11 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		if (inputSplits.size() < minNumSplits) {
 			LOG.warn("WARNING: Too few splits generated (" + inputSplits.size() +"), adding dummy splits.");
 			for (int index = files.size(); index < minNumSplits; index++) {
-				inputSplits.add(new EnviInputSplit(index, null, 0, 0, null, null, null));
+				inputSplits.add(new SceneInputSplit(index, null, 0, 0, null, null));
 			}
 		}
 
-		return inputSplits.toArray(new EnviInputSplit[0]);
-	}
-
-	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfo info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String aqcDate) throws IOException {
-	/*
-	 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
-	 *  pixels.
-	 */
-		int xsplits = (numColumns + xsize - 1) / xsize;
-		int ysplits = (numRows + ysize - 1) / ysize;
-
-		// Real coordinates of this image + coordinate differences:
-		Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
-
-		LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
-				xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + " for " + numBands + " bands: " + file.getPath());
-
-		for(int band = 0; band < numBands; band++) {
-			long bandOffset = band * numRows * numColumns;
-			for(int currentYSplit = 0; currentYSplit < ysplits; currentYSplit++) {
-				// Calculate pixel coordinate of tile:
-				int pystart = currentYSplit *  ysize; // inclusive
-				int pynext = (currentYSplit + 1) *  ysize; // EXCLUSIVE
-
-				for(int currentXSplit = 0; currentXSplit < xsplits; currentXSplit++) {
-					// Calculate pixel coordinate of tile:
-					int pxstart = currentXSplit *  xsize; // inclusive
-					int pxnext = ((currentXSplit + 1) % xsplits) *  xsize; // EXCLUSIVE
-					int pxnextNoWrapped = (currentXSplit + 1) *  xsize; // EXCLUSIVE
-
-					Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + currentXSplit * xsize * pixelWidth, upperLeftCorner.lat - currentYSplit * ysize * pixelHeight);
-					Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
-
-					// Filter this tile if no pixel is contained in the selected region:
-					if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
-						if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); }
-						continue;
-					}
-
-					// Determine start and end position of the pixel block, considering empty pixels at the right and lower boundary:
-					long startPos = bandOffset + 1L * pystart * numColumns + pxstart;
-					/*
-					 *  Pixel position after last pixel in this tile.
-					 *  If the next block is in the same row (pxnext >= pxstart), the next start position is not below this block,
-					 *  but in the last row of the current block. Thus, decrement pynext in this case.
-					 */
-					long nextStartPos = bandOffset + 1L * (pxnext < pxstart ? pynext : pynext - 1) * numColumns + pxnext;
-					long numPixels = nextStartPos - startPos;
-
-					if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " startPos: " + startPos +" next: " + nextStartPos); }
-
-					long offset = startPos * data_size;
-					long length = numPixels * data_size;
-
-					if(offset + length > dataFileStatus.getLen()) { // Don't read over the end of file
-						length = dataFileStatus.getLen() - offset;
-					}
-
-					if(LOG.isDebugEnabled()) { LOG.debug("Tile " + currentXSplit + "x" + currentYSplit + " at offset " + offset +" +" + length + " bytes"); }
-					// Determine list of FS blocks that contain the given block
-					final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, offset, length);
-					Arrays.sort(blocks);
-
-					inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
-							blocks[0].getHosts(), info,
-							new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, aqcDate)));
-				}
-			}
-		}
-	}
-
-	/**
-	 * Return true iff the rectangle with the given left upper and lower right points, which is oriented along the latitudinal 
-	 * and longitudinal lines, intersects with the limits rectangle, which is oriented the same way.
-	 */
-	private final boolean rectIntersectsLimits(Coordinate tileUpperLeft,
-			Coordinate tileLowerRight) {
-		// Rectangles intersect if the pairs of left and right latitudinal or longitudinal lines are not besides each other.
-		return !dotPairsDontMix(this.leftUpperLimit.lat, this.rightLowerLimit.lat, tileUpperLeft.lat, tileLowerRight.lat)
-				&& !dotPairsDontMix(this.leftUpperLimit.lon, this.rightLowerLimit.lon, tileUpperLeft.lon, tileLowerRight.lon);
-	}
-	
-	/**
-	 * Return true iff the four numbers are ordered on a circle with circumference "repeat" such that
-	 * the intervals a1-a2 and b1-b2 do not intersect.
-	 */
-	private static final boolean dotPairsDontMix(double a1, double a2, double b1, double b2) {
-		// check for both orders on the circel, clockwise:
-		int orderedPairs = 0;
-		if(a1 > a2) { orderedPairs++; }
-		if(a2 > b1) { orderedPairs++; }
-		if(b1 > b2) { orderedPairs++; }
-		if(b2 > a1) { orderedPairs++; }
-		if(orderedPairs == 3) { return true; }
-		
-		// counter-clockwise:
-		orderedPairs = 0;
-		if(a1 < a2) { orderedPairs++; }
-		if(a2 < b1) { orderedPairs++; }
-		if(b1 < b2) { orderedPairs++; }
-		if(b2 < a1) { orderedPairs++; }
-		return orderedPairs == 3;
+		return inputSplits.toArray(new SceneInputSplit[0]);
 	}
 
 	protected List<FileStatus> getFiles() throws IOException {
@@ -371,7 +261,6 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 
 	public void setPathRow(String pathRow) {
 		this.pathRow = pathRow;
-		this.completeScene = true;
 	}
 
 	private static class SequentialStatistics extends FileBaseStatistics {
@@ -393,10 +282,9 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 	public void open(FileInputSplit split) throws IOException {
 		super.open(split);
 		
-		this.info = ((EnviInputSplit) split).info;
-		this.pos = ((EnviInputSplit) split).pos;
-
-		if(LOG.isDebugEnabled()) { LOG.debug("Opened ENVI file " + split.getPath() + " with positions: " + pos); }
+		this.info = ((SceneInputSplit) split).info;
+		
+		if(LOG.isDebugEnabled()) { LOG.debug("Opened ENVI file " + split.getPath()); }
 		
 		this.readRecords = 0;
 	}
@@ -417,6 +305,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		return record;
 	}
 
+	//TODO: finish!!!
 	private T readEnviTile(T record) throws IOException {
 		/*
 		 * Determine how many pixels to read from the file.
@@ -427,31 +316,19 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		double pixelHeight = this.info.getPixelHeight();
 
 		//TODO: find out why xsize and ysize are -1 here
-		if(this.completeScene) {
-			this.xsize = this.info.getSamples();
-			this.ysize = this.info.getLines();
-		}
-
+		this.xsize = this.info.getSamples();
+		this.ysize = this.info.getLines();
+		
 		System.out.println("number of bands: " + this.info.getBands());
 
-		int xread = lineWidth - this.pos.xstart;
-		if(!this.completeScene && xread > xsize) { xread = xsize; }
+		int xread = lineWidth;
 
-		int yread = this.info.getLines() - this.pos.ystart;
-		if(!this.completeScene && yread > ysize) { yread = ysize; }
-
-		//in case complete scene should be read, use the number of lines of all bands
-		if(this.completeScene) {yread = yread * this.info.getBands();}
-
-		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
+		int yread = this.info.getLines() * this.info.getBands();
+		
+		record.update(this.info, this.info.getLeftUpper(), this.info.getLowerRightCoordinate(), xsize, ysize, -1, this.pathRow, this.info.getAcqDateAsString(), pixelWidth, pixelHeight);
 		short[] values = record.getS16Tile();
 		if(values == null) {
-			int multiplicator = 1; 
-			if(this.completeScene)
-			{
-				multiplicator = this.info.getBands();
-			}
-			values = new short[xsize * ysize * multiplicator];
+			values = new short[xsize * ysize * this.info.getBands()];
 			record.setS16Tile(values);
 		}
 		short dataIgnoreValue = (short) info.getDataIgnoreValue();
@@ -488,47 +365,44 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 	}
 	
 	
-	public static final class EnviTilePosition implements Serializable{
-		public final int band;
-		public final int xstart, xnext;
-		public final int ystart, ynext;
-		public final Coordinate leftUpperCorner, rightLowerCorner;
-		public final String pathRow;
-		public final String aqcDate;
-
-		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
-			this.band = band;
-			this.xstart = xstart;
-			this.xnext = xnext;
-			this.ystart = ystart;
-			this.ynext = ynext;
-			this.leftUpperCorner = leftUpperCorner;
-			this.rightLowerCorner = rightLowerCorner;
-			this.pathRow = pathRow;
-			this.aqcDate = aqcDate;
-		}
-		
-		@Override
-		public String toString() {
-			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner + ", band " + band;
-		}
-	}
+//	public static final class EnviTilePosition implements Serializable{
+//		public final int band;
+//		public final int xstart, xnext;
+//		public final int ystart, ynext;
+//		public final Coordinate leftUpperCorner, rightLowerCorner;
+//		public final String pathRow;
+//		public final String aqcDate;
+//
+//		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
+//			this.band = band;
+//			this.xstart = xstart;
+//			this.xnext = xnext;
+//			this.ystart = ystart;
+//			this.ynext = ynext;
+//			this.leftUpperCorner = leftUpperCorner;
+//			this.rightLowerCorner = rightLowerCorner;
+//			this.pathRow = pathRow;
+//			this.aqcDate = aqcDate;
+//		}
+//		
+//		@Override
+//		public String toString() {
+//			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner + ", band " + band;
+//		}
+//	}
 	
-	public static final class EnviInputSplit extends FileInputSplit implements Serializable{
+	public static final class SceneInputSplit extends FileInputSplit implements Serializable{
 		private static final long serialVersionUID = -9205048860784884871L;
 		public TileInfo info;
-		public EnviTilePosition pos;
 
-		public EnviInputSplit() {
+		public SceneInputSplit() {
 			super();
 			this.info = null;
-			this.pos = null;
 		}
 		
-		public EnviInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info, EnviTilePosition pos) {
+		public SceneInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info) {
 			super(num, file, start, length, hosts);
 			this.info = info;
-			this.pos = pos;
 		}
 		
 		@Override
@@ -536,36 +410,12 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 			this.info = new TileInfo();
 			this.info.deserialize(in);
 			
-			String aqcDate = in.readUTF();
-			int band = in.readInt();
-			Coordinate leftUpper = new Coordinate();
-			leftUpper.deserialize(in);
-			String pathRow = in.readUTF();
-			Coordinate rightLower = new Coordinate();
-			rightLower.deserialize(in);
-			int xnext = in.readInt();
-			int xstart = in.readInt();
-			int ynext = in.readInt();
-			int ystart = in.readInt();
-			this.pos = new EnviTilePosition(band, xstart, xnext, ystart, ynext, leftUpper, rightLower, pathRow, aqcDate);
-			
 			super.read(in);
 		}
 		
 		@Override
 		public void write(DataOutputView out) throws IOException {
 			this.info.serialize(out);
-			
-			out.writeUTF(this.pos.aqcDate);
-			out.writeInt(this.pos.band);
-			this.pos.leftUpperCorner.serialize(out);
-			out.writeUTF(this.pos.pathRow);
-			this.pos.rightLowerCorner.serialize(out);
-			out.writeInt(this.pos.xnext);
-			out.writeInt(this.pos.xstart);
-			out.writeInt(this.pos.ynext);
-			out.writeInt(this.pos.ystart);
-			
 			super.write(out);
 		}
 	}
@@ -579,10 +429,6 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 	public void setTileSize(int xpixels, int ypixels) {
 		this.xsize = xpixels;
 		this.ysize = ypixels;
-	}
-
-	public void setCompleteScene(boolean completeScene) {
-		this.completeScene = completeScene;
 	}
 
 }

@@ -438,7 +438,11 @@ public class TileInfo implements Serializable {
 	public long getAcqDate() {
 		return acqDate;
 	}
-
+	
+	public String getAcqDateAsString() {
+		return new Date(this.acqDate).toString();
+	}
+	
 	public void setPixelWidth(double pixelWidth) {
 		this.pixelWidth = pixelWidth;
 	}
