@@ -24,7 +24,8 @@ import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
-import org.apache.flink.api.java.spatial.EnviInputFormat;
+import org.apache.flink.api.java.spatial.envi.SceneInputFormat;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 
@@ -89,7 +90,7 @@ public class ReadCompleteScenes {
 			}
 		} else {
 			System.out
-					.println("Usage: <input directory> <left-upper-longitude>  <left-upper-latitude> <block size> <pixel size> <output path>");
+					.println("Usage: <dop> <input directory> <pathrow> <output path>");
 			return false;
 		}
 
@@ -97,7 +98,7 @@ public class ReadCompleteScenes {
 	}
 
 	private static DataSet<Tile> readTiles(ExecutionEnvironment env) {
-		EnviInputFormat<Tile> enviFormat = new EnviInputFormat<Tile>(new Path(filePath));
+		SceneInputFormat<Tile> enviFormat = new SceneInputFormat<Tile>(new Path(filePath));
 		enviFormat.setCompleteScene(true);
 		enviFormat.setPathRow(pathRow);
 

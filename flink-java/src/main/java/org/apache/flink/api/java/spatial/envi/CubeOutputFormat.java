@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.api.java.spatial;
+package org.apache.flink.api.java.spatial.envi;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,7 +34,7 @@ import org.apache.flink.core.fs.Path;
  * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
  *
  */
-public class EnviOutputFormat extends FileOutputFormat<Tile> {
+public class CubeOutputFormat extends FileOutputFormat<Tile> {
 
 	private static final long serialVersionUID = 1L;
 	List<String> bands = new ArrayList<String>();
@@ -43,7 +43,7 @@ public class EnviOutputFormat extends FileOutputFormat<Tile> {
 	private String projectionInfo = null;
 	private String coordinateSystemString = null;
 
-	public EnviOutputFormat(Path filePath) {
+	public CubeOutputFormat(Path filePath) {
 		super(filePath);
 	}
 
