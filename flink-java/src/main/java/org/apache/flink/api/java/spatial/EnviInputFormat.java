@@ -60,9 +60,13 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private TileInfo info;
 	private EnviTilePosition pos;
 	private boolean completeScene;
-	
+
+	//implies completeScenes
+	private String pathRow;
+
 	private int readRecords = 0;
-	
+
+
 	public EnviInputFormat(Path path) {
 		super(path);
 	} 
@@ -105,6 +109,16 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 				int numColumns = info.getSamples();
 				this.pixelHeight = info.getPixelHeight();
 				this.pixelWidth = info.getPixelWidth();
+				if(this.completeScene) {
+					this.leftUpperLimit = info.getLeftUpper();
+
+					double rightLong = this.leftUpperLimit.lon + this.pixelWidth * numColumns;
+					double rightLat = this.leftUpperLimit.lat + this.pixelHeight * numRows;
+					this.rightLowerLimit = new Coordinate(rightLong, rightLat);
+
+					this.xsize = numColumns;
+					this.ysize = numRows;
+				}
 				String filePath = file.getPath().toString();
 				int lastIndexOf = filePath.lastIndexOf("/");
 				filePath = filePath.substring(lastIndexOf + 1);
@@ -119,8 +133,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 
 					//create absolute position that comprises the whole scene
 					EnviTilePosition absolutePosition = new EnviTilePosition(-1, 0, numColumns, 0, numRows, this.leftUpperLimit, this.rightLowerLimit, pathRow, aqcDate);
-
-					EnviInputSplit sceneSplit = new EnviInputSplit(inputSplits.size(), dataFile, 0, data_size,
+					EnviInputSplit sceneSplit = new EnviInputSplit(1, dataFile, 0, data_size,
 							blocks[0].getHosts(), info,
 							absolutePosition);
 					inputSplits.add(sceneSplit);
@@ -350,6 +363,11 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 			totalCount);
 	}
 
+	public void setPathRow(String pathRow) {
+		this.pathRow = pathRow;
+		this.completeScene = true;
+	}
+
 	private static class SequentialStatistics extends FileBaseStatistics {
 
 		private final long numberOfRecords;
@@ -401,11 +419,24 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		int lineWidth = this.info.getSamples();
 		double pixelWidth = this.info.getPixelWidth();
 		double pixelHeight = this.info.getPixelHeight();
+
+		//TODO: find out why xsize and ysize are -1 here
+		if(this.completeScene) {
+			this.xsize = this.info.getSamples();
+			this.ysize = this.info.getLines();
+		}
+
+		System.out.println("number of bands: " + this.info.getBands());
+
 		int xread = lineWidth - this.pos.xstart;
-		if(xread > xsize) { xread = xsize; }
+		if(!this.completeScene && xread > xsize) { xread = xsize; }
+
 		int yread = this.info.getLines() - this.pos.ystart;
-		if(yread > ysize) { yread = ysize; }
-		
+		if(!this.completeScene && yread > ysize) { yread = ysize; }
+
+		//in case complete scene should be read, use the number of lines of all bands
+		if(this.completeScene) {yread = yread * this.info.getBands();}
+
 		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
 		short[] values = record.getS16Tile();
 		if(values == null) {
