@@ -31,9 +31,9 @@ import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 
-import org.apache.flink.api.java.spatial.EnviInputFormat;
 import org.junit.Assert;
-import org.apache.flink.api.java.spatial.EnviInputFormat.EnviInputSplit;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat.EnviInputSplit;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.core.fs.Path;
@@ -196,7 +196,7 @@ public class EnviInputFormatTest {
 	public void testSingleBlock() throws IOException {
 		Path path = prepareInput(dataBlock1, header1);
 		
-		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
+		TileInputFormat<Tile> eif = new TileInputFormat<Tile>(path);
 		eif.setTileSize(7, 3);
 		Coordinate[][] expectedCoords = new Coordinate[2][2];
 		Coordinate[] firstRow = new Coordinate[2];
@@ -215,7 +215,7 @@ public class EnviInputFormatTest {
 	public void testSubBlocks() throws IOException {
 		Path path = prepareInput(dataBlock1, header1);
 		
-		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
+		TileInputFormat<Tile> eif = new TileInputFormat<Tile>(path);
 		eif.setTileSize(4, 2);
 		
 		Coordinate[][] expectedCoords = new Coordinate[8][2];
@@ -259,7 +259,7 @@ public class EnviInputFormatTest {
 	public void testIntersect() throws IOException {
 		Path path = prepareInput(dataBlock1, header1);
 		
-		EnviInputFormat<Tile> eif = new EnviInputFormat<Tile>(path);
+		TileInputFormat<Tile> eif = new TileInputFormat<Tile>(path);
 		eif.setTileSize(4, 2);
 		eif.setLimitRectangle(new Coordinate(430404.0572 + 5 * 30.0, 3120036.4653 - 1 * 30.0), 
 				new Coordinate(430404.0572 + 6 * 30.0, 3120036.4653 - 2 * 30.0));
@@ -287,11 +287,11 @@ public class EnviInputFormatTest {
 		checkResult(eif, expectedIntersectBlocks, expectedCoords);
 	}
 
-	private void checkResult(EnviInputFormat<Tile> eif, short[][] result, Coordinate[][] expectedCoords) throws IOException {
-		EnviInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
+	private void checkResult(TileInputFormat<Tile> eif, short[][] result, Coordinate[][] expectedCoords) throws IOException {
+		TileInputFormat.EnviInputSplit[] splits = (EnviInputSplit[]) eif.createInputSplits(-1);
 		Assert.assertEquals("Sub splits generated", result.length, splits.length);
 		int i = 0;
-		for(EnviInputFormat.EnviInputSplit split: splits) {
+		for(TileInputFormat.EnviInputSplit split: splits) {
 			eif.open(split);
 			Tile tile = new Tile();
 			eif.nextRecord(tile);

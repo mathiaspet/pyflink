@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.api.java.spatial;
+package org.apache.flink.api.java.spatial.envi;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -31,6 +31,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
+import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.spatial.TileInfo;
+import org.apache.flink.api.java.spatial.TileInfo.DataTypes;
+import org.apache.flink.api.java.spatial.TileInfo.InterleaveTypes;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -47,10 +52,11 @@ import org.apache.flink.util.StringUtils;
  * Missing pixels are filled with the missing value specified in the ENVI file.
  * 
  * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
+ * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
  */
-public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
+public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
-	private static final Logger LOG = LoggerFactory.getLogger(EnviInputFormat.class);
+	private static final Logger LOG = LoggerFactory.getLogger(SceneInputFormat.class);
 
 	private int xsize = -1, ysize = -1;
 	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
@@ -67,7 +73,7 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private int readRecords = 0;
 
 
-	public EnviInputFormat(Path path) {
+	public SceneInputFormat(Path path) {
 		super(path);
 	} 
 	
@@ -440,7 +446,12 @@ public class EnviInputFormat<T extends Tile> extends FileInputFormat<T> {
 		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
 		short[] values = record.getS16Tile();
 		if(values == null) {
-			values = new short[xsize * ysize];
+			int multiplicator = 1; 
+			if(this.completeScene)
+			{
+				multiplicator = this.info.getBands();
+			}
+			values = new short[xsize * ysize * multiplicator];
 			record.setS16Tile(values);
 		}
 		short dataIgnoreValue = (short) info.getDataIgnoreValue();

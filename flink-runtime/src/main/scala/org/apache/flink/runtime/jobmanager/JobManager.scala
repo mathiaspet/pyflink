@@ -1429,7 +1429,8 @@ object JobManager {
 
     // run the job manager
     try {
-      if (SecurityUtils.isSecurityEnabled) {
+      //TODO: remove hack
+      if (false && SecurityUtils.isSecurityEnabled) {
         LOG.info("Security is enabled. Starting secure JobManager.")
         SecurityUtils.runSecured(new FlinkSecuredRunner[Unit] {
           override def run(): Unit = {

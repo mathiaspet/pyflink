@@ -23,9 +23,9 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
-import org.apache.flink.api.java.spatial.EnviInputFormat;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.Path;
 
 /**
@@ -83,7 +83,7 @@ public class EnviReader {
 		return this;
 	}
 	
-	private void configureInputFormat(EnviInputFormat<?> format) {
+	private void configureInputFormat(TileInputFormat<?> format) {
 		format.setLimitRectangle(leftUpperLimit, rightLowerLimit);
 		format.setTileSize(xpixels, ypixels);
 	}
@@ -95,7 +95,7 @@ public class EnviReader {
 	 * @return The {@link org.apache.flink.api.java.DataSet} representing the parsed ENVI tiles.
 	 */
 	public DataSource<Tile> build() {
-		EnviInputFormat<Tile> inputFormat = new EnviInputFormat<Tile>(path);
+		TileInputFormat<Tile> inputFormat = new TileInputFormat<Tile>(path);
 		configureInputFormat(inputFormat);
 		return new DataSource<Tile>(executionContext, inputFormat, new TileTypeInformation(), Utils.getCallLocationName());
 	}

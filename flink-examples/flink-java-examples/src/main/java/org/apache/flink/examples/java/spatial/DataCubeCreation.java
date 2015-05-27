@@ -19,7 +19,6 @@ package org.apache.flink.examples.java.spatial;
 
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.spatial.EnviInputFormat;
 //import org.apache.flink.api.java.io.EnviReader;
 import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
@@ -27,6 +26,7 @@ import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTimeKeySelector;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 
@@ -110,7 +110,7 @@ public class DataCubeCreation {
 		//EnviReader enviReader = env
 		//		.readEnviFile(filePath, blockSize, blockSize);
 		//return enviReader.restrictTo(leftUpper, rightLower).build();
-		EnviInputFormat<Tile> enviFormat = new EnviInputFormat<Tile>(new Path(filePath));
+		TileInputFormat<Tile> enviFormat = new TileInputFormat<Tile>(new Path(filePath));
 		enviFormat.setLimitRectangle(leftUpper, rightLower);
 		enviFormat.setTileSize(blockSize, blockSize);
 

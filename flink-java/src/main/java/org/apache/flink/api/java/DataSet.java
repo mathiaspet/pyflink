@@ -90,7 +90,8 @@ import org.apache.flink.util.AbstractID;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.flink.api.java.spatial.EnviOutputFormat;
+import org.apache.flink.api.java.spatial.envi.CubeOutputFormat;
+
 
 /**
  * A DataSet represents a collection of elements of the same type.<br>
@@ -1545,7 +1546,7 @@ public abstract class DataSet<T> {
 	 * @return
 	 */
 	public DataSink<T> writeAsEnvi(String filePath, WriteMode writeMode) {
-		EnviOutputFormat enviOutputFormat = new EnviOutputFormat(new Path(filePath));
+		CubeOutputFormat enviOutputFormat = new CubeOutputFormat(new Path(filePath));
 		enviOutputFormat.setWriteMode(writeMode);
 		
 		return output((OutputFormat<T>) enviOutputFormat);
