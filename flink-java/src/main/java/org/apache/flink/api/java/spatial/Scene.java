@@ -40,9 +40,9 @@ public class Scene extends SpatialObject {
 		this.tileWidth = info.getSamples();
 		this.tileHeight = info.getLines();
 		this.numBands = info.getBands();
-		this.pathRow = pathRow;
-		this.aqcuisitionDate = aqcDate;
-		this.xPixelWith = xPixelWidth;
-		this.yPixelWidth = yPixelWidth;
+		this.pathRow = info.getPathRow();
+		this.aqcuisitionDate = info.getAcqDateAsString();
+		this.xPixelWith = info.getPixelWidth();
+		this.yPixelWidth = info.getPixelHeight();
 	}
 }
