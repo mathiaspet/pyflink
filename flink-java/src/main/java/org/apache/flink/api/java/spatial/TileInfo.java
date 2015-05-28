@@ -20,18 +20,20 @@ package org.apache.flink.api.java.spatial;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
+
 import org.apache.flink.util.StringUtils;
 
-public class TileInfo implements Serializable {
+public class TileInfo extends HashMap<String, String> {
 	private static final long serialVersionUID = 5579375867489556640L;
 	
 	public static enum DataTypes {
@@ -63,20 +65,14 @@ public class TileInfo implements Serializable {
 		bil,
 		bip
 	}
-	
-	private DataTypes dataType;
-	private int bands, lines, samples, headerOffset, byteOrder, dataIgnoreValue;
-	private double pixelWidth, pixelHeight;
-	private int interleave; 
-	private Coordinate leftUpper, rightLower;
-	
-	private long acqDate;
-//	private String mapInfoString; //TODO: maybe constructed
-	private int dataTypeindex;
-	private String pathRow;
-	
 
-	public TileInfo() {}
+	public TileInfo() {
+		super();
+	}
+
+	public TileInfo(TileInfo other) {
+		super(other);
+	}
 
 	public TileInfo(InputStream is) throws IOException {
 		byte[] buf = new byte[4096];
@@ -97,24 +93,6 @@ public class TileInfo implements Serializable {
 		parseInfo(tileHeader);
 	}
 	
-
-	public TileInfo(TileInfo tileInfo) {
-		this.acqDate = tileInfo.acqDate;
-		this.bands = tileInfo.bands;
-		this.byteOrder = tileInfo.byteOrder;
-		this.dataIgnoreValue = tileInfo.dataIgnoreValue;
-		this.dataType = tileInfo.dataType;
-		this.headerOffset = tileInfo.headerOffset;
-		this.interleave = tileInfo.interleave;
-		this.leftUpper = new Coordinate(tileInfo.getLeftUpper());
-		this.lines = tileInfo.lines;
-//		this.mapInfoString = tileInfo.mapInfoString;
-		this.pixelHeight = tileInfo.pixelHeight;
-		this.pixelWidth = tileInfo.pixelWidth;
-		this.rightLower = new Coordinate(tileInfo.getLowerRightCoordinate());
-		this.samples = tileInfo.samples;
-	}
-
 	private final void parseInfo(String tileHeader) {
 		String name = null;
 		String value = null;
@@ -161,102 +139,15 @@ public class TileInfo implements Serializable {
 				braceImbalance -= countOccurences(value, '}');
 			}
 			if(braceImbalance == 0) {
-				
-				
-				if(name.equals("bands")) {
-					this.bands = Integer.parseInt(value);
-					continue;
-				}
-				
-				if(name.equals("samples")) {
-					this.samples = Integer.parseInt(value);
-					continue;
-				}
-				
-				if(name.equals("lines")) {
-					this.lines = Integer.parseInt(value);
-					continue;
-				}
-				
-				if(name.equals("data type")) {
-					int parseInt = Integer.parseInt(value);
-					
-					if(parseInt == -1) {
-						this.dataType = DataTypes.MISSING;
-						continue;
-					}
-					this.dataType = DataTypes.values()[parseInt];
-					this.dataTypeindex = parseInt;
-					continue;
-				}
-				if(name.equals("header offset")) {
-					this.headerOffset = Integer.parseInt(value);
-					continue;
-				}
-				
-				if(name.equals("interleave")) {
-					//TODO: switch
-					if(value.equals("bsq")) {
-						this.interleave = 0;
-					}
-					
-					if(value.equals("bil")) {
-						this.interleave = 1;
-					}
-					
-					if(value.equals("bip")) {
-						this.interleave = 2;
-					}
-					
-					continue;
-				}
-				
-				if(name.equals("data ignore value")) {
-					this.dataIgnoreValue = Integer.parseInt(value);
-					continue;
-				}
-				
-				if(name.trim().equals("map info")) {
-					
-					String list = value.substring(1, value.length() - 1).trim(); 
-					String[] splitted = list.split(", *");
-					
-					String easting = splitted[3];
-					String northing = splitted[4];
-					this.leftUpper = new Coordinate(Double.parseDouble(easting), Double.parseDouble(northing));
-					
-					
-					
-					this.pixelWidth = Double.parseDouble(splitted[5]);
-					this.pixelHeight = Double.parseDouble(splitted[6]);
-					
-					
-					
-					continue;
-				}
-				
-				if(name.equals("acquisitiondate")) {
-					DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS"); 
-					
-					try {
-						Date date = df.parse(value);
-						//TODO: find out how many seconds between two scenes on the same row
-						//and normalize the time to minutes
-						this.acqDate = date.getTime();  
-					} catch (ParseException e) {
-					}
-				}
-				
-				//entries.put(name, value);
+				this.put(name, value);
 			} else if(braceImbalance < 0) {
 				throw new RuntimeException(
 						"Parse error (negative curly brance balance) at line "
 								+ lineNo + ": " + line);
 			}
 		}
-		
-		getLowerRightCoordinate();
 	}
+
 
 	/**
 	 * Return how many times c appears in str.
@@ -270,6 +161,140 @@ public class TileInfo implements Serializable {
 		return occurences;
 	}
 
+	
+	public DataTypes getDataType() {
+		if (this.containsKey("data type")) {
+			int parseInt = Integer.parseInt(this.get("data type"));
+
+			if(parseInt == -1) {
+				return DataTypes.MISSING;
+			}
+			return DataTypes.values()[parseInt];
+		}
+
+		return null;
+	}
+	
+	
+	/**
+	 * Return the size of each pixel in bytes.
+	 */
+	public int getPixelSize() {
+		switch(getDataType()) {
+			case BYTE:
+				return 1;
+			case INT:
+			case UINT:
+				return 2;
+			case LONG:
+			case ULONG:
+				return 4;
+			case LONG64:
+			case ULONG64:
+				return 8;
+			default:
+				throw new RuntimeException("Unsupported data format: " + getDataType());
+		}
+	}
+
+
+	public TileInfo copy() {
+		return new TileInfo(this);
+	}
+
+	public void serialize(DataOutputView target) throws IOException {
+		target.writeInt(this.size());
+		for (Map.Entry<String, String> entry: this.entrySet()) {
+			target.writeUTF(entry.getKey());
+			target.writeUTF(entry.getValue());
+		}
+	}
+
+	public void deserialize(DataInputView source) throws IOException {
+		String key;
+		String value;
+		for (int i = source.readInt(); i > 0; i--) {
+			key = source.readUTF();
+			value = source.readUTF();
+			this.put(key, value);
+		}
+
+	}
+
+	public int getBands() {
+		return Integer.parseInt(this.get("bands"));
+	}
+
+	public int getLines() {
+		return Integer.parseInt(this.get("lines"));
+	}
+
+	public int getSamples() {
+		return Integer.parseInt(this.get("samples"));
+	}
+
+	public int getHeaderOffset() {
+		return Integer.parseInt(this.get("header offset"));
+	}
+
+	public int getInterleave() {
+		if (this.containsKey("interleave")) {
+			if (this.get("Interleave") == "bsq") {
+				return 0;
+			}
+			else if (this.get("Interleave") == "bil") {
+				return 1;
+			}
+			else if (this.get("Interleave") == "bip") {
+				return 2;
+			}
+		}
+		return -1;
+	}
+
+
+	public long getAcqDate() {
+		if (this.containsKey("acquisitiondate")) {
+			DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS"); 
+			try {
+				Date date = df.parse(this.get("acquisitiondate"));
+				return date.getTime();  
+			} catch (ParseException e) {
+			}
+		}
+		return -1;
+	}
+	
+	public String getAcqDateAsString() {
+		if (this.containsKey("acquisitiondate")) {
+			return this.get("acquisitiondate");
+		}
+		return null;
+	}
+	
+	public int getDataIgnoreValue() {
+		if (this.containsKey("data ignore value")) {
+			return Integer.parseInt(this.get("data ignore value"));
+		}
+		return -1;
+	}
+	
+	/**
+	 * Parse the header date given by this.info and compute the 
+	 * upper left coordinate given by map info.
+	 * @return a {@link Coordinate} yielding the geographical position of the upper left corner
+	 */
+	public Coordinate getUpperLeftCoordinate() {
+		if (this.containsKey("map info")) {
+			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+			String[] splitted = list.split(", *");
+
+			String easting = splitted[3];
+			String northing = splitted[4];
+			return new Coordinate(Double.parseDouble(easting), Double.parseDouble(northing));
+		}
+		return null;
+	}
 
 	/**
 	 * Since map info does not have a lower right coordinate we calculate it 
@@ -280,217 +305,36 @@ public class TileInfo implements Serializable {
 	 * @return a {@link Coordinate} yielding the geographical position of the lower right corner
 	 */
 	public Coordinate getLowerRightCoordinate() {
-		
-		if(this.rightLower == null) {
 		Coordinate upperLeft = getUpperLeftCoordinate();
 		int lines = getLines();
 		int samples = getSamples();
 		double pixelWidth = getPixelWidth();
 		double pixelHeight = getPixelHeight();
-		
+
 		double lowerRightEasting = upperLeft.lon + (samples-1) * pixelWidth;
 		double lowerRightNorthing = upperLeft.lat - (lines-1) * pixelHeight;
-		
-		this.rightLower = new Coordinate(lowerRightEasting, lowerRightNorthing);
-		}
-		
-		return this.rightLower;
-	}
 
-	
-	public DataTypes getDataType() {
-		return this.dataType;
-	}
-	
-	/**
-	 * TODO: fix for different coordinate systems.
-	 * @return
-	 */
-	public Coordinate getMapInfoUpperLeft() {
-		return this.leftUpper;
-//		String[] mapInfo = getStringArray("map info");
-//		
-//		String easting = mapInfo[3];
-//		String northing = mapInfo[4];
-//		
-//		return new Coordinate(Double.parseDouble(easting), Double.parseDouble(northing));
-	}
-	
-	/**
-	 * Return the size of each pixel in bytes.
-	 */
-	public int getPixelSize() {
-//		switch(getDataType()) {
-		switch(this.dataType) {
-		case BYTE:
-			return 1;
-		case INT:
-		case UINT:
-			return 2;
-		case LONG:
-		case ULONG:
-			return 4;
-		case LONG64:
-		case ULONG64:
-			return 8;
-		default:
-			throw new RuntimeException("Unsupported data format: " + getDataType());
-		}
+		return new Coordinate(lowerRightEasting, lowerRightNorthing);
 	}
 
 
-	public TileInfo copy() {
-		return new TileInfo(this);
-	}
-
-	public void serialize(DataOutputView target) throws IOException {
-		
-		target.writeLong(this.acqDate);
-		
-		target.writeInt(this.bands);
-		
-		target.writeInt(this.byteOrder);
-//		target.writeUTF(this.coordinateString);
-//		writeString(target, coordinateString);
-		
-		target.writeInt(this.dataIgnoreValue);
-		
-		target.writeInt(this.dataTypeindex);
-		
-		target.writeInt(this.headerOffset);
-		
-		target.writeInt(this.interleave);
-		
-		this.leftUpper.serialize(target);
-		
-		target.writeInt(this.lines);
-		
-//		target.writeUTF(this.mapInfoString);
-		target.writeDouble(this.pixelHeight);
-		target.writeDouble(this.pixelWidth);
-		
-//		target.writeUTF(this.projectionInfoString);
-		this.rightLower.serialize(target);
-		target.writeInt(this.samples);
-	}
-
-	public void deserialize(DataInputView source) throws IOException {
-		this.acqDate = source.readLong();
-		
-		this.bands = source.readInt();
-		
-		this.byteOrder = source.readInt();
-		
-		this.dataIgnoreValue = source.readInt();
-		
-		this.dataTypeindex = source.readInt();
-		
-		if(this.dataTypeindex >= 0) {
-			this.dataType = DataTypes.values()[this.dataTypeindex];
-		}else {
-			System.out.println("DT index wrong: " + this.dataTypeindex);
-		}
-		this.headerOffset = source.readInt();
-		
-		this.interleave = source.readInt();
-		
-		this.leftUpper = new Coordinate();
-		this.leftUpper.deserialize(source);
-		
-		this.lines = source.readInt();
-		
-		this.pixelHeight = source.readDouble();
-		this.pixelWidth = source.readDouble();
-		
-		this.rightLower = new Coordinate();
-		this.rightLower.deserialize(source);
-		
-		this.samples = source.readInt();
-	}
-
-	public int getBands() {
-		return bands;
-	}
-
-	public int getLines() {
-		return lines;
-	}
-
-	public int getSamples() {
-		return samples;
-	}
-
-	public int getHeaderOffset() {
-		return headerOffset;
-	}
-
-	public int getByteOrder() {
-		return byteOrder;
-	}
-
-	public int getInterleave() {
-		return interleave;
-	}
-
-	public Coordinate getLeftUpper() {
-		return leftUpper;
-	}
-
-	public long getAcqDate() {
-		return acqDate;
-	}
-	
-	public String getAcqDateAsString() {
-		return new Date(this.acqDate).toString();
-	}
-	
-	public void setPixelWidth(double pixelWidth) {
-		this.pixelWidth = pixelWidth;
-	}
-
-//	public String getCoordinateString() {
-//		return coordinateString;
-//	}
-
-//	public String getProjectionInfoString() {
-//		return projectionInfoString;
-//	}
-
-//	public String getMapInfoString() {
-//		return mapInfoString;
-//	}
-
-	public int getDataIgnoreValue() {
-		return dataIgnoreValue;
-	}
-	
 	public double getPixelWidth() {
-		return this.pixelWidth;
+		if (this.containsKey("map info")) {
+			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+			String[] splitted = list.split(", *");
+
+			return Double.parseDouble(splitted[5]);
+		}
+		return -1.0;
 	}
 
 	public double getPixelHeight() {
-		return this.pixelHeight;
-	}
+		if (this.containsKey("map info")) {
+			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+			String[] splitted = list.split(", *");
 
-	/**
-	 * Parse the header date given by this.info and compute the 
-	 * upper left coordinate given by map info.
-	 * @return a {@link Coordinate} yielding the geographical position of the upper left corner
-	 */
-	public Coordinate getUpperLeftCoordinate() {
-		return this.leftUpper;
+			return Double.parseDouble(splitted[5]);
+		}
+		return -1.0;
 	}
-
-	public int getDataTypeindex() {
-		return dataTypeindex;
-	}
-
-	public String getPathRow() {
-		return this.pathRow;
-	}
-	
-	public void setPathRow(String pathRow) {
-		this.pathRow = pathRow;
-	}
-
 }
