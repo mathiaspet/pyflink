@@ -28,6 +28,11 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
  */
 public class TileTypeInformation extends TypeInformation<Tile> {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -2038796034760464628L;
+
 	@Override
 	public boolean isBasicType() {
 		return false;

@@ -49,22 +49,10 @@ public class Tile extends SpatialObject{
 	}
 
 	public Tile(Tile tile) {
-		this.aqcuisitionDate = tile.getAqcuisitionDate();
+		super(tile);
+		
 		this.band = tile.getBand();
-		this.luCord = tile.getNWCoord().copy();
-		this.pathRow = tile.getPathRow();
-		this.rlCord = tile.getSECoord().copy();
-
-		short[] content = tile.getS16Tile();
-		short[] newContent = new short[content.length];
-		System.arraycopy(content, 0, newContent, 0, content.length);
-		this.s16Tile = newContent;
-
-		this.tileHeight = tile.getTileHeight();
-		this.tileInfo = tile.getTileInfo().copy();
-		this.tileWidth = tile.getTileWidth();
-		this.xPixelWith = tile.xPixelWith;
-		this.yPixelWidth = tile.yPixelWidth;
+		
 	}
 
 	public int getBand() {
@@ -161,23 +149,8 @@ public class Tile extends SpatialObject{
 	}
 
 	public void copyTo(Tile target) {
-		target.aqcuisitionDate = this.aqcuisitionDate;
+		super.copyTo(target);
 		target.band = this.band;
-		target.luCord = this.luCord.copy();
-		target.pathRow = this.pathRow;
-		target.rlCord = this.rlCord.copy();
-
-		short[] content = this.s16Tile;
-		short[] newContent = new short[content.length];
-		System.arraycopy(content, 0, newContent, 0, content.length);
-		target.s16Tile = newContent;
-
-		target.tileHeight = this.tileHeight;
-		target.tileInfo = this.getTileInfo().copy();
-		target.tileWidth = this.tileWidth;
-		target.xPixelWith = this.xPixelWith;
-		target.yPixelWidth = this.yPixelWidth;
-
 	}
 
 	public void serialize(DataOutputView target) throws IOException {

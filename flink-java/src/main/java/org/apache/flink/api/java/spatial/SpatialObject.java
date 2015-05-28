@@ -51,6 +51,25 @@ public class SpatialObject  implements Serializable {
 		super();
 	}
 
+	public SpatialObject(SpatialObject spatialObject) {
+		this.aqcuisitionDate = spatialObject.getAqcuisitionDate();
+		this.luCord = spatialObject.luCord.copy();
+		this.pathRow = spatialObject.getPathRow();
+		this.rlCord = spatialObject.rlCord.copy();
+
+		short[] content = spatialObject.getS16Tile();
+		short[] newContent = new short[content.length];
+		System.arraycopy(content, 0, newContent, 0, content.length);
+		this.s16Tile = newContent;
+
+		this.tileHeight = spatialObject.getTileHeight();
+		this.tileInfo = spatialObject.getTileInfo().copy();
+		this.tileWidth = spatialObject.getTileWidth();
+		this.xPixelWith = spatialObject.xPixelWith;
+		this.yPixelWidth = spatialObject.yPixelWidth;
+		
+	}
+
 	/**
 	 * Returns the tile contents as 1-dimensional array of pixels organized in
 	 * rows. The pixels are addressed by converting a coordinate (x, y) starting
@@ -233,5 +252,24 @@ public class SpatialObject  implements Serializable {
 			this.s16Tile = new short[0];
 		}
 
+	}
+
+	public void copyTo(SpatialObject target) {
+		target.aqcuisitionDate = this.aqcuisitionDate;
+		target.luCord = this.luCord.copy();
+		target.pathRow = this.pathRow;
+		target.rlCord = this.rlCord.copy();
+
+		short[] content = this.s16Tile;
+		short[] newContent = new short[content.length];
+		System.arraycopy(content, 0, newContent, 0, content.length);
+		target.s16Tile = newContent;
+
+		target.tileHeight = this.tileHeight;
+		target.tileInfo = this.getTileInfo().copy();
+		target.tileWidth = this.tileWidth;
+		target.xPixelWith = this.xPixelWith;
+		target.yPixelWidth = this.yPixelWidth;
+		
 	}
 }

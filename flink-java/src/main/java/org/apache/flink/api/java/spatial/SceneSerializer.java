@@ -29,47 +29,51 @@ import org.apache.flink.core.memory.DataOutputView;
  */
 public class SceneSerializer extends TypeSerializer<Scene> {
 
+	
+	private static SceneSerializer INSTANCE = new SceneSerializer();
+	
+	private SceneSerializer() {
+	}
+	
+	public static SceneSerializer getInstance() {
+		return INSTANCE;
+	}
+	
 	@Override
 	public boolean isImmutableType() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public TypeSerializer<Scene> duplicate() {
-		// TODO Auto-generated method stub
-		return null;
+		return this;
 	}
 
 	@Override
 	public Scene createInstance() {
-		// TODO Auto-generated method stub
-		return null;
+		return new Scene();
 	}
 
 	@Override
 	public Scene copy(Scene from) {
-		// TODO Auto-generated method stub
-		return null;
+		return from.createCopy();
 	}
 
 	@Override
 	public Scene copy(Scene from, Scene reuse) {
-		// TODO Auto-generated method stub
-		return null;
+		from.copyTo(reuse);
+		return reuse;
 	}
 
 	@Override
 	public int getLength() {
-		// TODO Auto-generated method stub
-		return 0;
+		return -1;
 	}
 
 	@Override
 	public void serialize(Scene record, DataOutputView target)
 			throws IOException {
-		// TODO Auto-generated method stub
-		
+		record.serialize(target);
 	}
 
 	@Override

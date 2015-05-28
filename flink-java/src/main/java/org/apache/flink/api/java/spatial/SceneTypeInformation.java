@@ -21,52 +21,46 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
-/**
- * @author mathiasp
- *
- */
 public class SceneTypeInformation extends TypeInformation<Scene> {
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 3039175882869466092L;
 
 	@Override
 	public boolean isBasicType() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public boolean isTupleType() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public int getArity() {
-		// TODO Auto-generated method stub
-		return 0;
+		return 1;
 	}
 
 	@Override
 	public int getTotalFields() {
-		// TODO Auto-generated method stub
-		return 0;
+		return -1;
 	}
 
 	@Override
 	public Class<Scene> getTypeClass() {
-		// TODO Auto-generated method stub
-		return null;
+		return Scene.class;
 	}
 
 	@Override
 	public boolean isKeyType() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public TypeSerializer<Scene> createSerializer(ExecutionConfig config) {
-		// TODO Auto-generated method stub
-		return null;
+		return SceneSerializer.getInstance();
 	}
 
 }

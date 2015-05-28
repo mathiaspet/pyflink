@@ -17,6 +17,11 @@
  */
 package org.apache.flink.api.java.spatial;
 
+import java.io.IOException;
+
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataOutputView;
+
 /**
  * Represents a complete Scene including possibly all the bands
  *
@@ -28,6 +33,23 @@ public class Scene extends SpatialObject {
 	private static final long serialVersionUID = -937223003083256908L;
 
 	private int numBands = -1;
+	
+	public int getNumBands() {
+		return numBands;
+	}
+
+	public void setNumBands(int numBands) {
+		this.numBands = numBands;
+	}
+
+	public Scene(){}
+	
+	public Scene(Scene scene) {
+		super(scene);
+		this.numBands = scene.numBands;
+	}
+
+
 	/**
 	 * Update the tile information to the given object.
 	 * 
@@ -44,5 +66,27 @@ public class Scene extends SpatialObject {
 		this.aqcuisitionDate = info.getAcqDateAsString();
 		this.xPixelWith = info.getPixelWidth();
 		this.yPixelWidth = info.getPixelHeight();
+	}
+	
+	
+	public Scene createCopy() {
+		return new Scene(this);
+	}
+	
+	public void copyTo(Scene target) {
+		super.copyTo(target);
+		target.numBands = this.numBands;
+	}
+	
+	@Override
+	public void serialize(DataOutputView target) throws IOException {
+		super.serialize(target);
+		target.writeInt(this.numBands);
+	}
+	
+	@Override
+	public void deserialize(DataInputView source) throws IOException {
+		super.deserialize(source);
+		this.numBands = source.readInt();
 	}
 }
