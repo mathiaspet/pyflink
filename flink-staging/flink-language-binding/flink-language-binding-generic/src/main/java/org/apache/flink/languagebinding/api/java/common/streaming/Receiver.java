@@ -12,6 +12,22 @@
  */
 package org.apache.flink.languagebinding.api.java.common.streaming;
 
+//CHECKSTYLE.ON: AvoidStarImport
+import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
+import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_BOOLEAN;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_BYTE;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_BYTES;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_DOUBLE;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_FLOAT;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_INTEGER;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_LONG;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_NULL;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_SHORT;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_STRING;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_TILE;
+import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.TYPE_TUPLE;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,15 +41,34 @@ import java.nio.channels.FileChannel;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 //CHECKSTYLE.OFF: AvoidStarImport - tuple imports
 import org.apache.flink.api.java.spatial.Coordinate;
-import org.apache.flink.api.java.spatial.SpatialObject;
 import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.api.java.tuple.*;
-
-import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.*;
-//CHECKSTYLE.ON: AvoidStarImport
-import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
-import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
-
+import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.tuple.Tuple0;
+import org.apache.flink.api.java.tuple.Tuple1;
+import org.apache.flink.api.java.tuple.Tuple10;
+import org.apache.flink.api.java.tuple.Tuple11;
+import org.apache.flink.api.java.tuple.Tuple12;
+import org.apache.flink.api.java.tuple.Tuple13;
+import org.apache.flink.api.java.tuple.Tuple14;
+import org.apache.flink.api.java.tuple.Tuple15;
+import org.apache.flink.api.java.tuple.Tuple16;
+import org.apache.flink.api.java.tuple.Tuple17;
+import org.apache.flink.api.java.tuple.Tuple18;
+import org.apache.flink.api.java.tuple.Tuple19;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple20;
+import org.apache.flink.api.java.tuple.Tuple21;
+import org.apache.flink.api.java.tuple.Tuple22;
+import org.apache.flink.api.java.tuple.Tuple23;
+import org.apache.flink.api.java.tuple.Tuple24;
+import org.apache.flink.api.java.tuple.Tuple25;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.api.java.tuple.Tuple6;
+import org.apache.flink.api.java.tuple.Tuple7;
+import org.apache.flink.api.java.tuple.Tuple8;
+import org.apache.flink.api.java.tuple.Tuple9;
 import org.apache.flink.util.Collector;
 
 /**
@@ -368,7 +403,7 @@ public class Receiver implements Serializable {
 		private LongDeserializer intDes;
 		private BytesDeserializer bytesDes;
 		//TODO: check if this is still in line with the serialization approach of Flink
-		SpatialObject reuse;
+		Tile reuse;
 
 		public TileDeserializer() {
 			this.stringDes = new StringDeserializer();
@@ -380,7 +415,7 @@ public class Receiver implements Serializable {
 
 
 		@Override
-		public SpatialObject deserialize() {
+		public Tile deserialize() {
 			this.reuse.setAqcuisitionDate(this.stringDes.deserialize());
 			this.reuse.setBand(this.intDes.deserialize().intValue());
 
