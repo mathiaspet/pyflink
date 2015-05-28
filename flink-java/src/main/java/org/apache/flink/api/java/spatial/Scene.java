@@ -35,12 +35,13 @@ public class Scene extends SpatialObject {
 	 */
 	public void update(TileInfo info) {
 		this.tileInfo = info;
-		this.luCord = info.getLeftUpper();
+		this.luCord = info.getUpperLeftCoordinate();
 		this.rlCord = info.getLowerRightCoordinate();
 		this.tileWidth = info.getSamples();
 		this.tileHeight = info.getLines();
 		this.numBands = info.getBands();
-		this.pathRow = info.getPathRow();
+		// Path row is never set to anything in TileInfo
+		// this.pathRow = info.getPathRow();
 		this.aqcuisitionDate = info.getAcqDateAsString();
 		this.xPixelWith = info.getPixelWidth();
 		this.yPixelWidth = info.getPixelHeight();
