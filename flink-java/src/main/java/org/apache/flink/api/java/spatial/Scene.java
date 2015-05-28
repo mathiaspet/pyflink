@@ -27,21 +27,19 @@ public class Scene extends SpatialObject {
 	 */
 	private static final long serialVersionUID = -937223003083256908L;
 
+	private int numBands = -1;
 	/**
 	 * Update the tile information to the given object.
 	 * 
 	 * @param aqcDate
 	 */
-	public void update(TileInfo tileInfo, Coordinate leftUpper,
-			Coordinate rightLower, int width, int height, int band,
-			String pathRow, String aqcDate, double xPixelWidth, 
-			double yPixelWidth) {
-//		this.tileInfo = tileInfo;
-		this.luCord = leftUpper;
-		this.rlCord = rightLower;
-		this.tileWidth = width;
-		this.tileHeight = height;
-//		this.band = band;
+	public void update(TileInfo info) {
+		this.tileInfo = info;
+		this.luCord = info.getLeftUpper();
+		this.rlCord = info.getLowerRightCoordinate();
+		this.tileWidth = info.getSamples();
+		this.tileHeight = info.getLines();
+		this.numBands = info.getBands();
 		this.pathRow = pathRow;
 		this.aqcuisitionDate = aqcDate;
 		this.xPixelWith = xPixelWidth;

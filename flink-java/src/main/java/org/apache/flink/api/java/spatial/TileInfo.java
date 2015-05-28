@@ -73,6 +73,7 @@ public class TileInfo implements Serializable {
 	private long acqDate;
 //	private String mapInfoString; //TODO: maybe constructed
 	private int dataTypeindex;
+	private String pathRow;
 	
 
 	public TileInfo() {}
@@ -482,6 +483,14 @@ public class TileInfo implements Serializable {
 
 	public int getDataTypeindex() {
 		return dataTypeindex;
+	}
+
+	public String getPathRow() {
+		return this.pathRow;
+	}
+	
+	public void setPathRow(String pathRow) {
+		this.pathRow = pathRow;
 	}
 
 }

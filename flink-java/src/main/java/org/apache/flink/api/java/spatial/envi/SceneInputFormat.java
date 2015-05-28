@@ -55,9 +55,6 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 	private static final Logger LOG = LoggerFactory.getLogger(SceneInputFormat.class);
 
 	private int xsize = -1, ysize = -1;
-	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
-	
-	private double pixelWidth = -1.0, pixelHeight = -1.0;
 	
 	private TileInfo info;
 	private String pathRow;
@@ -106,34 +103,20 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 					throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
 							+ " File: " + file.getPath());
 				}
+				
 				int data_size = info.getPixelSize();
 				int numRows = info.getLines();
 				int numColumns = info.getSamples();
-				this.pixelHeight = info.getPixelHeight();
-				this.pixelWidth = info.getPixelWidth();
-				
-				this.leftUpperLimit = info.getLeftUpper();
-
-				double rightLong = this.leftUpperLimit.lon + this.pixelWidth * numColumns;
-				double rightLat = this.leftUpperLimit.lat + this.pixelHeight * numRows;
-				this.rightLowerLimit = new Coordinate(rightLong, rightLat);
-
-				this.xsize = numColumns;
-				this.ysize = numRows;
 				
 				String filePath = file.getPath().toString();
 				int lastIndexOf = filePath.lastIndexOf("/");
 				filePath = filePath.substring(lastIndexOf + 1);
 				String[] split = filePath.split("_");
-				String pathRow = split[0];
-				String aqcDate = split[1];
 
 				// Determine list of FS blocks that contain the given block
 				final BlockLocation[] blocks = fs.getFileBlockLocations(dataFileStatus, 0, numRows * numColumns);
 				Arrays.sort(blocks);
 
-				//create absolute position that comprises the whole scene
-				
 				SceneInputSplit sceneSplit = new SceneInputSplit(1, dataFile, 0, data_size,
 						blocks[0].getHosts(), info);
 				inputSplits.add(sceneSplit);
@@ -315,17 +298,11 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 		double pixelWidth = this.info.getPixelWidth();
 		double pixelHeight = this.info.getPixelHeight();
 
-		//TODO: find out why xsize and ysize are -1 here
-		this.xsize = this.info.getSamples();
-		this.ysize = this.info.getLines();
-		
-		System.out.println("number of bands: " + this.info.getBands());
-
 		int xread = lineWidth;
 
 		int yread = this.info.getLines() * this.info.getBands();
 		
-		record.update(this.info, this.info.getLeftUpper(), this.info.getLowerRightCoordinate(), xsize, ysize, -1, this.pathRow, this.info.getAcqDateAsString(), pixelWidth, pixelHeight);
+		record.update(this.info);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			values = new short[xsize * ysize * this.info.getBands()];
@@ -364,71 +341,4 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 		return record;
 	}
 	
-	
-//	public static final class EnviTilePosition implements Serializable{
-//		public final int band;
-//		public final int xstart, xnext;
-//		public final int ystart, ynext;
-//		public final Coordinate leftUpperCorner, rightLowerCorner;
-//		public final String pathRow;
-//		public final String aqcDate;
-//
-//		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
-//			this.band = band;
-//			this.xstart = xstart;
-//			this.xnext = xnext;
-//			this.ystart = ystart;
-//			this.ynext = ynext;
-//			this.leftUpperCorner = leftUpperCorner;
-//			this.rightLowerCorner = rightLowerCorner;
-//			this.pathRow = pathRow;
-//			this.aqcDate = aqcDate;
-//		}
-//		
-//		@Override
-//		public String toString() {
-//			return "x:" + xstart + "--" + xnext + ", y:" + ystart + "--" + ynext + ", left Upper: " + leftUpperCorner + ", rightLower: " + rightLowerCorner + ", band " + band;
-//		}
-//	}
-	
-	public static final class SceneInputSplit extends FileInputSplit implements Serializable{
-		private static final long serialVersionUID = -9205048860784884871L;
-		public TileInfo info;
-
-		public SceneInputSplit() {
-			super();
-			this.info = null;
-		}
-		
-		public SceneInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info) {
-			super(num, file, start, length, hosts);
-			this.info = info;
-		}
-		
-		@Override
-		public void read(DataInputView in) throws IOException {
-			this.info = new TileInfo();
-			this.info.deserialize(in);
-			
-			super.read(in);
-		}
-		
-		@Override
-		public void write(DataOutputView out) throws IOException {
-			this.info.serialize(out);
-			super.write(out);
-		}
-	}
-
-	public void setLimitRectangle(Coordinate leftUpperLimit,
-			Coordinate rightLowerLimit) {
-		this.leftUpperLimit = leftUpperLimit;
-		this.rightLowerLimit = rightLowerLimit;
-	}
-
-	public void setTileSize(int xpixels, int ypixels) {
-		this.xsize = xpixels;
-		this.ysize = ypixels;
-	}
-
 }
