@@ -432,7 +432,7 @@ public class Receiver implements Serializable {
 			this.reuse.setPathRow(this.stringDes.deserialize());
 			this.reuse.setTileHeight(this.intDes.deserialize().intValue());
 			this.reuse.setTileWidth(this.intDes.deserialize().intValue());
-			this.reuse.setxPixelWith(this.doubleDes.deserialize());
+			this.reuse.setxPixelWidth(this.doubleDes.deserialize());
 			this.reuse.setyPixelWidth(this.doubleDes.deserialize());
 
 			byte[] bytes = this.bytesDes.deserialize();

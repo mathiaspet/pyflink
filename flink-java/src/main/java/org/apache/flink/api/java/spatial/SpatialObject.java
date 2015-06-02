@@ -41,7 +41,7 @@ public abstract class SpatialObject  implements Serializable {
 	protected short[] s16Tile = null;
 	protected Coordinate luCord = null;
 	protected Coordinate rlCord = null;
-	protected double xPixelWith = -1.0;
+	protected double xPixelWidth = -1.0;
 	protected double yPixelWidth = -1.0;
 	protected int tileWidth = -1;
 	protected int tileHeight = -1;
@@ -65,7 +65,7 @@ public abstract class SpatialObject  implements Serializable {
 		this.tileHeight = spatialObject.getTileHeight();
 		this.tileInfo = spatialObject.getTileInfo().copy();
 		this.tileWidth = spatialObject.getTileWidth();
-		this.xPixelWith = spatialObject.xPixelWith;
+		this.xPixelWidth = spatialObject.xPixelWidth;
 		this.yPixelWidth = spatialObject.yPixelWidth;
 		
 	}
@@ -164,15 +164,15 @@ public abstract class SpatialObject  implements Serializable {
 		this.tileWidth = tileWidth;
 	}
 
-	public void setxPixelWith(Double xPixelWith) {
-		this.xPixelWith = xPixelWith;
+	public void setxPixelWidth(Double xPixelWidth) {
+		this.xPixelWidth = xPixelWidth;
 	}
 
 	public void setyPixelWidth(Double yPixelWidth) {
 		this.yPixelWidth = yPixelWidth;
 	}
 
-	public double getxPixelWith() {	return xPixelWith;}
+	public double getxPixelWidth() {	return xPixelWidth;}
 
 	public double getyPixelWidth() {return yPixelWidth;	}
 	
@@ -196,7 +196,7 @@ public abstract class SpatialObject  implements Serializable {
 		
 		target.writeInt(this.tileHeight);
 		target.writeInt(this.tileWidth);
-		target.writeDouble(this.xPixelWith);
+		target.writeDouble(this.xPixelWidth);
 		target.writeDouble(this.yPixelWidth);
 
 		this.tileInfo.serialize(target);
@@ -235,7 +235,7 @@ public abstract class SpatialObject  implements Serializable {
 		
 		this.tileHeight = source.readInt();
 		this.tileWidth = source.readInt();
-		this.xPixelWith = source.readDouble();
+		this.xPixelWidth = source.readDouble();
 		this.yPixelWidth = source.readDouble();
 		
 		this.tileInfo = new TileInfo();
@@ -268,7 +268,7 @@ public abstract class SpatialObject  implements Serializable {
 		target.tileHeight = this.tileHeight;
 		target.tileInfo = this.getTileInfo().copy();
 		target.tileWidth = this.tileWidth;
-		target.xPixelWith = this.xPixelWith;
+		target.xPixelWidth = this.xPixelWidth;
 		target.yPixelWidth = this.yPixelWidth;
 		
 	}

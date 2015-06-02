@@ -110,6 +110,7 @@ class Tile(object):
         self._xPixelWidth = 0.0
         self._yPixelWidth = 0.0
         self._content = bytearray()
+        self._tileInfo = dict()
 
     def update(self, leftUpper, rightLower, width, height, band,
                pathRow, acquisitionDate, xPixelWidth, yPixelWidth):

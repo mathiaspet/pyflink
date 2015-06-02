@@ -63,7 +63,7 @@ public class Scene extends SpatialObject {
 		this.tileHeight = info.getLines();
 		this.numBands = info.getBands();
 		this.aqcuisitionDate = info.getAcqDateAsString();
-		this.xPixelWith = info.getPixelWidth();
+		this.xPixelWidth = info.getPixelWidth();
 		this.yPixelWidth = info.getPixelHeight();
 	}
 	

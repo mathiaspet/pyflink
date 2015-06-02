@@ -94,7 +94,7 @@ public class Tile extends SpatialObject{
 		this.band = band;
 		this.pathRow = pathRow;
 		this.aqcuisitionDate = aqcDate;
-		this.xPixelWith = xPixelWidth;
+		this.xPixelWidth = xPixelWidth;
 		this.yPixelWidth = yPixelWidth;
 	}
 
@@ -116,7 +116,7 @@ public class Tile extends SpatialObject{
 	public Coordinate getCoordinate(int contentIndex) {
 		int x = contentIndex % tileWidth;
 		int y = (int) (contentIndex / tileWidth);
-		double newLon = this.luCord.lon + this.xPixelWith * x;
+		double newLon = this.luCord.lon + this.xPixelWidth * x;
 		double newLat = this.luCord.lat - this.yPixelWidth * y;
 
 		return new Coordinate(newLon, newLat);
@@ -138,7 +138,7 @@ public class Tile extends SpatialObject{
 			return -1;
 		}
 
-		int x = (int) (lonDiff / this.xPixelWith);
+		int x = (int) (lonDiff / this.xPixelWidth);
 		int y = (int) (latDiff / this.yPixelWidth);
 
 		return y * this.tileWidth + x;
