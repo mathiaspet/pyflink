@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.io.FileNotFoundException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
@@ -26,8 +25,11 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.java.spatial.SpatialObject;
 import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.spatial.TileInfo;
 import org.apache.flink.api.java.tuple.Tuple;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
@@ -421,186 +423,142 @@ public class Sender implements Serializable {
 		}
 	}
 
-	//TODO: use TileTypeSerializer instead
-	//TODO: refactor the whole serializer logic for tiles and tuples
-	//this screams because of code duplication!!!
-	private class TileSerializer extends Serializer<Tile> {
 
-		//FIXME: fix the reuse of these objects
-		//putting the buffer of each serializer into this.buffer
-		//immediately will help
-		private StringSerializer stringSerializer;
-		private StringSerializer stringSerializer2;
-		private IntSerializer intSerializer;
-		private IntSerializer intSerializer2;
-		private IntSerializer intSerializer3;
-		private IntSerializer intSerializer4;
+	private class SpatialObjectSerializer extends Serializer<SpatialObject> {
+		protected int reserve = 0;
+		protected StringSerializer stringSerializer;
+		protected IntSerializer intSerializer;
+		protected DoubleSerializer doubleSerializer;
+		protected BytesSerializer bytesSerializer;
+		protected BooleanSerializer booleanSerializer;
 
-		private DoubleSerializer doubleSerializer;
-		private DoubleSerializer doubleSerializer2;
-		private DoubleSerializer doubleSerializer3;
-		private DoubleSerializer doubleSerializer4;
-		private DoubleSerializer doubleSerializer5;
-		private DoubleSerializer doubleSerializer6;
-
-		private BytesSerializer bytesSerializer;
-		private BooleanSerializer boolSerializer;
-		private BooleanSerializer boolSerializer2;
-		private BooleanSerializer boolSerializer3;
-
-		private List<ByteBuffer> buffers;
-
-		public TileSerializer() {
+		public SpatialObjectSerializer() {
 			super(0);
-			this.doubleSerializer = new DoubleSerializer();
-			this.doubleSerializer2 = new DoubleSerializer();
-			this.doubleSerializer3 = new DoubleSerializer();
-			this.doubleSerializer4 = new DoubleSerializer();
-			this.doubleSerializer5 = new DoubleSerializer();
-			this.doubleSerializer6 = new DoubleSerializer();
-
-			this.intSerializer = new IntSerializer();
-			this.intSerializer2 = new IntSerializer();
-			this.intSerializer3 = new IntSerializer();
-			this.intSerializer4 = new IntSerializer();
-
-			this.stringSerializer = new StringSerializer();
-			this.stringSerializer2 = new StringSerializer();
-
-			this.bytesSerializer = new BytesSerializer();
-
-			this.boolSerializer = new BooleanSerializer();
-			this.boolSerializer2 = new BooleanSerializer();
-			this.boolSerializer3 = new BooleanSerializer();
-
-			this.buffers = new ArrayList<ByteBuffer>();
+			stringSerializer = new StringSerializer();
+			intSerializer = new IntSerializer();
+			doubleSerializer = new DoubleSerializer();
+			bytesSerializer = new BytesSerializer();
+			booleanSerializer = new BooleanSerializer();
 		}
 
 		@Override
-		public void serializeInternal(Tile value) {
-			int length = 0;
-			//TODO: allocation
+		public void serializeInternal(SpatialObject value) {
+			// Determine length and allocate buffer
+			int length = getSize(value);
+			this.buffer = ByteBuffer.allocate(length + this.reserve);
 
-
+			// acquisitionDate
 			if (value.getAqcuisitionDate() != null) {
-				this.boolSerializer.buffer.clear();
-				this.boolSerializer.serializeInternal(true);
-				length += this.boolSerializer.buffer.position();
-				this.buffers.add(this.boolSerializer.buffer);
-
-				String acqDate = value.getAqcuisitionDate();
-				this.stringSerializer.buffer.clear();
-				this.stringSerializer.serializeInternal(acqDate);
-				length+= this.stringSerializer.buffer.position();
-				this.buffers.add(this.stringSerializer.buffer);
-
+				this.serializeWith(booleanSerializer, true);
+				this.serializeWith(stringSerializer, value.getAqcuisitionDate());
 			} else {
-				this.boolSerializer.buffer.clear();
-				this.boolSerializer.serializeInternal(false);
-				length += this.boolSerializer.buffer.position();
-				this.buffers.add(this.boolSerializer.buffer);
+				this.serializeWith(booleanSerializer, false);
 			}
 
-			this.intSerializer.buffer.clear();
-			this.intSerializer.serializeInternal(value.getBand());
-			length += this.intSerializer.buffer.position();
-			this.buffers.add(this.intSerializer.buffer);
+			// coordinates
+			this.serializeWith(doubleSerializer, value.getLuCord().lon);
+			this.serializeWith(doubleSerializer, value.getLuCord().lat);
+			this.serializeWith(doubleSerializer, value.getRlCord().lon);
+			this.serializeWith(doubleSerializer, value.getRlCord().lat);
 
-			this.doubleSerializer.buffer.clear();
-			this.doubleSerializer.serializeInternal(value.getLuCord().lon);
-			length += this.doubleSerializer.buffer.position();
-			this.buffers.add(this.doubleSerializer.buffer);
-
-			this.doubleSerializer2.buffer.clear();
-			this.doubleSerializer2.serializeInternal(value.getLuCord().lat);
-			length += this.doubleSerializer2.buffer.position();
-			this.buffers.add(this.doubleSerializer2.buffer);
-
-			this.doubleSerializer3.buffer.clear();
-			this.doubleSerializer3.serializeInternal(value.getRlCord().lon);
-			length += this.doubleSerializer3.buffer.position();
-			this.buffers.add(this.doubleSerializer3.buffer);
-
-			this.doubleSerializer4.buffer.clear();
-			this.doubleSerializer4.serializeInternal(value.getRlCord().lat);
-			length += this.doubleSerializer4.buffer.position();
-			this.buffers.add(this.doubleSerializer4.buffer);
-
-
+			// pathRow
 			if (value.getPathRow() != null) {
-				this.boolSerializer2.buffer.clear();
-				this.boolSerializer2.serializeInternal(true);
-				length += this.boolSerializer2.buffer.position();
-				this.buffers.add(this.boolSerializer2.buffer);
-
-				try{
-					this.stringSerializer2.buffer.clear();
-					String pathRow = value.getPathRow();
-					pathRow = new String(pathRow.getBytes(), "UTF-8");
-					this.stringSerializer2.serializeInternal(pathRow);
-					length+= this.stringSerializer2.buffer.position();
-					this.buffers.add(this.stringSerializer2.buffer);
-				}catch(UnsupportedEncodingException ex) {
-					ex.printStackTrace();
-				}
+				this.serializeWith(booleanSerializer, true);
+				this.serializeWith(stringSerializer, value.getPathRow());
 			} else {
-				this.boolSerializer2.buffer.clear();
-				this.boolSerializer2.serializeInternal(false);
-				length += this.boolSerializer2.buffer.position();
-				this.buffers.add(this.boolSerializer2.buffer);
+				this.serializeWith(booleanSerializer, false);
 			}
 
-			this.intSerializer2.buffer.clear();
-			this.intSerializer2.serializeInternal(value.getTileHeight());
-			length += this.intSerializer2.buffer.position();
-			this.buffers.add(this.intSerializer2.buffer);
+			// tileHeight, tileWidth, xPixelWidth, yPixelWidth
+			this.serializeWith(intSerializer, value.getTileHeight());
+			this.serializeWith(intSerializer, value.getTileWidth());
+			this.serializeWith(doubleSerializer, value.getxPixelWidth());
+			this.serializeWith(doubleSerializer, value.getyPixelWidth());
 
-			this.intSerializer3.buffer.clear();
-			this.intSerializer3.serializeInternal(value.getTileWidth());
-			length += this.intSerializer3.buffer.position();
-			this.buffers.add(this.intSerializer3.buffer);
+			// tileInfo
+			TileInfo tileInfo = value.getTileInfo();
+			if (tileInfo != null) {
+				this.serializeWith(intSerializer, tileInfo.size());
 
-			this.doubleSerializer5.buffer.clear();
-			this.doubleSerializer5.serializeInternal(value.getxPixelWith());
-			length += this.doubleSerializer5.buffer.position();
-			this.buffers.add(this.doubleSerializer5.buffer);
+				for (Map.Entry<String, String> entry: value.getTileInfo().entrySet()) {
+					this.serializeWith(stringSerializer, entry.getKey());
+					this.serializeWith(stringSerializer, entry.getValue());
+				}
+			}
+			else {
+				this.serializeWith(intSerializer, 0);
+			}
 
-			this.doubleSerializer6.buffer.clear();
-			this.doubleSerializer6.serializeInternal(value.getyPixelWidth());
-			length += this.doubleSerializer6.buffer.position();
-			this.buffers.add(this.doubleSerializer6.buffer);
+			// s16Tile
+			short[] s16Tile = value.getS16Tile();
+			if(s16Tile != null && s16Tile.length > 0) {
+				this.serializeWith(booleanSerializer, true);
 
-//				this.tileInfo.serialize(fileBuffer);
-
-			if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
-				this.boolSerializer.buffer.clear();
-				this.boolSerializer.serializeInternal(true);
-				length += this.boolSerializer.buffer.position();
-				this.buffers.add(this.boolSerializer.buffer);
-
-				byte[] byteContent = new byte[value.getS16Tile().length * 2];
+				byte[] byteContent = new byte[s16Tile.length * 2];
 				ByteBuffer.wrap(byteContent).order(ByteOrder.LITTLE_ENDIAN)
-						.asShortBuffer().put(value.getS16Tile());
-				this.bytesSerializer.buffer.clear();
-				this.bytesSerializer.serializeInternal(byteContent);
-				length += this.bytesSerializer.buffer.position();
-				this.buffers.add(this.bytesSerializer.buffer);
-
-			} else{
-				this.boolSerializer.buffer.clear();
-				this.boolSerializer.serializeInternal(false);
-				length += this.boolSerializer.buffer.position();
-				this.buffers.add(this.boolSerializer.buffer);
+					.asShortBuffer().put(s16Tile);
+				this.serializeWith(bytesSerializer, byteContent);
 			}
-
-			buffer = ByteBuffer.allocate(length);
-			for (ByteBuffer b : buffers) {
-				b.flip();
-				buffer.put(b);
+			else{
+				this.serializeWith(booleanSerializer, false);
 			}
-			buffers.clear();
 		}
 
+		private <S, T extends Serializer<S>> void serializeWith(T serializer, S value) {
+		// private <T> extends void serializeWith(<? extends Serializer<T>> serializer, T value) {
+			serializer.buffer.clear();
+			serializer.serializeInternal(value);
+			serializer.buffer.flip();
+			this.buffer.put(serializer.buffer);
+		}
+
+		private int getSize(SpatialObject value) {
+			int length = 0;
+			// Integers: height, width
+			length += 2 * 4;
+			// Doubles: xWidth, yWidth, coordinates
+			length += + 6 * 8;
+
+			//Strings:
+			// acquisitionDate: bool + length + string
+			length += 1;
+			if (value.getAqcuisitionDate() != null) {
+				length += 4 + value.getAqcuisitionDate().length();
+			}
+
+			// pathRow: bool + length + string
+			length += 1;
+			if (value.getPathRow() != null) {
+				length += 4 + value.getPathRow().length();
+			}
+
+			// s16Tile: bool + length + content
+			length += 1;
+			if(value.getS16Tile() != null && value.getS16Tile().length > 0) {
+				length += 4 + value.getS16Tile().length * 2;
+			}
+
+			// tileInfo: length + keys + values
+			length += 4;
+			for (Map.Entry<String, String> entry: value.getTileInfo().entrySet()) {
+				length += 4 + entry.getKey().length();
+				length += 4 + entry.getValue().length();
+			}
+			return length;
+		}
 	}
 
+
+	// TODO: Add parameter <T extends SpatialObject> to SpatialObjectSerializer
+	private class TileSerializer extends SpatialObjectSerializer {
+		public TileSerializer() {
+			super();
+			this.reserve = 4;
+		}
+
+		public void serializeInternal(Tile value) {
+			super.serializeInternal(value);
+			super.serializeWith(intSerializer, value.getBand());
+		}
+	}
 }
