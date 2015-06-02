@@ -23,12 +23,12 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
-/**
- * @author mathiasp
- *
- */
 public class SceneSerializer extends TypeSerializer<Scene> {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 7659326131704515484L;
 	
 	private static SceneSerializer INSTANCE = new SceneSerializer();
 	
@@ -78,22 +78,23 @@ public class SceneSerializer extends TypeSerializer<Scene> {
 
 	@Override
 	public Scene deserialize(DataInputView source) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		return deserialize(new Scene(), source);
 	}
 
 	@Override
 	public Scene deserialize(Scene reuse, DataInputView source)
 			throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		reuse.deserialize(source);
+		return reuse;
 	}
 
 	@Override
 	public void copy(DataInputView source, DataOutputView target)
 			throws IOException {
-		// TODO Auto-generated method stub
-		
+		Scene intermediate = new Scene();
+		intermediate.deserialize(source);
+		intermediate.serialize(target);
+		intermediate = null;
 	}
 
 }

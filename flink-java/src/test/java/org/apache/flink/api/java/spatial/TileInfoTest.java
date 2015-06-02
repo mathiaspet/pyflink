@@ -95,7 +95,7 @@ public class TileInfoTest {
 		Assert.assertEquals("data type", TileInfo.DataTypes.INT, info.getDataType());
 		Assert.assertEquals("number of bands", 6, info.getBands());
 
-		Coordinate upperLeftMapInfo = info.getMapInfoUpperLeft();
+		Coordinate upperLeftMapInfo = info.getUpperLeftCoordinate();
 		MatcherAssert.assertThat(upperLeftMapInfo.lon, Matchers.is(Matchers.equalTo(430404.0572)));
 		MatcherAssert.assertThat(upperLeftMapInfo.lat, Matchers.is(Matchers.equalTo(3120036.4653)));
 		

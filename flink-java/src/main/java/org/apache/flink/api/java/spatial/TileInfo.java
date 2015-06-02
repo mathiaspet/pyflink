@@ -30,10 +30,23 @@ import java.util.HashMap;
 
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-
 import org.apache.flink.util.StringUtils;
 
 public class TileInfo extends HashMap<String, String> {
+	private static final String BYTE_ORDER = "byte order";
+	private static final String BIP = "bip";
+	private static final String BIL = "bil";
+	private static final String BSQ = "bsq";
+	private static final String INTERLEAVE = "interleave";
+	private static final String HEADER_OFFSET = "header offset";
+	private static final String SAMPLES = "samples";
+	private static final String LINES = "lines";
+	private static final String BANDS = "bands";
+	private static final String ACQUISITIONDATE = "acquisitiondate";
+	private static final String DATA_IGNORE_VALUE = "data ignore value";
+	private static final String MAP_INFO = "map info";
+	private static final String WRS_ROW = "wrs_row";
+	private static final String WRS_PATH = "wrs_path";
 	private static final long serialVersionUID = 5579375867489556640L;
 	
 	public static enum DataTypes {
@@ -222,30 +235,30 @@ public class TileInfo extends HashMap<String, String> {
 	}
 
 	public int getBands() {
-		return Integer.parseInt(this.get("bands"));
+		return Integer.parseInt(this.get(BANDS));
 	}
 
 	public int getLines() {
-		return Integer.parseInt(this.get("lines"));
+		return Integer.parseInt(this.get(LINES));
 	}
 
 	public int getSamples() {
-		return Integer.parseInt(this.get("samples"));
+		return Integer.parseInt(this.get(SAMPLES));
 	}
 
 	public int getHeaderOffset() {
-		return Integer.parseInt(this.get("header offset"));
+		return Integer.parseInt(this.get(HEADER_OFFSET));
 	}
 
 	public int getInterleave() {
-		if (this.containsKey("interleave")) {
-			if (this.get("Interleave") == "bsq") {
+		if (this.containsKey(INTERLEAVE)) {
+			if ( this.get(INTERLEAVE).equals(BSQ)) {
 				return 0;
 			}
-			else if (this.get("Interleave") == "bil") {
+			else if (this.get(INTERLEAVE).equals(BIL)) {
 				return 1;
 			}
-			else if (this.get("Interleave") == "bip") {
+			else if (this.get(INTERLEAVE).equals(BIP)) {
 				return 2;
 			}
 		}
@@ -254,10 +267,10 @@ public class TileInfo extends HashMap<String, String> {
 
 
 	public long getAcqDate() {
-		if (this.containsKey("acquisitiondate")) {
+		if (this.containsKey(ACQUISITIONDATE)) {
 			DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS"); 
 			try {
-				Date date = df.parse(this.get("acquisitiondate"));
+				Date date = df.parse(this.get(ACQUISITIONDATE));
 				return date.getTime();  
 			} catch (ParseException e) {
 			}
@@ -266,15 +279,15 @@ public class TileInfo extends HashMap<String, String> {
 	}
 	
 	public String getAcqDateAsString() {
-		if (this.containsKey("acquisitiondate")) {
-			return this.get("acquisitiondate");
+		if (this.containsKey(ACQUISITIONDATE)) {
+			return this.get(ACQUISITIONDATE);
 		}
 		return null;
 	}
 	
 	public int getDataIgnoreValue() {
-		if (this.containsKey("data ignore value")) {
-			return Integer.parseInt(this.get("data ignore value"));
+		if (this.containsKey(DATA_IGNORE_VALUE)) {
+			return Integer.parseInt(this.get(DATA_IGNORE_VALUE));
 		}
 		return -1;
 	}
@@ -285,8 +298,8 @@ public class TileInfo extends HashMap<String, String> {
 	 * @return a {@link Coordinate} yielding the geographical position of the upper left corner
 	 */
 	public Coordinate getUpperLeftCoordinate() {
-		if (this.containsKey("map info")) {
-			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+		if (this.containsKey(MAP_INFO)) {
+			String list = this.get(MAP_INFO).substring(1, this.get(MAP_INFO).length() - 1).trim(); 
 			String[] splitted = list.split(", *");
 
 			String easting = splitted[3];
@@ -319,8 +332,8 @@ public class TileInfo extends HashMap<String, String> {
 
 
 	public double getPixelWidth() {
-		if (this.containsKey("map info")) {
-			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+		if (this.containsKey(MAP_INFO)) {
+			String list = this.get(MAP_INFO).substring(1, this.get(MAP_INFO).length() - 1).trim(); 
 			String[] splitted = list.split(", *");
 
 			return Double.parseDouble(splitted[5]);
@@ -329,12 +342,38 @@ public class TileInfo extends HashMap<String, String> {
 	}
 
 	public double getPixelHeight() {
-		if (this.containsKey("map info")) {
-			String list = this.get("map info").substring(1, this.get("map info").length() - 1).trim(); 
+		if (this.containsKey(MAP_INFO)) {
+			String list = this.get(MAP_INFO).substring(1, this.get(MAP_INFO).length() - 1).trim(); 
 			String[] splitted = list.split(", *");
 
 			return Double.parseDouble(splitted[5]);
 		}
 		return -1.0;
+	}
+	
+	public String getPathRow() {
+		StringBuilder retVal = new StringBuilder();
+		
+		if(this.containsKey(WRS_PATH) && this.containsKey(WRS_ROW)) {
+			int path = Integer.parseInt(this.get(WRS_PATH));
+			int row = Integer.parseInt(this.get(WRS_ROW));
+			retVal.append(String.format("%03d", path));
+			retVal.append(String.format("%03d", row));
+		}
+		return retVal.toString();
+	}
+
+	public int getByteOrder() {
+		if(this.containsKey(BYTE_ORDER)) {
+			return Integer.parseInt(this.get(BYTE_ORDER));
+		}
+		return -1;
+	}
+
+	public int getDataTypeindex() {
+		if(this.containsKey("data type")) {
+			return Integer.parseInt(this.get("data type"));
+		}
+		return -1;
 	}
 }

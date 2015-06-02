@@ -62,8 +62,6 @@ public class Scene extends SpatialObject {
 		this.tileWidth = info.getSamples();
 		this.tileHeight = info.getLines();
 		this.numBands = info.getBands();
-		// Path row is never set to anything in TileInfo
-		// this.pathRow = info.getPathRow();
 		this.aqcuisitionDate = info.getAcqDateAsString();
 		this.xPixelWith = info.getPixelWidth();
 		this.yPixelWidth = info.getPixelHeight();

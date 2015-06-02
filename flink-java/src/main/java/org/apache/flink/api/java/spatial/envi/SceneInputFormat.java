@@ -291,17 +291,13 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 		 * All remaining pixels are filled with missing values
 		 */
 		int lineWidth = this.info.getSamples();
-		double pixelWidth = this.info.getPixelWidth();
-		double pixelHeight = this.info.getPixelHeight();
-
 		int xread = lineWidth;
-
 		int yread = this.info.getLines() * this.info.getBands();
 		
 		record.update(this.info);
 		short[] values = record.getS16Tile();
 		if(values == null) {
-			values = new short[xsize * ysize * this.info.getBands()];
+			values = new short[xread * yread];
 			record.setS16Tile(values);
 		}
 		short dataIgnoreValue = (short) info.getDataIgnoreValue();
@@ -325,10 +321,6 @@ public class SceneInputFormat<T extends Scene> extends FileInputFormat<T> {
 			System.arraycopy(shortBuffer, 0, values, pos, xread);
 			pos = pos + xread;
 			
-			// Fill with empty columns:
-			for(int x = xread; x < xsize; x++) {
-				values[pos++] = dataIgnoreValue;
-			}
 		}
 		// Fill missing rows with empty data:
 		while(pos < values.length) {
