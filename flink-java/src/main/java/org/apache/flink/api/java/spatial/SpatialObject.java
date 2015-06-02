@@ -31,7 +31,7 @@ import org.apache.flink.core.memory.DataOutputView;
  * with certain dimensions. 
  *
  */
-public class SpatialObject  implements Serializable {
+public abstract class SpatialObject  implements Serializable {
 
 	protected String pathRow;
 	protected String aqcuisitionDate;
