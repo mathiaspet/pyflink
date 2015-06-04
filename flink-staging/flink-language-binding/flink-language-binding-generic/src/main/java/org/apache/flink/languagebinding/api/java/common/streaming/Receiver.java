@@ -41,7 +41,9 @@ import java.nio.channels.FileChannel;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 //CHECKSTYLE.OFF: AvoidStarImport - tuple imports
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.SpatialObject;
 import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.spatial.TileInfo;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple1;
@@ -396,54 +398,80 @@ public class Receiver implements Serializable {
 		}
 	}
 
-	private class TileDeserializer implements Deserializer<Tile> {
 
-		private StringDeserializer stringDes;
-		private DoubleDeserializer doubleDes;
-		private LongDeserializer intDes;
-		private BytesDeserializer bytesDes;
-		//TODO: check if this is still in line with the serialization approach of Flink
-		Tile reuse;
+	private abstract class SpatialObjectDeserializer<T extends SpatialObject> implements Deserializer<T> {
+		protected StringDeserializer stringDes;
+		protected IntDeserializer intDes;
+		protected DoubleDeserializer doubleDes;
+		protected BytesDeserializer bytesDes;
+		protected BooleanDeserializer booleanDes;
 
-		public TileDeserializer() {
-			this.stringDes = new StringDeserializer();
-			this.intDes = new LongDeserializer();
-			this.doubleDes = new DoubleDeserializer();
-			this.bytesDes = new BytesDeserializer();
-			this.reuse = new Tile();
+		protected T reuse;
+
+		public SpatialObjectDeserializer() {
+			stringDes = new StringDeserializer();
+			intDes = new IntDeserializer();
+			doubleDes = new DoubleDeserializer();
+			bytesDes = new BytesDeserializer();
+			booleanDes = new BooleanDeserializer();
 		}
 
+		public T deserialize() {
+			// acquisition date
+			reuse.setAqcuisitionDate(stringDes.deserialize());
 
-		@Override
-		public Tile deserialize() {
-			this.reuse.setAqcuisitionDate(this.stringDes.deserialize());
-			this.reuse.setBand(this.intDes.deserialize().intValue());
+			// Coordinates
+			double lon = doubleDes.deserialize();
+			double lat = doubleDes.deserialize();
+			reuse.setLuCord(new Coordinate(lon, lat));
 
-			double luLon = this.doubleDes.deserialize();
-			double luLat = this.doubleDes.deserialize();
-			Coordinate leftUpper = new Coordinate(luLon, luLat);
-			this.reuse.setLuCord(leftUpper);
+			lon = doubleDes.deserialize();
+			lat = doubleDes.deserialize();
+			reuse.setRlCord(new Coordinate(lon, lat));
 
-			double rlLon = this.doubleDes.deserialize();
-			double rlLat = this.doubleDes.deserialize();
-			Coordinate rightLower = new Coordinate(rlLon, rlLat);
-			this.reuse.setRlCord(rightLower);
+			// path row
+			reuse.setPathRow(stringDes.deserialize());
 
-			this.reuse.setPathRow(this.stringDes.deserialize());
-			this.reuse.setTileHeight(this.intDes.deserialize().intValue());
-			this.reuse.setTileWidth(this.intDes.deserialize().intValue());
-			this.reuse.setxPixelWidth(this.doubleDes.deserialize());
-			this.reuse.setyPixelWidth(this.doubleDes.deserialize());
+			// tileHeight, tileWidth, xPixelWidth, yPixelWidth
+			reuse.setTileHeight(intDes.deserialize());
+			reuse.setTileWidth(intDes.deserialize());
+			reuse.setxPixelWidth(doubleDes.deserialize());
+			reuse.setyPixelWidth(doubleDes.deserialize());
 
-			byte[] bytes = this.bytesDes.deserialize();
+			// tileInfo
+			TileInfo tileInfo = new TileInfo();
+			String key, value;
+			for (int i = intDes.deserialize(); i > 0; i--) {
+				key = stringDes.deserialize();
+				value = stringDes.deserialize();
+				tileInfo.put(key, value);
+			}
+			reuse.setTileInfo(tileInfo);
+
+			// content
+			byte[] bytes = bytesDes.deserialize();
 			short[] data = new short[bytes.length / 2];
 			ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
 					.get(data);
 
-			this.reuse.setS16Tile(data);
-			return this.reuse;
+			reuse.setS16Tile(data);
+			return reuse;
+		}
+	}
+
+
+	private class TileDeserializer extends SpatialObjectDeserializer<Tile> {
+		public TileDeserializer() {
+			super();
+			reuse = new Tile();
 		}
 
+		@Override
+		public Tile deserialize() {
+			super.deserialize();
+			reuse.setBand(intDes.deserialize());
+			return reuse;
+		}
 	}
 
 
