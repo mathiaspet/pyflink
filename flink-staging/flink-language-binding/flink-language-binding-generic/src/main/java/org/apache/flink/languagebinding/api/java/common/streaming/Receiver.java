@@ -401,7 +401,7 @@ public class Receiver implements Serializable {
 
 	private abstract class SpatialObjectDeserializer<T extends SpatialObject> implements Deserializer<T> {
 		protected StringDeserializer stringDes;
-		protected IntDeserializer intDes;
+		protected LongDeserializer intDes;
 		protected DoubleDeserializer doubleDes;
 		protected BytesDeserializer bytesDes;
 		protected BooleanDeserializer booleanDes;
@@ -410,7 +410,7 @@ public class Receiver implements Serializable {
 
 		public SpatialObjectDeserializer() {
 			stringDes = new StringDeserializer();
-			intDes = new IntDeserializer();
+			intDes = new LongDeserializer();
 			doubleDes = new DoubleDeserializer();
 			bytesDes = new BytesDeserializer();
 			booleanDes = new BooleanDeserializer();
@@ -433,15 +433,15 @@ public class Receiver implements Serializable {
 			reuse.setPathRow(stringDes.deserialize());
 
 			// tileHeight, tileWidth, xPixelWidth, yPixelWidth
-			reuse.setTileHeight(intDes.deserialize());
-			reuse.setTileWidth(intDes.deserialize());
+			reuse.setTileHeight(intDes.deserialize().intValue());
+			reuse.setTileWidth(intDes.deserialize().intValue());
 			reuse.setxPixelWidth(doubleDes.deserialize());
 			reuse.setyPixelWidth(doubleDes.deserialize());
 
 			// tileInfo
 			TileInfo tileInfo = new TileInfo();
 			String key, value;
-			for (int i = intDes.deserialize(); i > 0; i--) {
+			for (int i = intDes.deserialize().intValue(); i > 0; i--) {
 				key = stringDes.deserialize();
 				value = stringDes.deserialize();
 				tileInfo.put(key, value);
@@ -469,7 +469,7 @@ public class Receiver implements Serializable {
 		@Override
 		public Tile deserialize() {
 			super.deserialize();
-			reuse.setBand(intDes.deserialize());
+			reuse.setBand(intDes.deserialize().intValue());
 			return reuse;
 		}
 	}

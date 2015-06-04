@@ -339,41 +339,50 @@ class NullDeserializer(object):
     def deserialize(self):
         return None
 
+
 class TileDeserializer(object):
     def __init__(self, read, group):
         self.read = read
         self._group = group
-        self._stringSerializer = StringDeserializer(read, group)
-        self._boolSerializer = BooleanDeserializer(read, group)
-        self._intSerializer = IntegerDeserializer(read, group)
-        self._doubleSerializer = DoubleDeserializer(read, group)
-        self._bytesSerializer = ByteArrayDeserializer(read, group)
+        self.deserializeString = StringDeserializer(read, group).deserialize
+        self.deserializeBool = BooleanDeserializer(read, group).deserialize
+        self.deserializeInt = IntegerDeserializer(read, group).deserialize
+        self.deserializeDouble = DoubleDeserializer(read, group).deserialize
+        self.deserializeBytes = ByteArrayDeserializer(read, group).deserialize
 
     def deserialize(self):
         tile = Tile()
-        isAckDate = self._boolSerializer.deserialize()
-        if isAckDate > 0:
-            tile._aquisitionDate = self._stringSerializer.deserialize()
 
-        tile._band = self._intSerializer.deserialize()
+        # SpatialObject
+        isAckDate = self.deserializeBool()
+        if isAckDate:
+            tile._aquisitionDate = self.deserializeString()
 
-        tile._leftUpperLon = self._doubleSerializer.deserialize()
-        tile._leftUpperLat = self._doubleSerializer.deserialize()
-        tile._rightLowerLon = self._doubleSerializer.deserialize()
-        tile._rightLowerLat = self._doubleSerializer.deserialize()
+        tile._leftUpperLon = self.deserializeDouble()
+        tile._leftUpperLat = self.deserializeDouble()
+        tile._rightLowerLon = self.deserializeDouble()
+        tile._rightLowerLat = self.deserializeDouble()
 
-        isPathRow = self._boolSerializer.deserialize()
-        if isPathRow > 0:
-            tile._pathRow = self._stringSerializer.deserialize()
+        isPathRow = self.deserializeBool()
+        if isPathRow:
+            tile._pathRow = self.deserializeString()
 
-        tile._height = self._intSerializer.deserialize()
-        tile._width = self._intSerializer.deserialize()
+        tile._height = self.deserializeInt()
+        tile._width = self.deserializeInt()
 
-        tile._xPixelWidth = self._doubleSerializer.deserialize()
-        tile._yPixelWidth = self._doubleSerializer.deserialize()
+        tile._xPixelWidth = self.deserializeDouble()
+        tile._yPixelWidth = self.deserializeDouble()
 
-        hasContent = self._boolSerializer.deserialize()
-        if hasContent > 0:
-            tile._content = self._bytesSerializer.deserialize()
+        for i in range(self.deserializeInt()):
+            key = self.deserializeString()
+            value = self.deserializeString()
+            tile._tileInfo[key] = value
+
+        hasContent = self.deserializeBool()
+        if hasContent:
+            tile._content = self.deserializeBytes()
+
+        # Tile
+        tile._band = self.deserializeInt()
 
         return tile

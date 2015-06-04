@@ -96,30 +96,42 @@ class BooleanSerializer(object):
     def serialize(self, value):
         return pack(">?", value)
 
+
 class TileSerializer(object):
     def __init__(self, write, value):
-        self._boolSerializer = BooleanSerializer()
-        self._longSerializer = LongSerializer()
-        self._stringSerializer = StringSerializer()
-        self._bytesSerializer = ByteArraySerializer()
-        self._doubleSerializer = FloatSerializer()
+        self.serializeBool = BooleanSerializer().serialize
+        self.serializeLong = LongSerializer().serialize
+        self.serializeString = StringSerializer().serialize
+        self.serializeBytes = ByteArraySerializer().serialize
+        self.serializeFloat = FloatSerializer().serialize
 
     def serialize(self, value):
         bits = []
-        """TODO: remove check isNull checks from Tile Serialization for pathRow, ackDate and Content """
-        bits.append(self._stringSerializer.serialize(value._aquisitionDate))
-        bits.append(self._longSerializer.serialize(value._band))
-        bits.append(self._doubleSerializer.serialize(value._leftUpperLon))
-        bits.append(self._doubleSerializer.serialize(value._leftUpperLat))
-        bits.append(self._doubleSerializer.serialize(value._rightLowerLon))
-        bits.append(self._doubleSerializer.serialize(value._rightLowerLat))
-        bits.append(self._stringSerializer.serialize(value._pathRow))
-        bits.append(self._longSerializer.serialize(value._height))
-        bits.append(self._longSerializer.serialize(value._width))
-        bits.append(self._doubleSerializer.serialize(value._xPixelWidth))
-        bits.append(self._doubleSerializer.serialize(value._yPixelWidth))
-        bits.append(self._bytesSerializer.serialize(value._content))
+
+        # SpatialObject
+        bits.append(self.serializeString(value._aquisitionDate))
+        bits.append(self.serializeFloat(value._leftUpperLon))
+        bits.append(self.serializeFloat(value._leftUpperLat))
+        bits.append(self.serializeFloat(value._rightLowerLon))
+        bits.append(self.serializeFloat(value._rightLowerLat))
+        bits.append(self.serializeString(value._pathRow))
+        bits.append(self.serializeLong(value._height))
+        bits.append(self.serializeLong(value._width))
+        bits.append(self.serializeFloat(value._xPixelWidth))
+        bits.append(self.serializeFloat(value._yPixelWidth))
+
+        bits.append(self.serializeLong(len(value._tileInfo)))
+        for k, v in value._tileInfo.items():
+            bits.append(self.serializeString(k))
+            bits.append(self.serializeString(v))
+
+        bits.append(self.serializeBytes(value._content))
+
+        # Tile
+        bits.append(self.serializeLong(value._band))
+
         return b"".join(bits)
+
 
 class FloatSerializer(object):
     def serialize(self, value):
