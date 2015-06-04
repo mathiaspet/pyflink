@@ -424,8 +424,9 @@ public class Sender implements Serializable {
 	}
 
 
-	private class SpatialObjectSerializer extends Serializer<SpatialObject> {
+	private abstract class SpatialObjectSerializer<T extends SpatialObject> extends Serializer<T> {
 		protected int reserve = 0;
+
 		protected StringSerializer stringSerializer;
 		protected IntSerializer intSerializer;
 		protected DoubleSerializer doubleSerializer;
@@ -441,8 +442,13 @@ public class Sender implements Serializable {
 			booleanSerializer = new BooleanSerializer();
 		}
 
+		public SpatialObjectSerializer(int reserve) {
+			this();
+			this.reserve = reserve;
+		}
+
 		@Override
-		public void serializeInternal(SpatialObject value) {
+		public void serializeInternal(T value) {
 			// Determine length and allocate buffer
 			int length = getSize(value);
 			this.buffer = ByteBuffer.allocate(length + this.reserve);
@@ -504,8 +510,7 @@ public class Sender implements Serializable {
 			}
 		}
 
-		private <S, T extends Serializer<S>> void serializeWith(T serializer, S value) {
-		// private <T> extends void serializeWith(<? extends Serializer<T>> serializer, T value) {
+		private <U, V extends Serializer<U>> void serializeWith(V serializer, U value) {
 			serializer.buffer.clear();
 			serializer.serializeInternal(value);
 			serializer.buffer.flip();
@@ -549,11 +554,9 @@ public class Sender implements Serializable {
 	}
 
 
-	// TODO: Add parameter <T extends SpatialObject> to SpatialObjectSerializer
-	private class TileSerializer extends SpatialObjectSerializer {
+	private class TileSerializer extends SpatialObjectSerializer<Tile> {
 		public TileSerializer() {
-			super();
-			this.reserve = 4;
+			super(4);
 		}
 
 		public void serializeInternal(Tile value) {
