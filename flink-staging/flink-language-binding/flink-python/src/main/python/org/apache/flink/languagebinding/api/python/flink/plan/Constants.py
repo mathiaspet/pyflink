@@ -93,10 +93,7 @@ class Order(object):
     ANY = 3
 
 
-class Tile(object):
-    """
-    Represents an envi tile (a blocked sub matrix of a scene in bsq)
-    """
+class SpatialObject(object):
     def __init__(self):
         self._aquisitionDate = ""
         self._pathRow = ""
@@ -106,11 +103,19 @@ class Tile(object):
         self._rightLowerLon = 0.0
         self._width = -1
         self._height = -1
-        self._band = -1
         self._xPixelWidth = 0.0
         self._yPixelWidth = 0.0
         self._content = bytearray()
         self._tileInfo = dict()
+
+
+class Tile(SpatialObject):
+    """
+    Represents an envi tile (a blocked sub matrix of a scene in bsq)
+    """
+    def __init__(self):
+        super().__init__()
+        self._band = -1
 
     def update(self, leftUpper, rightLower, width, height, band,
                pathRow, acquisitionDate, xPixelWidth, yPixelWidth):
@@ -149,6 +154,7 @@ class Tile(object):
         y = latDiff // self._yPixelWidth
 
         return int(2 * (y * self._width + x))
+
 
 class Cube(object):
     def __init__(self):
