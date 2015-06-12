@@ -18,8 +18,8 @@
 
 package org.apache.flink.runtime.messages
 
+import org.apache.flink.api.common.JobID
 import org.apache.flink.runtime.executiongraph.ExecutionGraph
-import org.apache.flink.runtime.jobgraph.JobID
 
 /**
  * This object contains the archive specific messages.
@@ -32,6 +32,19 @@ object ArchiveMessages {
    * Request the currently archived jobs in the archiver. The resulting response is [[ArchivedJobs]]
    */
   case object RequestArchivedJobs
+
+  /**
+   * Requests the number of finished, canceled, and failed jobs
+   */
+  case object RequestJobCounts
+
+  /**
+   * Reqeuest a specific ExecutionGraph by JobID. The response is [[RequestArchivedJob]]
+   * @param jobID
+   */
+  case class RequestArchivedJob(jobID: JobID)
+
+  case class ArchivedJob(job: Option[ExecutionGraph])
 
   /**
    * Response to [[RequestArchivedJobs]] message. The response contains the archived jobs.
@@ -48,12 +61,16 @@ object ArchiveMessages {
       jobs.asJavaCollection
     }
   }
-  
+
   // --------------------------------------------------------------------------
   // Utility methods to allow simpler case object access from Java
   // --------------------------------------------------------------------------
   
   def getRequestArchivedJobs : AnyRef = {
     RequestArchivedJobs
+  }
+
+  def getRequestJobCounts : AnyRef = {
+    RequestJobCounts
   }
 }

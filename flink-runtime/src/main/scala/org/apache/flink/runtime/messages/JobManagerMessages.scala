@@ -18,11 +18,14 @@
 
 package org.apache.flink.runtime.messages
 
-import org.apache.flink.runtime.accumulators.AccumulatorEvent
+import org.apache.flink.api.common.JobID
+import org.apache.flink.runtime.client.{SerializedJobExecutionResult, JobStatusMessage}
 import org.apache.flink.runtime.executiongraph.{ExecutionAttemptID, ExecutionGraph}
 import org.apache.flink.runtime.instance.{InstanceID, Instance}
-import org.apache.flink.runtime.jobgraph.{JobGraph, JobID, JobStatus, JobVertexID}
-import org.apache.flink.runtime.taskmanager.TaskExecutionState
+import org.apache.flink.runtime.io.network.partition.ResultPartitionID
+import org.apache.flink.runtime.jobgraph.{IntermediateDataSetID, JobGraph, JobStatus, JobVertexID}
+
+import scala.collection.JavaConverters._
 
 /**
  * The job manager specific actor messages
@@ -34,10 +37,10 @@ object JobManagerMessages {
    * then the sender will be registered as listener for the state change messages.
    * The submission result will be sent back to the sender as a success message.
    *
-   * @param jobGraph
+   * @param jobGraph The job to be submitted to the JobManager
    * @param registerForEvents if true, then register for state change events
    */
-  case class SubmitJob(jobGraph: JobGraph, registerForEvents: Boolean = false)
+  case class SubmitJob(jobGraph: JobGraph, registerForEvents: Boolean)
 
   /**
    * Cancels a job with the given [[jobID]] at the JobManager. The result of the cancellation is
@@ -46,14 +49,6 @@ object JobManagerMessages {
    * @param jobID
    */
   case class CancelJob(jobID: JobID)
-
-  /**
-   * Denotes a state change of a task at the JobManager. The update success is acknowledged by a
-   * boolean value which is sent back to the sender.
-   *
-   * @param taskExecutionState
-   */
-  case class UpdateTaskExecutionState(taskExecutionState: TaskExecutionState)
 
   /**
    * Requesting next input split for the
@@ -68,65 +63,46 @@ object JobManagerMessages {
   ExecutionAttemptID)
 
   /**
+   * Contains the next input split for a task. This message is a response to
+   * [[org.apache.flink.runtime.messages.JobManagerMessages.RequestNextInputSplit]].
+   *
+   * @param splitData
+   */
+  case class NextInputSplit(splitData: Array[Byte])
+
+  /**
+   * Requests the current state of the partition.
+   *
+   * The state of a partition is currently bound to the state of the producing execution.
+   * 
+   * @param jobId The job ID of the job, which produces the partition.
+   * @param partitionId The partition ID of the partition to request the state of.
+   * @param taskExecutionId The execution attempt ID of the task requesting the partition state.
+   * @param taskResultId The input gate ID of the task requesting the partition state.
+   */
+  case class RequestPartitionState(jobId: JobID,
+                                   partitionId: ResultPartitionID,
+                                   taskExecutionId: ExecutionAttemptID,
+                                   taskResultId: IntermediateDataSetID)
+
+  /**
    * Notifies the [[org.apache.flink.runtime.jobmanager.JobManager]] about available data for a
    * produced partition.
    * <p>
    * There is a call to this method for each
    * [[org.apache.flink.runtime.executiongraph.ExecutionVertex]] instance once per produced
-   * [[org.apache.flink.runtime.io.network.partition.IntermediateResultPartition]] instance,
+   * [[org.apache.flink.runtime.io.network.partition.ResultPartition]] instance,
    * either when first producing data (for pipelined executions) or when all data has been produced
    * (for staged executions).
    * <p>
    * The [[org.apache.flink.runtime.jobmanager.JobManager]] then can decide when to schedule the
    * partition consumers of the given session.
    *
-   * @see [[org.apache.flink.runtime.io.network.partition.IntermediateResultPartition]]
+   * @see [[org.apache.flink.runtime.io.network.partition.ResultPartition]]
    */
-  case class ScheduleOrUpdateConsumers(jobId: JobID,
-                                       executionId: ExecutionAttemptID,
-                                       partitionIndex: Int)
+  case class ScheduleOrUpdateConsumers(jobId: JobID, partitionId: ResultPartitionID)
 
   case class ConsumerNotificationResult(success: Boolean, error: Option[Throwable] = None)
-
-  /**
-   * Reports the accumulator results of the individual tasks to the job manager.
-   *
-   * @param accumulatorEvent
-   */
-  case class ReportAccumulatorResult(accumulatorEvent: AccumulatorEvent)
-
-  /**
-   * Requests the accumulator results of the job identified by [[jobID]] from the job manager.
-   * The result is sent back to the sender as a [[AccumulatorResultsResponse]] message.
-   *
-   * @param jobID
-   */
-  case class RequestAccumulatorResults(jobID: JobID)
-
-  sealed trait AccumulatorResultsResponse{
-    val jobID: JobID
-  }
-
-  /**
-   * Contains the retrieved accumulator results from the job manager. This response is triggered
-   * by [[RequestAccumulatorResults]].
-   *
-   * @param jobID
-   * @param results
-   */
-  case class AccumulatorResultsFound(jobID: JobID, results: Map[String,
-    Object]) extends AccumulatorResultsResponse{
-    def asJavaMap: java.util.Map[String, Object] = {
-      import scala.collection.JavaConverters._
-      results.asJava
-    }
-  }
-
-  /**
-   * Denotes that no accumulator results for [[jobID]] could be found at the job manager.
-   * @param jobID
-   */
-  case class AccumulatorResultsNotFound(jobID: JobID) extends AccumulatorResultsResponse
 
   /**
    * Requests the current [[JobStatus]] of the job identified by [[jobID]]. This message triggers
@@ -168,13 +144,9 @@ object JobManagerMessages {
 
   /**
    * Denotes a successful job execution.
-   *
-   * @param jobID
-   * @param runtime
-   * @param accumulatorResults
    */
-  case class JobResultSuccess(jobID: JobID, runtime: Long,
-                              accumulatorResults: java.util.Map[String, AnyRef]) {}
+  case class JobResultSuccess(result: SerializedJobExecutionResult)
+
 
   sealed trait CancellationResponse{
     def jobID: JobID
@@ -202,21 +174,31 @@ object JobManagerMessages {
   /**
    * This message is the response to the [[RequestRunningJobs]] message. It contains all
    * execution graphs of the currently running jobs.
-   *
-   * @param runningJobs
    */
   case class RunningJobs(runningJobs: Iterable[ExecutionGraph]) {
     def this() = this(Seq())
     def asJavaIterable: java.lang.Iterable[ExecutionGraph] = {
-      import scala.collection.JavaConverters._
       runningJobs.asJava
     }
   }
 
   /**
-   * Requests the execution graph of a specific job identified by [[jobID]]. The result is sent
-   * back to the sender as a [[JobResponse]].
-   * @param jobID
+   * Requests the status of all currently running jobs from the job manager.
+   * This message triggers a [[RunningJobsStatus]] response.
+   */
+  case object RequestRunningJobsStatus
+
+  case class RunningJobsStatus(runningJobs: Iterable[JobStatusMessage]) {
+    def this() = this(Seq())
+
+    def getStatusMessages(): java.util.List[JobStatusMessage] = {
+      new java.util.ArrayList[JobStatusMessage](runningJobs.asJavaCollection)
+    }
+  }
+
+  /**
+   * Requests the execution graph of a specific job identified by [[jobID]].
+   * The result is sent back to the sender as a [[JobResponse]].
    */
   case class RequestJob(jobID: JobID)
 
@@ -283,7 +265,7 @@ object JobManagerMessages {
 
   case object JobManagerStatusAlive extends JobManagerStatus
 
-    // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
   // Utility methods to allow simpler case object access from Java
   // --------------------------------------------------------------------------
   
@@ -302,7 +284,11 @@ object JobManagerMessages {
   def getRequestRunningJobs : AnyRef = {
     RequestRunningJobs
   }
-  
+
+  def getRequestRunningJobsStatus : AnyRef = {
+    RequestRunningJobsStatus
+  }
+
   def getRequestRegisteredTaskManagers : AnyRef = {
     RequestRegisteredTaskManagers
   }

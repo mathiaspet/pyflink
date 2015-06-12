@@ -18,17 +18,17 @@
 
 package org.apache.flink.test.util;
 
-import akka.actor.ActorRef;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.Plan;
+import org.apache.flink.api.common.CodeAnalysisMode;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.ExecutionEnvironmentFactory;
-import org.apache.flink.compiler.DataStatistics;
-import org.apache.flink.compiler.PactCompiler;
-import org.apache.flink.compiler.plan.OptimizedPlan;
-import org.apache.flink.compiler.plandump.PlanJSONDumpGenerator;
-import org.apache.flink.compiler.plantranslate.NepheleJobGraphGenerator;
-import org.apache.flink.runtime.client.JobClient;
+import org.apache.flink.optimizer.DataStatistics;
+import org.apache.flink.optimizer.Optimizer;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
+import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
+import org.apache.flink.runtime.client.SerializedJobExecutionResult;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.junit.Assert;
 
@@ -36,12 +36,11 @@ public class TestEnvironment extends ExecutionEnvironment {
 
 	private final ForkableFlinkMiniCluster executor;
 
-	protected JobExecutionResult latestResult;
-
-
-	public TestEnvironment(ForkableFlinkMiniCluster executor, int degreeOfParallelism) {
+	public TestEnvironment(ForkableFlinkMiniCluster executor, int parallelism) {
 		this.executor = executor;
-		setDegreeOfParallelism(degreeOfParallelism);
+		setParallelism(parallelism);
+		// disabled to improve build time
+		getConfig().setCodeAnalysisMode(CodeAnalysisMode.DISABLE);
 	}
 
 	@Override
@@ -49,15 +48,13 @@ public class TestEnvironment extends ExecutionEnvironment {
 		try {
 			OptimizedPlan op = compileProgram(jobName);
 
-			NepheleJobGraphGenerator jgg = new NepheleJobGraphGenerator();
+			JobGraphGenerator jgg = new JobGraphGenerator();
 			JobGraph jobGraph = jgg.compileJobGraph(op);
+			
+			SerializedJobExecutionResult result = executor.submitJobAndWait(jobGraph, false);
 
-			ActorRef client = this.executor.getJobClient();
-			JobExecutionResult result = JobClient.submitJobAndWait(jobGraph, false, client,
-					executor.timeout());
-
-			this.latestResult = result;
-			return result;
+			this.lastJobExecutionResult = result.toJobExecutionResult(getClass().getClassLoader());
+			return this.lastJobExecutionResult;
 		}
 		catch (Exception e) {
 			System.err.println(e.getMessage());
@@ -80,11 +77,11 @@ public class TestEnvironment extends ExecutionEnvironment {
 	private OptimizedPlan compileProgram(String jobName) {
 		Plan p = createProgramPlan(jobName);
 
-		PactCompiler pc = new PactCompiler(new DataStatistics());
+		Optimizer pc = new Optimizer(new DataStatistics(), this.executor.getConfiguration());
 		return pc.compile(p);
 	}
 
-	protected void setAsContext() {
+	public void setAsContext() {
 		ExecutionEnvironmentFactory factory = new ExecutionEnvironmentFactory() {
 			@Override
 			public ExecutionEnvironment createExecutionEnvironment() {

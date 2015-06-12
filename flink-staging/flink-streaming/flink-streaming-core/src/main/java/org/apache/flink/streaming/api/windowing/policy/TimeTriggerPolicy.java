@@ -19,6 +19,7 @@ package org.apache.flink.streaming.api.windowing.policy;
 
 import java.util.LinkedList;
 
+import org.apache.flink.streaming.api.windowing.helper.SystemTimestamp;
 import org.apache.flink.streaming.api.windowing.helper.Timestamp;
 import org.apache.flink.streaming.api.windowing.helper.TimestampWrapper;
 
@@ -33,7 +34,7 @@ import org.apache.flink.streaming.api.windowing.helper.TimestampWrapper;
  *            policy.
  */
 public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
-		CloneableTriggerPolicy<DATA> {
+		CloneableTriggerPolicy<DATA>, CentralActiveTrigger<DATA> {
 
 	/**
 	 * auto generated version id
@@ -43,34 +44,10 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 	protected long startTime;
 	public long granularity;
 	public TimestampWrapper<DATA> timestampWrapper;
-	protected long delay;
-
-	/**
-	 * This trigger policy triggers with regard to the time. The is measured
-	 * using a given {@link Timestamp} implementation. A point in time is always
-	 * represented as long. Therefore, parameters such as granularity can be set
-	 * as long value as well. If this value for the granularity is set to 2 for
-	 * example, the policy will trigger at every second point in time.
-	 * 
-	 * @param granularity
-	 *            The granularity of the trigger. If this value is set to x the
-	 *            policy will trigger at every x-th time point
-	 * @param timestampWrapper
-	 *            The {@link TimestampWrapper} to measure the time with. This
-	 *            can be either user defined of provided by the API.
-	 * @param timeWrapper
-	 *            This policy creates fake elements to not miss windows in case
-	 *            no element arrived within the duration of the window. This
-	 *            extractor should wrap a long into such an element of type
-	 *            DATA.
-	 */
-	public TimeTriggerPolicy(long granularity, TimestampWrapper<DATA> timestampWrapper) {
-		this(granularity, timestampWrapper, 0);
-	}
 
 	/**
 	 * This is mostly the same as
-	 * {@link TimeTriggerPolicy#TimeTriggerPolicy(long, Timestamp)}. In addition
+	 * {@link TimeTriggerPolicy#TimeTriggerPolicy(long, TimestampWrapper)}. In addition
 	 * to granularity and timestamp a delay can be specified for the first
 	 * trigger. If the start time given by the timestamp is x, the delay is y,
 	 * and the granularity is z, the first trigger will happen at x+y+z.
@@ -81,21 +58,11 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 	 * @param timestampWrapper
 	 *            The {@link TimestampWrapper} to measure the time with. This
 	 *            can be either user defined of provided by the API.
-	 * @param delay
-	 *            A delay for the first trigger. If the start time given by the
-	 *            timestamp is x, the delay is y, and the granularity is z, the
-	 *            first trigger will happen at x+y+z.
-	 * @param timeWrapper
-	 *            This policy creates fake elements to not miss windows in case
-	 *            no element arrived within the duration of the window. This
-	 *            extractor should wrap a long into such an element of type
-	 *            DATA.
 	 */
-	public TimeTriggerPolicy(long granularity, TimestampWrapper<DATA> timestampWrapper, long delay) {
-		this.startTime = timestampWrapper.getStartTime() + delay;
+	public TimeTriggerPolicy(long granularity, TimestampWrapper<DATA> timestampWrapper) {
+		this.startTime = timestampWrapper.getStartTime();
 		this.timestampWrapper = timestampWrapper;
 		this.granularity = granularity;
-		this.delay = delay;
 	}
 
 	/**
@@ -115,9 +82,9 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 	}
 
 	/**
-	 * In case {@link DefaultTimeStamp} is used, a runnable is returned which
+	 * In case {@link SystemTimestamp} is used, a runnable is returned which
 	 * triggers based on the current system time. If any other time measure is
-	 * used the method return null.
+	 * used the method returns null.
 	 * 
 	 * @param callback
 	 *            The object which is takes the callbacks for adding fake
@@ -136,7 +103,7 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 
 	/**
 	 * This method is only called in case the runnable triggers a window end
-	 * according to the {@link DefaultTimeStamp}.
+	 * according to the {@link SystemTimestamp}.
 	 * 
 	 * @param callback
 	 *            The callback object.
@@ -194,7 +161,7 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 
 	@Override
 	public TimeTriggerPolicy<DATA> clone() {
-		return new TimeTriggerPolicy<DATA>(granularity, timestampWrapper, delay);
+		return new TimeTriggerPolicy<DATA>(granularity, timestampWrapper);
 	}
 
 	@Override
@@ -213,10 +180,30 @@ public class TimeTriggerPolicy<DATA> implements ActiveTriggerPolicy<DATA>,
 		}
 	}
 
+	public long getSlideSize() {
+		return granularity;
+	}
+
 	@Override
 	public String toString() {
 		return "TimePolicy(" + granularity + ", " + timestampWrapper.getClass().getSimpleName()
 				+ ")";
+	}
+
+	public TimestampWrapper<DATA> getTimeStampWrapper() {
+		return timestampWrapper;
+	}
+
+	@Override
+	public Object[] notifyOnLastGlobalElement(DATA datapoint) {
+		LinkedList<Object> fakeElements = new LinkedList<Object>();
+		// check if there is more then one window border missed
+		// use > here. In case >= would fit, the regular call will do the job.
+		while (timestampWrapper.getTimestamp(datapoint) >= startTime + granularity) {
+			startTime += granularity;
+			fakeElements.add(startTime - 1);
+		}
+		return (Object[]) fakeElements.toArray();
 	}
 
 }

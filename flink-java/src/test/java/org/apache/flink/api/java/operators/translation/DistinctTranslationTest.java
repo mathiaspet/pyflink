@@ -27,6 +27,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.io.DiscardingOutputFormat;
 import org.apache.flink.api.java.operators.DistinctOperator;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -60,7 +61,7 @@ public class DistinctTranslationTest {
 				public String getKey(String value) { return value; }
 			});
 			
-			op.print();
+			op.output(new DiscardingOutputFormat<String>());
 			
 			Plan p = env.createProgramPlan();
 			
@@ -76,12 +77,12 @@ public class DistinctTranslationTest {
 	@Test
 	public void translateDistinctPlain() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 
-			initialData.distinct().print();
+			initialData.distinct().output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 
 			Plan p = env.createProgramPlan();
 
@@ -97,8 +98,8 @@ public class DistinctTranslationTest {
 			// check keys
 			assertArrayEquals(new int[] {0, 1, 2}, reducer.getKeyColumns(0));
 
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == 1 || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == 1 || reducer.getParallelism() == -1);
 
 			assertTrue(reducer.getInput() instanceof GenericDataSourceBase<?, ?>);
 		}
@@ -112,12 +113,12 @@ public class DistinctTranslationTest {
 	@Test
 	public void translateDistinctPlain2() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 
 			DataSet<CustomType> initialData = getSourcePojoDataSet(env);
 
-			initialData.distinct().print();
+			initialData.distinct().output(new DiscardingOutputFormat<CustomType>());
 
 			Plan p = env.createProgramPlan();
 
@@ -133,8 +134,8 @@ public class DistinctTranslationTest {
 			// check keys
 			assertArrayEquals(new int[] {0}, reducer.getKeyColumns(0));
 
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == 1 || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == 1 || reducer.getParallelism() == -1);
 
 			assertTrue(reducer.getInput() instanceof GenericDataSourceBase<?, ?>);
 		}
@@ -148,12 +149,12 @@ public class DistinctTranslationTest {
 	@Test
 	public void translateDistinctPosition() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 
-			initialData.distinct(1, 2).print();
+			initialData.distinct(1, 2).output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 
 			Plan p = env.createProgramPlan();
 
@@ -169,8 +170,8 @@ public class DistinctTranslationTest {
 			// check keys
 			assertArrayEquals(new int[] {1, 2}, reducer.getKeyColumns(0));
 
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == 1 || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == 1 || reducer.getParallelism() == -1);
 
 			assertTrue(reducer.getInput() instanceof GenericDataSourceBase<?, ?>);
 		}
@@ -184,8 +185,8 @@ public class DistinctTranslationTest {
 	@Test
 	public void translateDistinctKeySelector() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 
@@ -193,7 +194,7 @@ public class DistinctTranslationTest {
 				public StringValue getKey(Tuple3<Double, StringValue, LongValue> value) {
 					return value.f1;
 				}
-			}).setParallelism(4).print();
+			}).setParallelism(4).output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 
 			Plan p = env.createProgramPlan();
 
@@ -202,9 +203,9 @@ public class DistinctTranslationTest {
 			PlanUnwrappingReduceGroupOperator<?, ?, ?> reducer = (PlanUnwrappingReduceGroupOperator<?, ?, ?>) sink.getInput();
 			MapOperatorBase<?, ?, ?> keyExtractor = (MapOperatorBase<?, ?, ?>) reducer.getInput();
 
-			// check the DOPs
-			assertEquals(1, keyExtractor.getDegreeOfParallelism());
-			assertEquals(4, reducer.getDegreeOfParallelism());
+			// check the parallelisms
+			assertEquals(1, keyExtractor.getParallelism());
+			assertEquals(4, reducer.getParallelism());
 
 			// check types
 			TypeInformation<?> keyValueInfo = new TupleTypeInfo<Tuple2<StringValue, Tuple3<Double,StringValue,LongValue>>>(
@@ -232,12 +233,12 @@ public class DistinctTranslationTest {
 	@Test
 	public void translateDistinctExpressionKey() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 
 			DataSet<CustomType> initialData = getSourcePojoDataSet(env);
 
-			initialData.distinct("myInt").print();
+			initialData.distinct("myInt").output(new DiscardingOutputFormat<CustomType>());
 
 			Plan p = env.createProgramPlan();
 
@@ -253,8 +254,8 @@ public class DistinctTranslationTest {
 			// check keys
 			assertArrayEquals(new int[] {0}, reducer.getKeyColumns(0));
 
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == 1 || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == 1 || reducer.getParallelism() == -1);
 
 			assertTrue(reducer.getInput() instanceof GenericDataSourceBase<?, ?>);
 		}

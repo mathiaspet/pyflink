@@ -44,7 +44,7 @@ ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   "The JobManager" should {
     "handle gracefully failing task manager with slot sharing" in {
-      val num_tasks = 20
+      val num_tasks = 100
 
       val sender = new AbstractJobVertex("Sender")
       val receiver = new AbstractJobVertex("Receiver")
@@ -69,7 +69,7 @@ ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
       try{
         within(TestingUtils.TESTING_DURATION) {
-          jm ! SubmitJob(jobGraph)
+          jm ! SubmitJob(jobGraph, false)
           expectMsg(Success(jobGraph.getJobID))
 
           jm ! WaitForAllVerticesToBeRunningOrFinished(jobID)
@@ -118,7 +118,7 @@ ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
       try{
         within(TestingUtils.TESTING_DURATION) {
-          jm ! SubmitJob(jobGraph)
+          jm ! SubmitJob(jobGraph, false)
           expectMsg(Success(jobGraph.getJobID))
 
           jm ! WaitForAllVerticesToBeRunningOrFinished(jobID)

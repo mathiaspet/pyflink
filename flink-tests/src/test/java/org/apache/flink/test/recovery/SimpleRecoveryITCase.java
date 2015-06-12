@@ -37,8 +37,12 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
+/**
+ * A series of tests (reusing one FlinkMiniCluster) where tasks fail (one or more time)
+ * and the recovery should restart them to verify job completion.
+ */
+@SuppressWarnings("serial")
 public class SimpleRecoveryITCase {
-
 
 	private static ForkableFlinkMiniCluster cluster;
 
@@ -47,7 +51,7 @@ public class SimpleRecoveryITCase {
 		Configuration config = new Configuration();
 		config.setInteger(ConfigConstants.LOCAL_INSTANCE_MANAGER_NUMBER_TASK_MANAGER, 2);
 		config.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, 2);
-		config.setString(ConfigConstants.AKKA_WATCH_HEARTBEAT_PAUSE, "2 s");
+		config.setString(ConfigConstants.DEFAULT_EXECUTION_RETRY_DELAY_KEY, "100 ms");
 
 		cluster = new ForkableFlinkMiniCluster(config, false);
 	}
@@ -75,8 +79,9 @@ public class SimpleRecoveryITCase {
 				ExecutionEnvironment env = ExecutionEnvironment.createRemoteEnvironment(
 						"localhost", cluster.getJobManagerRPCPort());
 
-				env.setDegreeOfParallelism(4);
+				env.setParallelism(4);
 				env.setNumberOfExecutionRetries(0);
+				env.getConfig().disableSysoutLogging();
 
 				env.generateSequence(1, 10)
 						.rebalance()
@@ -91,7 +96,7 @@ public class SimpleRecoveryITCase {
 
 				try {
 					JobExecutionResult res = env.execute();
-					String msg = res == null ? "null result" : "result in " + res.getNetRuntime();
+					String msg = res == null ? "null result" : "result in " + res.getNetRuntime() + " ms";
 					fail("The program should have failed, but returned " + msg);
 				}
 				catch (ProgramInvocationException e) {
@@ -104,8 +109,9 @@ public class SimpleRecoveryITCase {
 				ExecutionEnvironment env = ExecutionEnvironment.createRemoteEnvironment(
 						"localhost", cluster.getJobManagerRPCPort());
 
-				env.setDegreeOfParallelism(4);
+				env.setParallelism(4);
 				env.setNumberOfExecutionRetries(0);
+				env.getConfig().disableSysoutLogging();
 
 				env.generateSequence(1, 10)
 						.rebalance()
@@ -150,8 +156,9 @@ public class SimpleRecoveryITCase {
 			ExecutionEnvironment env = ExecutionEnvironment.createRemoteEnvironment(
 					"localhost", cluster.getJobManagerRPCPort());
 
-			env.setDegreeOfParallelism(4);
+			env.setParallelism(4);
 			env.setNumberOfExecutionRetries(1);
+			env.getConfig().disableSysoutLogging();
 
 			env.generateSequence(1, 10)
 					.rebalance()
@@ -194,8 +201,9 @@ public class SimpleRecoveryITCase {
 			ExecutionEnvironment env = ExecutionEnvironment.createRemoteEnvironment(
 					"localhost", cluster.getJobManagerRPCPort());
 
-			env.setDegreeOfParallelism(4);
-			env.setNumberOfExecutionRetries(3);
+			env.setParallelism(4);
+			env.setNumberOfExecutionRetries(5);
+			env.getConfig().disableSysoutLogging();
 
 			env.generateSequence(1, 10)
 					.rebalance()
@@ -234,7 +242,7 @@ public class SimpleRecoveryITCase {
 
 	private static class FailingMapper1<T> extends RichMapFunction<T, T> {
 
-		private static int failuresBeforeSuccess = 1;
+		private static volatile int failuresBeforeSuccess = 1;
 
 		@Override
 		public T map(T value) throws Exception {
@@ -249,7 +257,7 @@ public class SimpleRecoveryITCase {
 
 	private static class FailingMapper2<T> extends RichMapFunction<T, T> {
 
-		private static int failuresBeforeSuccess = 1;
+		private static volatile int failuresBeforeSuccess = 1;
 
 		@Override
 		public T map(T value) throws Exception {
@@ -264,7 +272,7 @@ public class SimpleRecoveryITCase {
 
 	private static class FailingMapper3<T> extends RichMapFunction<T, T> {
 
-		private static int failuresBeforeSuccess = 3;
+		private static volatile int failuresBeforeSuccess = 3;
 
 		@Override
 		public T map(T value) throws Exception {

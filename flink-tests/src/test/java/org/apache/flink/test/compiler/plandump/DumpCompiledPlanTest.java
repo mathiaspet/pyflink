@@ -18,13 +18,14 @@
 
 package org.apache.flink.test.compiler.plandump;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.client.program.Client.ProgramAbortException;
 import org.apache.flink.client.program.PackagedProgram.PreviewPlanEnvironment;
-import org.apache.flink.compiler.plan.OptimizedPlan;
-import org.apache.flink.compiler.plandump.PlanJSONDumpGenerator;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.apache.flink.examples.java.clustering.KMeans;
-import org.apache.flink.test.compiler.util.CompilerTestBase;
+import org.apache.flink.optimizer.util.CompilerTestBase;
 import org.apache.flink.test.recordJobs.graph.DeltaPageRankWithInitialDeltas;
 import org.apache.flink.test.recordJobs.kmeans.KMeansBroadcast;
 import org.apache.flink.test.recordJobs.kmeans.KMeansSingleStep;
@@ -90,6 +91,7 @@ public class DumpCompiledPlanTest extends CompilerTestBase {
 	}
 	
 	private void dump(Plan p) {
+		p.setExecutionConfig(new ExecutionConfig());
 		try {
 			OptimizedPlan op = compileNoStats(p);
 			PlanJSONDumpGenerator dumper = new PlanJSONDumpGenerator();

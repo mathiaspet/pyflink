@@ -18,12 +18,13 @@
 
 package org.apache.flink.api.scala.operators.translation
 
+import org.apache.flink.api.java.io.DiscardingOutputFormat
 import org.apache.flink.api.scala._
+import org.apache.flink.optimizer.util.CompilerTestBase
 import org.junit.Test
 import org.junit.Assert._
 import org.apache.flink.api.common.functions.Partitioner
-import org.apache.flink.test.compiler.util.CompilerTestBase
-import org.apache.flink.compiler.plan.SingleInputPlanNode
+import org.apache.flink.optimizer.plan.SingleInputPlanNode
 import org.apache.flink.runtime.operators.shipping.ShipStrategyType
 import org.apache.flink.api.common.InvalidProgramException
 
@@ -37,13 +38,13 @@ class CustomPartitioningTest extends CompilerTestBase {
       val parallelism = 4
       
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(parallelism)
+      env.setParallelism(parallelism)
 
       val data = env.fromElements( (0,0) ).rebalance()
       
       data.partitionCustom(part, 0)
           .mapPartition( x => x )
-          .print()
+          .output(new DiscardingOutputFormat[(Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -54,17 +55,17 @@ class CustomPartitioningTest extends CompilerTestBase {
       val balancer = partitioner.getInput.getSource.asInstanceOf[SingleInputPlanNode]
       
       assertEquals(ShipStrategyType.FORWARD, sink.getInput.getShipStrategy)
-      assertEquals(parallelism, sink.getDegreeOfParallelism)
+      assertEquals(parallelism, sink.getParallelism)
       
       assertEquals(ShipStrategyType.FORWARD, mapper.getInput.getShipStrategy)
-      assertEquals(parallelism, mapper.getDegreeOfParallelism)
+      assertEquals(parallelism, mapper.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_CUSTOM, partitioner.getInput.getShipStrategy)
       assertEquals(part, partitioner.getInput.getPartitioner)
-      assertEquals(parallelism, partitioner.getDegreeOfParallelism)
+      assertEquals(parallelism, partitioner.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_FORCED_REBALANCE, balancer.getInput.getShipStrategy)
-      assertEquals(parallelism, balancer.getDegreeOfParallelism)
+      assertEquals(parallelism, balancer.getParallelism)
     }
     catch {
       case e: Exception => {
@@ -80,7 +81,7 @@ class CustomPartitioningTest extends CompilerTestBase {
       val parallelism = 4
       
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(parallelism)
+      env.setParallelism(parallelism)
       
       val data = env.fromElements( (0,0) ).rebalance()
       try {
@@ -106,14 +107,14 @@ class CustomPartitioningTest extends CompilerTestBase {
       val parallelism = 4
       
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(parallelism)
+      env.setParallelism(parallelism)
       
       val data = env.fromElements(new Pojo()).rebalance()
       
       data
           .partitionCustom(part, "a")
           .mapPartition( x => x)
-          .print()
+          .output(new DiscardingOutputFormat[Pojo])
           
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -124,17 +125,17 @@ class CustomPartitioningTest extends CompilerTestBase {
       val balancer = partitioner.getInput.getSource.asInstanceOf[SingleInputPlanNode]
       
       assertEquals(ShipStrategyType.FORWARD, sink.getInput.getShipStrategy)
-      assertEquals(parallelism, sink.getDegreeOfParallelism)
+      assertEquals(parallelism, sink.getParallelism)
       
       assertEquals(ShipStrategyType.FORWARD, mapper.getInput.getShipStrategy)
-      assertEquals(parallelism, mapper.getDegreeOfParallelism)
+      assertEquals(parallelism, mapper.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_CUSTOM, partitioner.getInput.getShipStrategy)
       assertEquals(part, partitioner.getInput.getPartitioner)
-      assertEquals(parallelism, partitioner.getDegreeOfParallelism)
+      assertEquals(parallelism, partitioner.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_FORCED_REBALANCE, balancer.getInput.getShipStrategy)
-      assertEquals(parallelism, balancer.getDegreeOfParallelism)
+      assertEquals(parallelism, balancer.getParallelism)
     }
     catch {
       case e: Exception => {
@@ -150,7 +151,7 @@ class CustomPartitioningTest extends CompilerTestBase {
       val parallelism = 4
       
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(parallelism)
+      env.setParallelism(parallelism)
       
       val data = env.fromElements(new Pojo()).rebalance()
       
@@ -177,14 +178,14 @@ class CustomPartitioningTest extends CompilerTestBase {
       val parallelism = 4
       
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(parallelism)
+      env.setParallelism(parallelism)
       
       val data = env.fromElements(new Pojo()).rebalance()
       
       data
           .partitionCustom(part, pojo => pojo.a)
           .mapPartition( x => x)
-          .print()
+          .output(new DiscardingOutputFormat[Pojo])
           
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -197,23 +198,23 @@ class CustomPartitioningTest extends CompilerTestBase {
       val balancer = keyExtractor.getInput.getSource.asInstanceOf[SingleInputPlanNode]
       
       assertEquals(ShipStrategyType.FORWARD, sink.getInput.getShipStrategy)
-      assertEquals(parallelism, sink.getDegreeOfParallelism)
+      assertEquals(parallelism, sink.getParallelism)
       
       assertEquals(ShipStrategyType.FORWARD, mapper.getInput.getShipStrategy)
-      assertEquals(parallelism, mapper.getDegreeOfParallelism)
+      assertEquals(parallelism, mapper.getParallelism)
       
       assertEquals(ShipStrategyType.FORWARD, keyRemover.getInput.getShipStrategy)
-      assertEquals(parallelism, keyRemover.getDegreeOfParallelism)
+      assertEquals(parallelism, keyRemover.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_CUSTOM, partitioner.getInput.getShipStrategy)
       assertEquals(part, partitioner.getInput.getPartitioner)
-      assertEquals(parallelism, partitioner.getDegreeOfParallelism)
+      assertEquals(parallelism, partitioner.getParallelism)
       
       assertEquals(ShipStrategyType.FORWARD, keyExtractor.getInput.getShipStrategy)
-      assertEquals(parallelism, keyExtractor.getDegreeOfParallelism)
+      assertEquals(parallelism, keyExtractor.getParallelism)
       
       assertEquals(ShipStrategyType.PARTITION_FORCED_REBALANCE, balancer.getInput.getShipStrategy)
-      assertEquals(parallelism, balancer.getDegreeOfParallelism)
+      assertEquals(parallelism, balancer.getParallelism)
     }
     catch {
       case e: Exception => {

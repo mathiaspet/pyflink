@@ -19,20 +19,25 @@
 package org.apache.flink.runtime.io.network.partition.consumer;
 
 import org.apache.flink.runtime.event.task.TaskEvent;
-import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.partition.queue.IntermediateResultPartitionQueue;
-import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
+import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.io.network.partition.ResultSubpartitionView;
+import scala.Tuple2;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * An input channel is the consumer of a single subpartition of an {@link IntermediateResultPartitionQueue}.
+ * An input channel consumes a single {@link ResultSubpartitionView}.
  * <p>
  * For each channel, the consumption life cycle is as follows:
  * <ol>
- * <li>{@link #requestIntermediateResultPartition(int)}</li>
- * <li>{@link #getNextBuffer()} until {@link #isReleased()}</li>
+ * <li>{@link #requestSubpartition(int)}</li>
+ * <li>{@link #getNextBuffer()}</li>
  * <li>{@link #releaseAllResources()}</li>
  * </ol>
  */
@@ -40,38 +45,53 @@ public abstract class InputChannel {
 
 	protected final int channelIndex;
 
-	protected final ExecutionAttemptID producerExecutionId;
-
-	protected final IntermediateResultPartitionID partitionId;
+	protected final ResultPartitionID partitionId;
 
 	protected final SingleInputGate inputGate;
 
-	protected InputChannel(SingleInputGate inputGate, int channelIndex, ExecutionAttemptID producerExecutionId, IntermediateResultPartitionID partitionId) {
-		this.inputGate = inputGate;
+	// - Asynchronous error notification --------------------------------------
+
+	private final AtomicReference<Throwable> cause = new AtomicReference<Throwable>();
+
+	// - Partition request backoff --------------------------------------------
+
+	/** The initial backoff (in ms). */
+	private final int initialBackoff;
+
+	/** The maximum backoff (in ms). */
+	private final int maxBackoff;
+
+	/** The current backoff (in ms) */
+	private int currentBackoff;
+
+	protected InputChannel(
+			SingleInputGate inputGate,
+			int channelIndex,
+			ResultPartitionID partitionId,
+			Tuple2<Integer, Integer> initialAndMaxBackoff) {
+
+		checkArgument(channelIndex >= 0);
+
+		int initial = initialAndMaxBackoff._1();
+		int max = initialAndMaxBackoff._2();
+
+		checkArgument(initial >= 0 && initial <= max);
+
+		this.inputGate = checkNotNull(inputGate);
 		this.channelIndex = channelIndex;
-		this.producerExecutionId = producerExecutionId;
-		this.partitionId = partitionId;
+		this.partitionId = checkNotNull(partitionId);
+
+		this.initialBackoff = initial;
+		this.maxBackoff = max;
+		this.currentBackoff = initial == 0 ? -1 : 0;
 	}
 
 	// ------------------------------------------------------------------------
 	// Properties
 	// ------------------------------------------------------------------------
 
-	public int getChannelIndex() {
+	int getChannelIndex() {
 		return channelIndex;
-	}
-
-	public ExecutionAttemptID getProducerExecutionId() {
-		return producerExecutionId;
-	}
-
-	public IntermediateResultPartitionID getPartitionId() {
-		return partitionId;
-	}
-
-	@Override
-	public String toString() {
-		return String.format("[%s:%s]", producerExecutionId, partitionId);
 	}
 
 	/**
@@ -92,12 +112,12 @@ public abstract class InputChannel {
 	 * The queue index to request depends on which sub task the channel belongs
 	 * to and is specified by the consumer of this channel.
 	 */
-	public abstract void requestIntermediateResultPartition(int queueIndex) throws IOException, InterruptedException;
+	abstract void requestSubpartition(int subpartitionIndex) throws IOException, InterruptedException;
 
 	/**
 	 * Returns the next buffer from the consumed subpartition.
 	 */
-	public abstract Buffer getNextBuffer() throws IOException;
+	abstract Buffer getNextBuffer() throws IOException, InterruptedException;
 
 	// ------------------------------------------------------------------------
 	// Task events
@@ -111,17 +131,92 @@ public abstract class InputChannel {
 	 * the producer will wait for all backwards events. Otherwise, this will lead to an Exception
 	 * at runtime.
 	 */
-	public abstract void sendTaskEvent(TaskEvent event) throws IOException;
+	abstract void sendTaskEvent(TaskEvent event) throws IOException;
 
 	// ------------------------------------------------------------------------
 	// Life cycle
 	// ------------------------------------------------------------------------
 
-	public abstract boolean isReleased();
+	abstract boolean isReleased();
+
+	abstract void notifySubpartitionConsumed() throws IOException;
 
 	/**
 	 * Releases all resources of the channel.
 	 */
-	public abstract void releaseAllResources() throws IOException;
+	abstract void releaseAllResources() throws IOException;
 
+	// ------------------------------------------------------------------------
+	// Error notification
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Checks for an error and rethrows it if one was reported.
+	 */
+	protected void checkError() throws IOException {
+		final Throwable t = cause.get();
+
+		if (t != null) {
+			if (t instanceof CancelTaskException) {
+				throw (CancelTaskException) t;
+			}
+			if (t instanceof IOException) {
+				throw (IOException) t;
+			}
+			else {
+				throw new IOException(t);
+			}
+		}
+	}
+
+	/**
+	 * Atomically sets an error for this channel and notifies the input gate about available data to
+	 * trigger querying this channel by the task thread.
+	 */
+	protected void setError(Throwable cause) {
+		if (this.cause.compareAndSet(null, checkNotNull(cause))) {
+			// Notify the input gate.
+			notifyAvailableBuffer();
+		}
+	}
+
+	// ------------------------------------------------------------------------
+	// Partition request exponential backoff
+	// ------------------------------------------------------------------------
+
+	/**
+	 * Returns the current backoff in ms.
+	 */
+	protected int getCurrentBackoff() {
+		return currentBackoff <= 0 ? 0 : currentBackoff;
+	}
+
+	/**
+	 * Increases the current backoff and returns whether the operation was successful.
+	 *
+	 * @return <code>true</code>, iff the operation was successful. Otherwise, <code>false</code>.
+	 */
+	protected boolean increaseBackoff() {
+		// Backoff is disabled
+		if (currentBackoff < 0) {
+			return false;
+		}
+
+		// This is the first time backing off
+		if (currentBackoff == 0) {
+			currentBackoff = initialBackoff;
+
+			return true;
+		}
+
+		// Continue backing off
+		else if (currentBackoff < maxBackoff) {
+			currentBackoff = Math.min(currentBackoff * 2, maxBackoff);
+
+			return true;
+		}
+
+		// Reached maximum backoff
+		return false;
+	}
 }

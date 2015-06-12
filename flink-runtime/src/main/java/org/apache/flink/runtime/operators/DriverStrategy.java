@@ -21,6 +21,7 @@ package org.apache.flink.runtime.operators;
 import static org.apache.flink.runtime.operators.DamBehavior.FULL_DAM;
 import static org.apache.flink.runtime.operators.DamBehavior.MATERIALIZING;
 import static org.apache.flink.runtime.operators.DamBehavior.PIPELINED;
+import org.apache.flink.runtime.operators.chaining.ChainedAllReduceDriver;
 
 import org.apache.flink.runtime.operators.chaining.ChainedCollectorMapDriver;
 import org.apache.flink.runtime.operators.chaining.ChainedDriver;
@@ -51,11 +52,11 @@ public enum DriverStrategy {
 	FLAT_MAP(FlatMapDriver.class, ChainedFlatMapDriver.class, PIPELINED, 0),
 
 	// group everything together into one group and apply the Reduce function
-	ALL_REDUCE(AllReduceDriver.class, null, PIPELINED, 0),
+	ALL_REDUCE(AllReduceDriver.class, ChainedAllReduceDriver.class, PIPELINED, 0),
 	// group everything together into one group and apply the GroupReduce function
 	ALL_GROUP_REDUCE(AllGroupReduceDriver.class, null, PIPELINED, 0),
 	// group everything together into one group and apply the GroupReduce's combine function
-	ALL_GROUP_COMBINE(AllGroupReduceDriver.class, null, PIPELINED, 0),
+	ALL_GROUP_REDUCE_COMBINE(AllGroupReduceDriver.class, null, PIPELINED, 0),
 
 	// grouping the inputs and apply the Reduce Function
 	SORTED_REDUCE(ReduceDriver.class, null, PIPELINED, 1),
@@ -66,6 +67,9 @@ public enum DriverStrategy {
 	SORTED_GROUP_REDUCE(GroupReduceDriver.class, null, PIPELINED, 1),
 	// partially grouping inputs (best effort resulting possibly in duplicates --> combiner)
 	SORTED_GROUP_COMBINE(GroupReduceCombineDriver.class, SynchronousChainedCombineDriver.class, MATERIALIZING, 2),
+
+	// group combine on all inputs within a partition (without grouping)
+	ALL_GROUP_COMBINE(AllGroupCombineDriver.class, null, PIPELINED, 0),
 
 	// both inputs are merged, but materialized to the side for block-nested-loop-join among values with equal key
 	MERGE(MatchDriver.class, null, MATERIALIZING, MATERIALIZING, 2),

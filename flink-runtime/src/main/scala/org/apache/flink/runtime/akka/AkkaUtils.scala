@@ -18,18 +18,16 @@
 
 package org.apache.flink.runtime.akka
 
-import java.io.IOException
 import java.net.InetAddress
 import java.util.concurrent.{TimeUnit, Callable}
 
-import akka.actor.Actor.Receive
 import akka.actor._
-import akka.pattern.{Patterns, ask => akkaAsk}
-import akka.remote.{RemotingLifecycleEvent, AssociationEvent}
+import akka.pattern.{ask => akkaAsk}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
+import org.jboss.netty.logging.{Slf4JLoggerFactory, InternalLoggerFactory}
 import org.slf4j.LoggerFactory
-import scala.concurrent.{ExecutionContext, Future, Await}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -44,6 +42,17 @@ object AkkaUtils {
   val INF_TIMEOUT = 21474835 seconds
 
   var globalExecutionContext: ExecutionContext = ExecutionContext.global
+
+  /**
+   * Creates a local actor system without remoting.
+   *
+   * @param configuration instance containing the user provided configuration values
+   * @return The created actor system
+   */
+  def createLocalActorSystem(configuration: Configuration): ActorSystem = {
+    val akkaConfig = getAkkaConfig(configuration, None)
+    createActorSystem(akkaConfig)
+  }
 
   /**
    * Creates an actor system. If a listening address is specified, then the actor system will listen
@@ -68,6 +77,8 @@ object AkkaUtils {
    * @return created actor system
    */
   def createActorSystem(akkaConfig: Config): ActorSystem = {
+    // Initialize slf4j as logger of Akka's Netty instead of java.util.logging (FLINK-1650)
+    InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory)
     ActorSystem.create("flink", akkaConfig)
   }
 
@@ -128,6 +139,13 @@ object AkkaUtils {
     val lifecycleEvents = configuration.getBoolean(ConfigConstants.AKKA_LOG_LIFECYCLE_EVENTS,
       ConfigConstants.DEFAULT_AKKA_LOG_LIFECYCLE_EVENTS)
 
+    val jvmExitOnFatalError = if (
+      configuration.getBoolean(ConfigConstants.AKKA_JVM_EXIT_ON_FATAL_ERROR, false)){
+      "on"
+    } else {
+      "off"
+    }
+
     val logLifecycleEvents = if (lifecycleEvents) "on" else "off"
 
     val logLevel = getLogLevel
@@ -141,7 +159,7 @@ object AkkaUtils {
         | logging-filter = "akka.event.slf4j.Slf4jLoggingFilter"
         | log-config-on-start = off
         |
-        | jvm-exit-on-fatal-error = off
+        | jvm-exit-on-fatal-error = $jvmExitOnFatalError
         |
         | serialize-messages = off
         |
@@ -232,9 +250,6 @@ object AkkaUtils {
          |  }
          |
          |  remote {
-         |    quarantine-systems-for = off
-         |    gate-invalid-addresses-for = 5 s
-         |
          |    startup-timeout = $startupTimeout
          |
          |    transport-failure-detector{

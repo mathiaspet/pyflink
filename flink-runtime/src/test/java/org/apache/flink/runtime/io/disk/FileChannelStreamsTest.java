@@ -44,12 +44,12 @@ public class FileChannelStreamsTest {
 	public void testCloseAndDeleteOutputView() {
 		final IOManager ioManager = new IOManagerAsync();
 		try {
-			MemoryManager memMan = new DefaultMemoryManager(4 * 16*1024, 1, 16*1024);
+			MemoryManager memMan = new DefaultMemoryManager(4 * 16*1024, 1, 16*1024, true);
 			List<MemorySegment> memory = new ArrayList<MemorySegment>();
 			memMan.allocatePages(new DummyInvokable(), memory, 4);
 			
 			FileIOChannel.ID channel = ioManager.createChannel();
-			BlockChannelWriter writer = ioManager.createBlockChannelWriter(channel);
+			BlockChannelWriter<MemorySegment> writer = ioManager.createBlockChannelWriter(channel);
 			
 			FileChannelOutputView out = new FileChannelOutputView(writer, memMan, memory, memMan.getPageSize());
 			new StringValue("Some test text").write(out);
@@ -78,7 +78,7 @@ public class FileChannelStreamsTest {
 	public void testCloseAndDeleteInputView() {
 		final IOManager ioManager = new IOManagerAsync();
 		try {
-			MemoryManager memMan = new DefaultMemoryManager(4 * 16*1024, 1, 16*1024);
+			MemoryManager memMan = new DefaultMemoryManager(4 * 16*1024, 1, 16*1024, true);
 			List<MemorySegment> memory = new ArrayList<MemorySegment>();
 			memMan.allocatePages(new DummyInvokable(), memory, 4);
 			
@@ -91,7 +91,7 @@ public class FileChannelStreamsTest {
 				wrt.close();
 			}
 			
-			BlockChannelReader reader = ioManager.createBlockChannelReader(channel);
+			BlockChannelReader<MemorySegment> reader = ioManager.createBlockChannelReader(channel);
 			FileChannelInputView in = new FileChannelInputView(reader, memMan, memory, 9);
 			
 			// read just something

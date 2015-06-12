@@ -18,13 +18,14 @@
 
 package org.apache.flink.api.scala.operators.translation
 
+import org.apache.flink.api.java.io.DiscardingOutputFormat
+import org.apache.flink.optimizer.util.CompilerTestBase
 import org.junit.Assert._
 import org.junit.Test
 import org.apache.flink.api.scala._
 import org.apache.flink.api.common.functions.Partitioner
 import org.apache.flink.runtime.operators.shipping.ShipStrategyType
-import org.apache.flink.compiler.plan.SingleInputPlanNode
-import org.apache.flink.test.compiler.util.CompilerTestBase
+import org.apache.flink.optimizer.plan.SingleInputPlanNode
 import org.apache.flink.api.common.operators.Order
 import org.apache.flink.api.common.InvalidProgramException
 
@@ -40,7 +41,7 @@ class CustomPartitioningGroupingKeySelectorTest extends CompilerTestBase {
       data
         .groupBy( _._1 ).withPartitioner(new TestPartitionerInt())
         .reduce( (a,b) => a )
-        .print()
+        .output(new DiscardingOutputFormat[(Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -73,7 +74,7 @@ class CustomPartitioningGroupingKeySelectorTest extends CompilerTestBase {
       data
         .groupBy( _._1 ).withPartitioner(new TestPartitionerInt())
         .reduce( (a, b) => a)
-        .print()
+        .output(new DiscardingOutputFormat[(Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -107,7 +108,7 @@ class CustomPartitioningGroupingKeySelectorTest extends CompilerTestBase {
         .withPartitioner(new TestPartitionerInt())
         .sortGroup(1, Order.ASCENDING)
         .reduce( (a,b) => a)
-        .print()
+        .output(new DiscardingOutputFormat[(Int, Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -141,7 +142,7 @@ class CustomPartitioningGroupingKeySelectorTest extends CompilerTestBase {
         .withPartitioner(new TestPartitionerInt())
         .sortGroup(_._2, Order.ASCENDING)
         .reduce( (a,b) => a)
-        .print()
+        .output(new DiscardingOutputFormat[(Int, Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)
@@ -175,7 +176,7 @@ class CustomPartitioningGroupingKeySelectorTest extends CompilerTestBase {
         .sortGroup(1, Order.ASCENDING)
         .sortGroup(2, Order.DESCENDING)
         .reduce( (a,b) => a)
-        .print()
+        .output(new DiscardingOutputFormat[(Int, Int, Int, Int)])
 
       val p = env.createProgramPlan()
       val op = compileNoStats(p)

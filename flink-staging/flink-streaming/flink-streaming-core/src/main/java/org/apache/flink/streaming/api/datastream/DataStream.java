@@ -20,62 +20,72 @@ package org.apache.flink.streaming.api.datastream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.FoldFunction;
+import org.apache.flink.api.common.functions.InvalidTypesException;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
+import org.apache.flink.api.common.functions.RichFoldFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.functions.RichReduceFunction;
 import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.api.common.typeinfo.BasicArrayTypeInfo;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.ClosureCleaner;
+import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.CsvOutputFormat;
 import org.apache.flink.api.java.io.TextOutputFormat;
 import org.apache.flink.api.java.operators.Keys;
 import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.typeutils.MissingTypeInfo;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.streaming.api.StreamGraph;
-import org.apache.flink.streaming.api.collector.OutputSelector;
-import org.apache.flink.streaming.api.datastream.temporaloperator.StreamCrossOperator;
-import org.apache.flink.streaming.api.datastream.temporaloperator.StreamJoinOperator;
+import org.apache.flink.streaming.api.collector.selector.OutputSelector;
+import org.apache.flink.streaming.api.datastream.temporal.StreamCrossOperator;
+import org.apache.flink.streaming.api.datastream.temporal.StreamJoinOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.function.aggregation.AggregationFunction;
-import org.apache.flink.streaming.api.function.aggregation.AggregationFunction.AggregationType;
-import org.apache.flink.streaming.api.function.aggregation.ComparableAggregator;
-import org.apache.flink.streaming.api.function.aggregation.SumAggregator;
-import org.apache.flink.streaming.api.function.sink.FileSinkFunctionByMillis;
-import org.apache.flink.streaming.api.function.sink.PrintSinkFunction;
-import org.apache.flink.streaming.api.function.sink.SinkFunction;
-import org.apache.flink.streaming.api.invokable.SinkInvokable;
-import org.apache.flink.streaming.api.invokable.StreamInvokable;
-import org.apache.flink.streaming.api.invokable.operator.CounterInvokable;
-import org.apache.flink.streaming.api.invokable.operator.FilterInvokable;
-import org.apache.flink.streaming.api.invokable.operator.FlatMapInvokable;
-import org.apache.flink.streaming.api.invokable.operator.MapInvokable;
-import org.apache.flink.streaming.api.invokable.operator.StreamReduceInvokable;
+import org.apache.flink.streaming.api.functions.aggregation.AggregationFunction;
+import org.apache.flink.streaming.api.functions.aggregation.AggregationFunction.AggregationType;
+import org.apache.flink.streaming.api.functions.aggregation.ComparableAggregator;
+import org.apache.flink.streaming.api.functions.aggregation.SumAggregator;
+import org.apache.flink.streaming.api.functions.sink.FileSinkFunctionByMillis;
+import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.api.functions.sink.SocketClientSink;
+import org.apache.flink.streaming.api.graph.StreamGraph;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.StreamCounter;
+import org.apache.flink.streaming.api.operators.StreamFilter;
+import org.apache.flink.streaming.api.operators.StreamFlatMap;
+import org.apache.flink.streaming.api.operators.StreamFold;
+import org.apache.flink.streaming.api.operators.StreamMap;
+import org.apache.flink.streaming.api.operators.StreamReduce;
+import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.api.windowing.helper.Count;
 import org.apache.flink.streaming.api.windowing.helper.Delta;
+import org.apache.flink.streaming.api.windowing.helper.FullStream;
 import org.apache.flink.streaming.api.windowing.helper.Time;
 import org.apache.flink.streaming.api.windowing.helper.WindowingHelper;
 import org.apache.flink.streaming.api.windowing.policy.EvictionPolicy;
 import org.apache.flink.streaming.api.windowing.policy.TriggerPolicy;
-import org.apache.flink.streaming.partitioner.BroadcastPartitioner;
-import org.apache.flink.streaming.partitioner.DistributePartitioner;
-import org.apache.flink.streaming.partitioner.FieldsPartitioner;
-import org.apache.flink.streaming.partitioner.GlobalPartitioner;
-import org.apache.flink.streaming.partitioner.ShufflePartitioner;
-import org.apache.flink.streaming.partitioner.StreamPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.BroadcastPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.RebalancePartitioner;
+import org.apache.flink.streaming.runtime.partitioner.FieldsPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.GlobalPartitioner;
+import org.apache.flink.streaming.runtime.partitioner.ShufflePartitioner;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.util.keys.KeySelectorUtil;
+import org.apache.flink.streaming.util.serialization.SerializationSchema;
+
+import com.google.common.base.Preconditions;
 
 /**
  * A DataStream represents a stream of elements of the same type. A DataStream
@@ -84,7 +94,7 @@ import org.apache.flink.streaming.util.keys.KeySelectorUtil;
  * <ul>
  * <li>{@link DataStream#map},</li>
  * <li>{@link DataStream#filter}, or</li>
- * <li>{@link DataStream#aggregate}.</li>
+ * <li>{@link DataStream#sum}.</li>
  * </ul>
  * 
  * @param <OUT>
@@ -96,15 +106,18 @@ public class DataStream<OUT> {
 	protected static Integer counter = 0;
 	protected final StreamExecutionEnvironment environment;
 	protected final Integer id;
-	protected final String type;
-	protected int degreeOfParallelism;
+	protected int parallelism;
 	protected List<String> userDefinedNames;
 	protected StreamPartitioner<OUT> partitioner;
 	@SuppressWarnings("rawtypes")
 	protected TypeInformation typeInfo;
-	protected List<DataStream<OUT>> mergedStreams;
+	protected List<DataStream<OUT>> unionizedStreams;
+	
+	protected Integer iterationID = null;
+	protected Long iterationWaitTime = null;
 
 	protected final StreamGraph streamGraph;
+	private boolean typeUsed;
 
 	/**
 	 * Create a new {@link DataStream} in the given execution environment with
@@ -112,28 +125,24 @@ public class DataStream<OUT> {
 	 * 
 	 * @param environment
 	 *            StreamExecutionEnvironment
-	 * @param operatorType
-	 *            The type of the operator in the component
 	 * @param typeInfo
 	 *            Type of the datastream
 	 */
-	public DataStream(StreamExecutionEnvironment environment, String operatorType,
-			TypeInformation<OUT> typeInfo) {
+	public DataStream(StreamExecutionEnvironment environment, TypeInformation<OUT> typeInfo) {
 		if (environment == null) {
 			throw new NullPointerException("context is null");
 		}
 
 		counter++;
 		this.id = counter;
-		this.type = operatorType;
 		this.environment = environment;
-		this.degreeOfParallelism = environment.getDegreeOfParallelism();
+		this.parallelism = environment.getParallelism();
 		this.streamGraph = environment.getStreamGraph();
 		this.userDefinedNames = new ArrayList<String>();
-		this.partitioner = new DistributePartitioner<OUT>(true);
+		this.partitioner = new RebalancePartitioner<OUT>(true);
 		this.typeInfo = typeInfo;
-		this.mergedStreams = new ArrayList<DataStream<OUT>>();
-		this.mergedStreams.add(this);
+		this.unionizedStreams = new ArrayList<DataStream<OUT>>();
+		this.unionizedStreams.add(this);
 	}
 
 	/**
@@ -145,24 +154,25 @@ public class DataStream<OUT> {
 	public DataStream(DataStream<OUT> dataStream) {
 		this.environment = dataStream.environment;
 		this.id = dataStream.id;
-		this.type = dataStream.type;
-		this.degreeOfParallelism = dataStream.degreeOfParallelism;
+		this.parallelism = dataStream.parallelism;
 		this.userDefinedNames = new ArrayList<String>(dataStream.userDefinedNames);
-		this.partitioner = dataStream.partitioner;
+		this.partitioner = dataStream.partitioner.copy();
 		this.streamGraph = dataStream.streamGraph;
 		this.typeInfo = dataStream.typeInfo;
-		this.mergedStreams = new ArrayList<DataStream<OUT>>();
-		this.mergedStreams.add(this);
-		if (dataStream.mergedStreams.size() > 1) {
-			for (int i = 1; i < dataStream.mergedStreams.size(); i++) {
-				this.mergedStreams.add(new DataStream<OUT>(dataStream.mergedStreams.get(i)));
+		this.iterationID = dataStream.iterationID;
+		this.iterationWaitTime = dataStream.iterationWaitTime;
+		this.unionizedStreams = new ArrayList<DataStream<OUT>>();
+		this.unionizedStreams.add(this);
+		if (dataStream.unionizedStreams.size() > 1) {
+			for (int i = 1; i < dataStream.unionizedStreams.size(); i++) {
+				this.unionizedStreams.add(new DataStream<OUT>(dataStream.unionizedStreams.get(i)));
 			}
 		}
 
 	}
 
 	/**
-	 * Returns the ID of the {@link DataStream}.
+	 * Returns the ID of the {@link DataStream} in the current {@link StreamExecutionEnvironment}.
 	 * 
 	 * @return ID of the DataStream
 	 */
@@ -171,12 +181,12 @@ public class DataStream<OUT> {
 	}
 
 	/**
-	 * Gets the degree of parallelism for this operator.
+	 * Gets the parallelism for this operator.
 	 * 
 	 * @return The parallelism set for this operator.
 	 */
 	public int getParallelism() {
-		return this.degreeOfParallelism;
+		return this.parallelism;
 	}
 
 	/**
@@ -186,22 +196,47 @@ public class DataStream<OUT> {
 	 */
 	@SuppressWarnings("unchecked")
 	public TypeInformation<OUT> getType() {
+		if (typeInfo instanceof MissingTypeInfo) {
+			MissingTypeInfo typeInfo = (MissingTypeInfo) this.typeInfo;
+			throw new InvalidTypesException(
+					"The return type of function '"
+							+ typeInfo.getFunctionName()
+							+ "' could not be determined automatically, due to type erasure. "
+							+ "You can give type information hints by using the returns(...) method on the result of "
+							+ "the transformation call, or by letting your function implement the 'ResultTypeQueryable' "
+							+ "interface.", typeInfo.getTypeException());
+		}
+		typeUsed = true;
 		return this.typeInfo;
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R> DataStream<R> setType(TypeInformation<R> outType) {
-		streamGraph.setOutType(id, outType);
-		typeInfo = outType;
-		return (DataStream<R>) this;
+	/**
+	 * Tries to fill in the type information. Type information can be filled in
+	 * later when the program uses a type hint. This method checks whether the
+	 * type information has ever been accessed before and does not allow
+	 * modifications if the type was accessed already. This ensures consistency
+	 * by making sure different parts of the operation do not assume different
+	 * type information.
+	 * 
+	 * @param typeInfo
+	 *            The type information to fill in.
+	 * 
+	 * @throws IllegalStateException
+	 *             Thrown, if the type information has been accessed before.
+	 */
+	protected void fillInType(TypeInformation<OUT> typeInfo) {
+		if (typeUsed) {
+			throw new IllegalStateException(
+					"TypeInformation cannot be filled in for the type after it has been used. "
+							+ "Please make sure that the type info hints are the first call after the transformation function, "
+							+ "before any access to types or semantic properties, etc.");
+		}
+		streamGraph.setOutType(id, typeInfo);
+		this.typeInfo = typeInfo;
 	}
 
-	public <F> F clean(F f) {
-		if (getExecutionEnvironment().getConfig().isClosureCleanerEnabled()) {
-			ClosureCleaner.clean(f, true);
-		}
-		ClosureCleaner.ensureSerializable(f);
-		return f;
+	protected <F> F clean(F f) {
+		return getExecutionEnvironment().clean(f);
 	}
 
 	public StreamExecutionEnvironment getExecutionEnvironment() {
@@ -218,16 +253,16 @@ public class DataStream<OUT> {
 	 * will be transformed simultaneously.
 	 * 
 	 * @param streams
-	 *            The DataStreams to merge output with.
+	 *            The DataStreams to union output with.
 	 * @return The {@link DataStream}.
 	 */
-	public DataStream<OUT> merge(DataStream<OUT>... streams) {
+	public DataStream<OUT> union(DataStream<OUT>... streams) {
 		DataStream<OUT> returnStream = this.copy();
 
 		for (DataStream<OUT> stream : streams) {
-			for (DataStream<OUT> ds : stream.mergedStreams) {
-				validateMerge(ds.getId());
-				returnStream.mergedStreams.add(ds.copy());
+			for (DataStream<OUT> ds : stream.unionizedStreams) {
+				validateUnion(ds.getId());
+				returnStream.unionizedStreams.add(ds.copy());
 			}
 		}
 		return returnStream;
@@ -235,18 +270,18 @@ public class DataStream<OUT> {
 
 	/**
 	 * Operator used for directing tuples to specific named outputs using an
-	 * {@link org.apache.flink.streaming.api.collector.OutputSelector}. Calling
-	 * this method on an operator creates a new {@link SplitDataStream}.
+	 * {@link org.apache.flink.streaming.api.collector.selector.OutputSelector}.
+	 * Calling this method on an operator creates a new {@link SplitDataStream}.
 	 * 
 	 * @param outputSelector
 	 *            The user defined
-	 *            {@link org.apache.flink.streaming.api.collector.OutputSelector}
+	 *            {@link org.apache.flink.streaming.api.collector.selector.OutputSelector}
 	 *            for directing the tuples.
 	 * @return The {@link SplitDataStream}
 	 */
 	public SplitDataStream<OUT> split(OutputSelector<OUT> outputSelector) {
-		for (DataStream<OUT> ds : this.mergedStreams) {
-			streamGraph.setOutputSelector(ds.getId(), clean(outputSelector));
+		for (DataStream<OUT> ds : this.unionizedStreams) {
+			streamGraph.addOutputSelector(ds.getId(), clean(outputSelector));
 		}
 
 		return new SplitDataStream<OUT>(this);
@@ -254,7 +289,7 @@ public class DataStream<OUT> {
 
 	/**
 	 * Creates a new {@link ConnectedDataStream} by connecting
-	 * {@link DataStream} outputs of (possible) different typea with each other.
+	 * {@link DataStream} outputs of (possible) different types with each other.
 	 * The DataStreams connected using this operator can be used with
 	 * CoFunctions to apply joint transformations.
 	 * 
@@ -301,9 +336,7 @@ public class DataStream<OUT> {
 	 * @return The grouped {@link DataStream}
 	 **/
 	public GroupedDataStream<OUT> groupBy(String... fields) {
-
 		return groupBy(new Keys.ExpressionKeys<OUT>(fields, getType()));
-
 	}
 
 	/**
@@ -330,22 +363,66 @@ public class DataStream<OUT> {
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output is
+	 * partitioned hashing on the given fields. This setting only
+	 * effects the how the outputs will be distributed between the parallel
+	 * instances of the next processing operator.
+	 *
+	 * @param fields The tuple fields that should be used for partitioning
+	 * @return The partitioned DataStream
+	 * Specifies how elements will be distributed to parallel instances of downstream operations.
+	 *
+	 */
+	public DataStream<OUT> partitionByHash(int... fields) {
+		if (getType() instanceof BasicArrayTypeInfo || getType() instanceof PrimitiveArrayTypeInfo) {
+			return partitionByHash(new KeySelectorUtil.ArrayKeySelector<OUT>(fields));
+		} else {
+			return partitionByHash(new Keys.ExpressionKeys<OUT>(fields, getType()));
+		}
+	}
+
+	/**
+	 * Sets the partitioning of the {@link DataStream} so that the output is
+	 * partitioned hashing on the given fields. This setting only
+	 * effects the how the outputs will be distributed between the parallel
+	 * instances of the next processing operator.
+	 *
+	 * @param fields The tuple fields that should be used for partitioning
+	 * @return The partitioned DataStream
+	 * Specifies how elements will be distributed to parallel instances of downstream operations.
+	 *
+	 */
+	public DataStream<OUT> partitionByHash(String... fields) {
+		return partitionByHash(new Keys.ExpressionKeys<OUT>(fields, getType()));
+	}
+
+	/**
+	 * Sets the partitioning of the {@link DataStream} so that the output is
 	 * partitioned using the given {@link KeySelector}. This setting only
 	 * effects the how the outputs will be distributed between the parallel
 	 * instances of the next processing operator.
-	 * 
+	 *
 	 * @param keySelector
-	 * @return
+	 * @return The partitioned DataStream
+	 * Specifies how elements will be distributed to parallel instances of downstream operations.
 	 */
-	protected DataStream<OUT> partitionBy(KeySelector<OUT, ?> keySelector) {
+	public DataStream<OUT> partitionByHash(KeySelector<OUT, ?> keySelector) {
 		return setConnectionType(new FieldsPartitioner<OUT>(clean(keySelector)));
+	}
+
+	//private helper method for partitioning
+	private DataStream<OUT> partitionByHash(Keys<OUT> keys) {
+		return setConnectionType(
+				new FieldsPartitioner<OUT>(
+						clean(KeySelectorUtil.getSelectorForKeys(keys, getType(), getExecutionConfig()))));
 	}
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are broadcasted to every parallel instance of the next component. This
-	 * setting only effects the how the outputs will be distributed between the
-	 * parallel instances of the next processing operator.
+	 * are broadcasted to every parallel instance of the next component.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
 	 * @return The DataStream with broadcast partitioning set.
 	 */
@@ -355,9 +432,11 @@ public class DataStream<OUT> {
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are shuffled to the next component. This setting only effects the how the
-	 * outputs will be distributed between the parallel instances of the next
-	 * processing operator.
+	 * are shuffled uniformly randomly to the next component.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
 	 * @return The DataStream with shuffle partitioning set.
 	 */
@@ -368,26 +447,31 @@ public class DataStream<OUT> {
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
 	 * are forwarded to the local subtask of the next component (whenever
-	 * possible). This is the default partitioner setting. This setting only
-	 * effects the how the outputs will be distributed between the parallel
-	 * instances of the next processing operator.
+	 * possible).
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
-	 * @return The DataStream with shuffle partitioning set.
+	 * @return The DataStream with forward partitioning set.
 	 */
 	public DataStream<OUT> forward() {
-		return setConnectionType(new DistributePartitioner<OUT>(true));
+		return setConnectionType(new RebalancePartitioner<OUT>(true));
 	}
 
 	/**
 	 * Sets the partitioning of the {@link DataStream} so that the output tuples
-	 * are distributed evenly to the next component.This setting only effects
-	 * the how the outputs will be distributed between the parallel instances of
-	 * the next processing operator.
+	 * are distributed evenly to instances of the next component in a Round-robin
+	 * fashion.
+	 *
+	 * <p>
+	 * This setting only effects the how the outputs will be distributed between
+	 * the parallel instances of the next processing operator.
 	 * 
-	 * @return The DataStream with shuffle partitioning set.
+	 * @return The DataStream with rebalance partitioning set.
 	 */
-	public DataStream<OUT> distribute() {
-		return setConnectionType(new DistributePartitioner<OUT>(false));
+	public DataStream<OUT> rebalance() {
+		return setConnectionType(new RebalancePartitioner<OUT>(false));
 	}
 
 	/**
@@ -472,9 +556,10 @@ public class DataStream<OUT> {
 	 */
 	public <R> SingleOutputStreamOperator<R, ?> map(MapFunction<OUT, R> mapper) {
 
-		TypeInformation<R> outType = TypeExtractor.getMapReturnTypes(clean(mapper), getType());
+		TypeInformation<R> outType = TypeExtractor.getMapReturnTypes(clean(mapper), getType(),
+				Utils.getCallLocationName(), true);
 
-		return transform("Map", outType, new MapInvokable<OUT, R>(clean(mapper)));
+		return transform("Map", outType, new StreamMap<OUT, R>(clean(mapper)));
 	}
 
 	/**
@@ -496,9 +581,9 @@ public class DataStream<OUT> {
 	public <R> SingleOutputStreamOperator<R, ?> flatMap(FlatMapFunction<OUT, R> flatMapper) {
 
 		TypeInformation<R> outType = TypeExtractor.getFlatMapReturnTypes(clean(flatMapper),
-				getType());
+				getType(), Utils.getCallLocationName(), true);
 
-		return transform("Flat Map", outType, new FlatMapInvokable<OUT, R>(clean(flatMapper)));
+		return transform("Flat Map", outType, new StreamFlatMap<OUT, R>(clean(flatMapper)));
 
 	}
 
@@ -516,8 +601,28 @@ public class DataStream<OUT> {
 	 */
 	public SingleOutputStreamOperator<OUT, ?> reduce(ReduceFunction<OUT> reducer) {
 
-		return transform("Reduce", getType(), new StreamReduceInvokable<OUT>(clean(reducer)));
+		return transform("Reduce", getType(), new StreamReduce<OUT>(clean(reducer)));
 
+	}
+
+	/**
+	 * Applies a fold transformation on the data stream. The returned stream
+	 * contains all the intermediate values of the fold transformation. The user
+	 * can also extend the {@link RichFoldFunction} to gain access to other
+	 * features provided by the
+	 * {@link org.apache.flink.api.common.functions.RichFunction} interface
+	 * 
+	 * @param folder
+	 *            The {@link FoldFunction} that will be called for every element
+	 *            of the input values.
+	 * @return The transformed DataStream
+	 */
+	public <R> SingleOutputStreamOperator<R, ?> fold(R initialValue, FoldFunction<OUT, R> folder) {
+		TypeInformation<R> outType = TypeExtractor.getFoldReturnTypes(clean(folder), getType(),
+				Utils.getCallLocationName(), true);
+
+		return transform("Fold", outType, new StreamFold<OUT, R>(clean(folder), initialValue,
+				outType));
 	}
 
 	/**
@@ -531,11 +636,11 @@ public class DataStream<OUT> {
 	 * 
 	 * @param filter
 	 *            The FilterFunction that is called for each element of the
-	 *            DataSet.
+	 *            DataStream.
 	 * @return The filtered DataStream.
 	 */
 	public SingleOutputStreamOperator<OUT, ?> filter(FilterFunction<OUT> filter) {
-		return transform("Filter", getType(), new FilterInvokable<OUT>(clean(filter)));
+		return transform("Filter", getType(), new StreamFilter<OUT>(clean(filter)));
 
 	}
 
@@ -543,24 +648,21 @@ public class DataStream<OUT> {
 	 * Initiates a Project transformation on a {@link Tuple} {@link DataStream}.<br/>
 	 * <b>Note: Only Tuple DataStreams can be projected.</b></br> The
 	 * transformation projects each Tuple of the DataSet onto a (sub)set of
-	 * fields.</br> This method returns a {@link StreamProjection} on which
-	 * {@link StreamProjection#types(Class)} needs to be called to completed the
-	 * transformation.
+	 * fields.
 	 * 
 	 * @param fieldIndexes
 	 *            The field indexes of the input tuples that are retained. The
 	 *            order of fields in the output tuple corresponds to the order
 	 *            of field indexes.
-	 * @return A StreamProjection that needs to be converted into a DataStream
-	 *         to complete the project transformation by calling
-	 *         {@link StreamProjection#types(Class)}.
+	 * @return The projected DataStream
 	 * 
 	 * @see Tuple
 	 * @see DataStream
 	 */
-	public StreamProjection<OUT> project(int... fieldIndexes) {
-		return new StreamProjection<OUT>(this.copy(), fieldIndexes);
+	public <R extends Tuple> SingleOutputStreamOperator<R, ?> project(int... fieldIndexes) {
+		return new StreamProjection<OUT>(this.copy(), fieldIndexes).projectTupleX();
 	}
+
 
 	/**
 	 * Initiates a temporal Cross transformation.<br/>
@@ -574,8 +676,8 @@ public class DataStream<OUT> {
 	 * {@link StreamCrossOperator#onWindow} should be called to define the
 	 * window.
 	 * <p>
-	 * Call {@link StreamCrossOperator.CrossWindow#with(crossFunction)} to
-	 * define a custom cross function.
+	 * Call {@link StreamCrossOperator.CrossWindow#with(org.apache.flink.api.common.functions.CrossFunction)}
+	 * to define a custom cross function.
 	 * 
 	 * @param dataStreamToCross
 	 *            The other DataStream with which this DataStream is crossed.
@@ -593,14 +695,17 @@ public class DataStream<OUT> {
 	 * {@link DataStream}s on key equality over a specified time window.</br>
 	 * 
 	 * This method returns a {@link StreamJoinOperator} on which the
-	 * {@link StreamJoinOperator#onWindow} should be called to define the
-	 * window, and then the {@link StreamJoinOperator.JoinWindow#where} and
-	 * {@link StreamJoinOperator.JoinPredicate#equalTo} can be used to define
-	 * the join keys.</p> The user can also use the
-	 * {@link StreamJoinOperator.JoinedStream#with(joinFunction)} to apply
-	 * custom join function.
+	 * {@link StreamJoinOperator#onWindow(long, java.util.concurrent.TimeUnit)}
+	 * should be called to define the window, and then the
+	 * {@link StreamJoinOperator.JoinWindow#where(int...)} and
+	 * {@link StreamJoinOperator.JoinPredicate#equalTo(int...)} can be used to define
+	 * the join keys.
+	 * <p>
+	 * The user can also use the
+	 * {@link StreamJoinOperator.JoinedStream#with(org.apache.flink.api.common.functions.JoinFunction)}
+	 * to apply a custom join function.
 	 * 
-	 * @param other
+	 * @param dataStreamToJoin
 	 *            The other DataStream with which this DataStream is joined.
 	 * @return A {@link StreamJoinOperator} to continue the definition of the
 	 *         Join transformation.
@@ -843,9 +948,9 @@ public class DataStream<OUT> {
 	 * @return The transformed DataStream.
 	 */
 	public SingleOutputStreamOperator<Long, ?> count() {
-		TypeInformation<Long> outTypeInfo = TypeExtractor.getForObject(Long.valueOf(0));
+		TypeInformation<Long> outTypeInfo = BasicTypeInfo.LONG_TYPE_INFO;
 
-		return transform("Count", outTypeInfo, new CounterInvokable<OUT>());
+		return transform("Count", outTypeInfo, new StreamCounter<OUT>());
 	}
 
 	/**
@@ -853,16 +958,16 @@ public class DataStream<OUT> {
 	 * transformation like {@link WindowedDataStream#reduceWindow},
 	 * {@link WindowedDataStream#mapWindow} or aggregations on preset
 	 * chunks(windows) of the data stream. To define windows a
-	 * {@link WindowingHelper} such as {@link Time}, {@link Count} and
-	 * {@link Delta} can be used.</br></br> When applied to a grouped data
-	 * stream, the windows (evictions) and slide sizes (triggers) will be
-	 * computed on a per group basis. </br></br> For more advanced control over
-	 * the trigger and eviction policies please refer to
-	 * {@link #window(trigger, eviction)} </br> </br> For example to create a
+	 * {@link WindowingHelper} such as {@link Time}, {@link Count},
+	 * {@link Delta} and {@link FullStream} can be used.</br></br> When applied
+	 * to a grouped data stream, the windows (evictions) and slide sizes
+	 * (triggers) will be computed on a per group basis. </br></br> For more
+	 * advanced control over the trigger and eviction policies please refer to
+	 * {@link #window(TriggerPolicy, EvictionPolicy)} </br> </br> For example to create a
 	 * sum every 5 seconds in a tumbling fashion:</br>
 	 * {@code ds.window(Time.of(5, TimeUnit.SECONDS)).sum(field)} </br></br> To
 	 * create sliding windows use the
-	 * {@link WindowedDataStream#every(WindowingHelper...)} </br></br> The same
+	 * {@link WindowedDataStream#every(WindowingHelper)} </br></br> The same
 	 * example with 3 second slides:</br>
 	 * 
 	 * {@code ds.window(Time.of(5, TimeUnit.SECONDS)).every(Time.of(3,
@@ -870,11 +975,13 @@ public class DataStream<OUT> {
 	 * 
 	 * @param policyHelper
 	 *            Any {@link WindowingHelper} such as {@link Time},
-	 *            {@link Count} and {@link Delta} to define the window size.
+	 *            {@link Count}, {@link Delta} {@link FullStream} to define the
+	 *            window size.
 	 * @return A {@link WindowedDataStream} providing further operations.
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public WindowedDataStream<OUT> window(WindowingHelper policyHelper) {
+		policyHelper.setExecutionConfig(getExecutionConfig());
 		return new WindowedDataStream<OUT>(this, policyHelper);
 	}
 
@@ -899,6 +1006,18 @@ public class DataStream<OUT> {
 	}
 
 	/**
+	 * Create a {@link WindowedDataStream} on the full stream history, to
+	 * produce periodic aggregates.
+	 * 
+	 * @return A {@link WindowedDataStream} providing further operations.
+	 */
+	@SuppressWarnings("rawtypes")
+	public WindowedDataStream<OUT> every(WindowingHelper policyHelper) {
+		policyHelper.setExecutionConfig(getExecutionConfig());
+		return window(FullStream.window()).every(policyHelper);
+	}
+
+	/**
 	 * Writes a DataStream to the standard output stream (stdout).<br>
 	 * For each element of the DataStream the result of
 	 * {@link Object#toString()} is written.
@@ -907,9 +1026,7 @@ public class DataStream<OUT> {
 	 */
 	public DataStreamSink<OUT> print() {
 		PrintSinkFunction<OUT> printFunction = new PrintSinkFunction<OUT>();
-		DataStreamSink<OUT> returnStream = addSink(printFunction);
-
-		return returnStream;
+		return addSink(printFunction);
 	}
 
 	/**
@@ -921,9 +1038,7 @@ public class DataStream<OUT> {
 	 */
 	public DataStreamSink<OUT> printToErr() {
 		PrintSinkFunction<OUT> printFunction = new PrintSinkFunction<OUT>(true);
-		DataStreamSink<OUT> returnStream = addSink(printFunction);
-
-		return returnStream;
+		return addSink(printFunction);
 	}
 
 	/**
@@ -937,7 +1052,7 @@ public class DataStream<OUT> {
 	 * @return the closed DataStream.
 	 */
 	public DataStreamSink<OUT> writeAsText(String path) {
-		return writeToFile(new TextOutputFormat<OUT>(new Path(path)), 0L);
+		return write(new TextOutputFormat<OUT>(new Path(path)), 0L);
 	}
 
 	/**
@@ -955,7 +1070,7 @@ public class DataStream<OUT> {
 	 */
 	public DataStreamSink<OUT> writeAsText(String path, long millis) {
 		TextOutputFormat<OUT> tof = new TextOutputFormat<OUT>(new Path(path));
-		return writeToFile(tof, millis);
+		return write(tof, millis);
 	}
 
 	/**
@@ -974,7 +1089,7 @@ public class DataStream<OUT> {
 	public DataStreamSink<OUT> writeAsText(String path, WriteMode writeMode) {
 		TextOutputFormat<OUT> tof = new TextOutputFormat<OUT>(new Path(path));
 		tof.setWriteMode(writeMode);
-		return writeToFile(tof, 0L);
+		return write(tof, 0L);
 	}
 
 	/**
@@ -995,7 +1110,7 @@ public class DataStream<OUT> {
 	public DataStreamSink<OUT> writeAsText(String path, WriteMode writeMode, long millis) {
 		TextOutputFormat<OUT> tof = new TextOutputFormat<OUT>(new Path(path));
 		tof.setWriteMode(writeMode);
-		return writeToFile(tof, millis);
+		return write(tof, millis);
 	}
 
 	/**
@@ -1010,11 +1125,11 @@ public class DataStream<OUT> {
 	 */
 	@SuppressWarnings("unchecked")
 	public <X extends Tuple> DataStreamSink<OUT> writeAsCsv(String path) {
-		Validate.isTrue(getType().isTupleType(),
+		Preconditions.checkArgument(getType().isTupleType(),
 				"The writeAsCsv() method can only be used on data sets of tuples.");
 		CsvOutputFormat<X> of = new CsvOutputFormat<X>(new Path(path),
 				CsvOutputFormat.DEFAULT_LINE_DELIMITER, CsvOutputFormat.DEFAULT_FIELD_DELIMITER);
-		return writeToFile((OutputFormat<OUT>) of, 0L);
+		return write((OutputFormat<OUT>) of, 0L);
 	}
 
 	/**
@@ -1032,11 +1147,11 @@ public class DataStream<OUT> {
 	 */
 	@SuppressWarnings("unchecked")
 	public <X extends Tuple> DataStreamSink<OUT> writeAsCsv(String path, long millis) {
-		Validate.isTrue(getType().isTupleType(),
+		Preconditions.checkArgument(getType().isTupleType(),
 				"The writeAsCsv() method can only be used on data sets of tuples.");
 		CsvOutputFormat<X> of = new CsvOutputFormat<X>(new Path(path),
 				CsvOutputFormat.DEFAULT_LINE_DELIMITER, CsvOutputFormat.DEFAULT_FIELD_DELIMITER);
-		return writeToFile((OutputFormat<OUT>) of, millis);
+		return write((OutputFormat<OUT>) of, millis);
 	}
 
 	/**
@@ -1054,14 +1169,14 @@ public class DataStream<OUT> {
 	 */
 	@SuppressWarnings("unchecked")
 	public <X extends Tuple> DataStreamSink<OUT> writeAsCsv(String path, WriteMode writeMode) {
-		Validate.isTrue(getType().isTupleType(),
+		Preconditions.checkArgument(getType().isTupleType(),
 				"The writeAsCsv() method can only be used on data sets of tuples.");
 		CsvOutputFormat<X> of = new CsvOutputFormat<X>(new Path(path),
 				CsvOutputFormat.DEFAULT_LINE_DELIMITER, CsvOutputFormat.DEFAULT_FIELD_DELIMITER);
 		if (writeMode != null) {
 			of.setWriteMode(writeMode);
 		}
-		return writeToFile((OutputFormat<OUT>) of, 0L);
+		return write((OutputFormat<OUT>) of, 0L);
 	}
 
 	/**
@@ -1083,58 +1198,88 @@ public class DataStream<OUT> {
 	@SuppressWarnings("unchecked")
 	public <X extends Tuple> DataStreamSink<OUT> writeAsCsv(String path, WriteMode writeMode,
 			long millis) {
-		Validate.isTrue(getType().isTupleType(),
+		Preconditions.checkArgument(getType().isTupleType(),
 				"The writeAsCsv() method can only be used on data sets of tuples.");
 		CsvOutputFormat<X> of = new CsvOutputFormat<X>(new Path(path),
 				CsvOutputFormat.DEFAULT_LINE_DELIMITER, CsvOutputFormat.DEFAULT_FIELD_DELIMITER);
 		if (writeMode != null) {
 			of.setWriteMode(writeMode);
 		}
-		return writeToFile((OutputFormat<OUT>) of, millis);
-	}
-
-	private DataStreamSink<OUT> writeToFile(OutputFormat<OUT> format, long millis) {
-		DataStreamSink<OUT> returnStream = addSink(new FileSinkFunctionByMillis<OUT>(format, millis));
-		return returnStream;
-	}
-
-	protected SingleOutputStreamOperator<OUT, ?> aggregate(AggregationFunction<OUT> aggregate) {
-
-		StreamReduceInvokable<OUT> invokable = new StreamReduceInvokable<OUT>(aggregate);
-
-		SingleOutputStreamOperator<OUT, ?> returnStream = transform("Aggregation", getType(),
-				invokable);
-
-		return returnStream;
+		return write((OutputFormat<OUT>) of, millis);
 	}
 
 	/**
-	 * Method for passing user defined invokables along with the type
-	 * informations that will transform the DataStream.
+	 * Writes the DataStream to a socket as a byte array. The format of the
+	 * output is specified by a {@link SerializationSchema}.
+	 * 
+	 * @param hostName
+	 *            host of the socket
+	 * @param port
+	 *            port of the socket
+	 * @param schema
+	 *            schema for serialization
+	 * @return the closed DataStream
+	 */
+	public DataStreamSink<OUT> writeToSocket(String hostName, int port, SerializationSchema<OUT, byte[]> schema) {
+		DataStreamSink<OUT> returnStream = addSink(new SocketClientSink<OUT>(hostName, port, schema));
+		returnStream.setParallelism(1); // It would not work if multiple instances would connect to the same port
+		return returnStream;
+	}
+	
+	/**
+	 * Writes the dataStream into an output, described by an OutputFormat.
+	 * 
+	 * @param format The output format
+	 * @param millis the write frequency
+	 * @return The closed DataStream
+	 */
+	public DataStreamSink<OUT> write(OutputFormat<OUT> format, long millis) {
+		return addSink(new FileSinkFunctionByMillis<OUT>(format, millis));
+	}
+
+	protected SingleOutputStreamOperator<OUT, ?> aggregate(AggregationFunction<OUT> aggregate) {
+		StreamReduce<OUT> operator = new StreamReduce<OUT>(aggregate);
+		return transform("Aggregation", getType(), operator);
+	}
+
+	/**
+	 * Method for passing user defined operators along with the type
+	 * information that will transform the DataStream.
 	 * 
 	 * @param operatorName
 	 *            name of the operator, for logging purposes
 	 * @param outTypeInfo
 	 *            the output type of the operator
-	 * @param invokable
+	 * @param operator
 	 *            the object containing the transformation logic
 	 * @param <R>
 	 *            type of the return stream
 	 * @return the data stream constructed
 	 */
 	public <R> SingleOutputStreamOperator<R, ?> transform(String operatorName,
-			TypeInformation<R> outTypeInfo, StreamInvokable<OUT, R> invokable) {
+			TypeInformation<R> outTypeInfo, OneInputStreamOperator<OUT, R> operator) {
 		DataStream<OUT> inputStream = this.copy();
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		SingleOutputStreamOperator<R, ?> returnStream = new SingleOutputStreamOperator(environment,
-				operatorName, outTypeInfo, invokable);
+				outTypeInfo, operator);
 
-		streamGraph.addStreamVertex(returnStream.getId(), invokable, getType(), outTypeInfo,
-				operatorName, returnStream.getParallelism());
+		streamGraph.addOperator(returnStream.getId(), operator, getType(), outTypeInfo,
+				operatorName);
 
 		connectGraph(inputStream, returnStream.getId(), 0);
+		
+		if (iterationID != null) {
+			//This data stream is an input to some iteration
+			addIterationSource(returnStream);
+		}
 
 		return returnStream;
+	}
+	
+	private <X> void addIterationSource(DataStream<X> dataStream) {
+		Integer id = ++counter;
+		streamGraph.addIterationHead(id, dataStream.getId(), iterationID, iterationWaitTime);
+		streamGraph.setParallelism(id, dataStream.getParallelism());
 	}
 
 	/**
@@ -1147,7 +1292,7 @@ public class DataStream<OUT> {
 	protected DataStream<OUT> setConnectionType(StreamPartitioner<OUT> partitioner) {
 		DataStream<OUT> returnStream = this.copy();
 
-		for (DataStream<OUT> stream : returnStream.mergedStreams) {
+		for (DataStream<OUT> stream : returnStream.unionizedStreams) {
 			stream.partitioner = partitioner;
 		}
 
@@ -1168,8 +1313,8 @@ public class DataStream<OUT> {
 	 *            Number of the type (used at co-functions)
 	 */
 	protected <X> void connectGraph(DataStream<X> inputStream, Integer outputID, int typeNumber) {
-		for (DataStream<X> stream : inputStream.mergedStreams) {
-			streamGraph.setEdge(stream.getId(), outputID, stream.partitioner, typeNumber,
+		for (DataStream<X> stream : inputStream.unionizedStreams) {
+			streamGraph.addEdge(stream.getId(), outputID, stream.partitioner, typeNumber,
 					inputStream.userDefinedNames);
 		}
 
@@ -1186,13 +1331,12 @@ public class DataStream<OUT> {
 	 */
 	public DataStreamSink<OUT> addSink(SinkFunction<OUT> sinkFunction) {
 
-		StreamInvokable<OUT, OUT> sinkInvokable = new SinkInvokable<OUT>(clean(sinkFunction));
+		OneInputStreamOperator<OUT, Object> sinkOperator = new StreamSink<OUT>(clean(sinkFunction));
 
 		DataStreamSink<OUT> returnStream = new DataStreamSink<OUT>(environment, "sink", getType(),
-				sinkInvokable);
+				sinkOperator);
 
-		streamGraph.addStreamVertex(returnStream.getId(), sinkInvokable, getType(), null,
-				"Stream Sink", returnStream.getParallelism());
+		streamGraph.addOperator(returnStream.getId(), sinkOperator, getType(), null, "Stream Sink");
 
 		this.connectGraph(this.copy(), returnStream.getId(), 0);
 
@@ -1200,7 +1344,7 @@ public class DataStream<OUT> {
 	}
 
 	/**
-	 * Gets the class of the field at the given position
+	 * Gets the class of the field at the given position.
 	 * 
 	 * @param pos
 	 *            Position of the field
@@ -1260,8 +1404,8 @@ public class DataStream<OUT> {
 		}
 	}
 
-	private void validateMerge(Integer id) {
-		for (DataStream<OUT> ds : this.mergedStreams) {
+	private void validateUnion(Integer id) {
+		for (DataStream<OUT> ds : this.unionizedStreams) {
 			if (ds.getId().equals(id)) {
 				throw new RuntimeException("A DataStream cannot be merged with itself");
 			}
@@ -1276,5 +1420,4 @@ public class DataStream<OUT> {
 	public DataStream<OUT> copy() {
 		return new DataStream<OUT>(this);
 	}
-
 }

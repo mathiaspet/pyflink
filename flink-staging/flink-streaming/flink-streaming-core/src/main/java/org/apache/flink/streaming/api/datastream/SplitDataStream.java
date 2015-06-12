@@ -19,7 +19,7 @@ package org.apache.flink.streaming.api.datastream;
 
 import java.util.Arrays;
 
-import org.apache.flink.streaming.api.collector.OutputSelector;
+import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 
 /**
  * The SplitDataStream represents an operator that has been split using an
@@ -57,7 +57,7 @@ public class SplitDataStream<OUT> extends DataStream<OUT> {
 
 		DataStream<OUT> returnStream = copy();
 
-		for (DataStream<OUT> ds : returnStream.mergedStreams) {
+		for (DataStream<OUT> ds : returnStream.unionizedStreams) {
 			ds.userDefinedNames = Arrays.asList(outputNames);
 		}
 		return returnStream;

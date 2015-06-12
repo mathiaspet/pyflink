@@ -61,22 +61,41 @@ under the License.
 		</dependency>
 
 		<dependency>
-		   <groupId>org.scalamacros</groupId>
-		   <artifactId>quasiquotes_${scala.binary.version}</artifactId>
-		   <version>${scala.macros.version}</version>
-		</dependency>
-
-		<dependency>
 			<groupId>org.ow2.asm</groupId>
 			<artifactId>asm</artifactId>
+			<version>${asm.version}</version>
 		</dependency>
 		
-		<!--  guava needs to be in "provided" scope, to make sure it is not included into the jars by the shading -->
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
 			<version>${guava.version}</version>
-			<scope>provided</scope>
+		</dependency>
+
+		<!-- To access general test utils -->
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-tests</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+			<type>test-jar</type>
+		</dependency>
+
+		<!-- To access test data -->
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-test-utils</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- To access streaming test utils -->
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-streaming-core</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+			<type>test-jar</type>
 		</dependency>
 
 	</dependencies>
@@ -114,7 +133,7 @@ under the License.
 						<jvmArg>-Xms128m</jvmArg>
 						<jvmArg>-Xmx512m</jvmArg>
 					</jvmArgs>
-					<compilerPlugins>
+					<compilerPlugins combine.children="append">
 					   <compilerPlugin>
 						   <groupId>org.scalamacros</groupId>
 						   <artifactId>paradise_${scala.version}</artifactId>
@@ -123,7 +142,7 @@ under the License.
 				   </compilerPlugins>
 				</configuration>
 			</plugin>
-			
+
 			<!-- Eclipse Integration -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

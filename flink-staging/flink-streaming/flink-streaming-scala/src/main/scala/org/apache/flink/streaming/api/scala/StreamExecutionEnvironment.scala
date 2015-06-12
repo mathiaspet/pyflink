@@ -19,34 +19,65 @@
 package org.apache.flink.streaming.api.scala
 
 import com.esotericsoftware.kryo.Serializer
-import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer
-
-import scala.reflect.ClassTag
-import org.apache.commons.lang.Validate
+import org.apache.flink.api.common.io.{FileInputFormat, InputFormat}
 import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.streaming.api.environment.{StreamExecutionEnvironment => JavaEnv}
-import org.apache.flink.streaming.api.function.source.{ FromElementsFunction, SourceFunction }
-import org.apache.flink.util.Collector
+import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer
 import org.apache.flink.api.scala.ClosureCleaner
-import org.apache.flink.streaming.api.function.source.FileMonitoringFunction.WatchType
+import org.apache.flink.runtime.state.StateHandleProvider
+import org.apache.flink.streaming.api.environment.{StreamExecutionEnvironment => JavaEnv}
+import org.apache.flink.streaming.api.functions.source.FileMonitoringFunction.WatchType
+import org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext
+import org.apache.flink.streaming.api.functions.source.{FromElementsFunction, SourceFunction}
+import org.apache.flink.types.StringValue
+import org.apache.flink.util.SplittableIterator
+
+import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
+
+import _root_.scala.language.implicitConversions
 
 class StreamExecutionEnvironment(javaEnv: JavaEnv) {
 
   /**
-   * Sets the degree of parallelism (DOP) for operations executed through this environment.
-   * Setting a DOP of x here will cause all operators (such as join, map, reduce) to run with
-   * x parallel instances. This value can be overridden by specific operations using
-   * [[DataStream.setParallelism]].
+   * Gets the config object.
    */
+  def getConfig = javaEnv.getConfig
+
+  /**
+   * Sets the parallelism for operations executed through this environment.
+   * Setting a parallelism of x here will cause all operators (such as join, map, reduce) to run
+   * with x parallel instances. This value can be overridden by specific operations using
+   * [[DataStream.setParallelism]].
+   * @deprecated Please use [[setParallelism]]
+   */
+  @deprecated
   def setDegreeOfParallelism(degreeOfParallelism: Int): Unit = {
-    javaEnv.setDegreeOfParallelism(degreeOfParallelism)
+    javaEnv.setParallelism(degreeOfParallelism)
   }
 
   /**
-   * Returns the default degree of parallelism for this execution environment. Note that this
+   * Returns the default parallelism for this execution environment. Note that this
+   * value can be overridden by individual operations using [[DataStream.setParallelism]]
+   * @deprecated Please use [[getParallelism]]
+   */
+  @deprecated
+  def getDegreeOfParallelism = javaEnv.getParallelism
+
+  /**
+   * Sets the parallelism for operations executed through this environment.
+   * Setting a parallelism of x here will cause all operators (such as join, map, reduce) to run
+   * with x parallel instances. This value can be overridden by specific operations using
+   * [[DataStream.setParallelism]].
+   */
+  def setParallelism(parallelism: Int): Unit = {
+    javaEnv.setParallelism(parallelism)
+  }
+
+  /**
+   * Returns the default parallelism for this execution environment. Note that this
    * value can be overridden by individual operations using [[DataStream.setParallelism]]
    */
-  def getDegreeOfParallelism = javaEnv.getDegreeOfParallelism
+  def getParallelism = javaEnv.getParallelism
 
   /**
    * Sets the maximum time frequency (milliseconds) for the flushing of the
@@ -73,7 +104,121 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
   /**
    * Gets the default buffer timeout set for this environment
    */
-  def getBufferTimout: Long = javaEnv.getBufferTimeout()
+  def getBufferTimeout = javaEnv.getBufferTimeout
+
+  /**
+   * Disables operator chaining for streaming operators. Operator chaining
+   * allows non-shuffle operations to be co-located in the same thread fully
+   * avoiding serialization and de-serialization.
+   *
+   */
+  def disableOperatorChaining(): StreamExecutionEnvironment = {
+    javaEnv.disableOperatorChaining()
+    this
+  }
+
+  /**
+   * Method for enabling fault-tolerance. Activates monitoring and backup of streaming
+   * operator states. Time interval between state checkpoints is specified in in millis.
+   * 
+   * If the force flag is set to true, checkpointing will be enabled for iterative jobs as
+   * well.Please note that the checkpoint/restore guarantees for iterative jobs are
+   * only best-effort at the moment. Records inside the loops may be lost during failure.
+   *
+   * Setting this option assumes that the job is used in production and thus if not stated
+   * explicitly otherwise with calling with the
+   * {@link #setNumberOfExecutionRetries(int numberOfExecutionRetries)} method in case of
+   * failure the job will be resubmitted to the cluster indefinitely.
+   */
+  @deprecated
+  def enableCheckpointing(interval : Long, force: Boolean) : StreamExecutionEnvironment = {
+    javaEnv.enableCheckpointing(interval, force)
+    this
+  }
+  
+   /**
+   * Method for enabling fault-tolerance. Activates monitoring and backup of streaming
+   * operator states. Time interval between state checkpoints is specified in in millis.
+   * 
+   * Setting this option assumes that the job is used in production and thus if not stated
+   * explicitly otherwise with calling with the
+   * {@link #setNumberOfExecutionRetries(int numberOfExecutionRetries)} method in case of
+   * failure the job will be resubmitted to the cluster indefinitely.
+   */
+  def enableCheckpointing(interval : Long) : StreamExecutionEnvironment = {
+    javaEnv.enableCheckpointing(interval)
+    this
+  }
+
+  /**
+   * Method for enabling fault-tolerance. Activates monitoring and backup of streaming
+   * operator states. Time interval between state checkpoints is specified in in millis.
+   *
+   * Setting this option assumes that the job is used in production and thus if not stated
+   * explicitly otherwise with calling with the
+   * {@link #setNumberOfExecutionRetries(int numberOfExecutionRetries)} method in case of
+   * failure the job will be resubmitted to the cluster indefinitely.
+   */
+  def enableCheckpointing() : StreamExecutionEnvironment = {
+    javaEnv.enableCheckpointing()
+    this
+  }
+
+  /**
+   * Sets the given StateHandleProvider to be used for storing operator state
+   * checkpoints when checkpointing is enabled.
+   */
+  def setStateHandleProvider(provider: StateHandleProvider[_]): StreamExecutionEnvironment = {
+    javaEnv.setStateHandleProvider(provider)
+    this
+  }
+
+  /**
+   * Sets the number of times that failed tasks are re-executed. A value of zero
+   * effectively disables fault tolerance. A value of "-1" indicates that the system
+   * default value (as defined in the configuration) should be used.
+   */
+  def setNumberOfExecutionRetries(numRetries: Int): Unit = {
+    javaEnv.setNumberOfExecutionRetries(numRetries)
+  }
+
+  /**
+   * Gets the number of times the system will try to re-execute failed tasks. A value
+   * of "-1" indicates that the system default value (as defined in the configuration)
+   * should be used.
+   */
+  def getNumberOfExecutionRetries = javaEnv.getNumberOfExecutionRetries
+
+  // --------------------------------------------------------------------------------------------
+  // Registry for types and serializers
+  // --------------------------------------------------------------------------------------------
+  /**
+   * Adds a new Kryo default serializer to the Runtime.
+   * <p/>
+   * Note that the serializer instance must be serializable (as defined by
+   * java.io.Serializable), because it may be distributed to the worker nodes
+   * by java serialization.
+   *
+   * @param type
+   * The class of the types serialized with the given serializer.
+   * @param serializer
+   * The serializer to use.
+   */
+  def addDefaultKryoSerializer(`type`: Class[_], serializer: Serializer[_]) {
+    javaEnv.addDefaultKryoSerializer(`type`, serializer)
+  }
+
+  /**
+   * Adds a new Kryo default serializer to the Runtime.
+   *
+   * @param type
+   * The class of the types serialized with the given serializer.
+   * @param serializerClass
+   * The class of the serializer to use.
+   */
+  def addDefaultKryoSerializer(`type`: Class[_], serializerClass: Class[_ <: Serializer[_]]) {
+    javaEnv.addDefaultKryoSerializer(`type`, serializerClass)
+  }
 
   /**
    * Registers the given type with the serializer at the [[KryoSerializer]].
@@ -92,24 +237,6 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
     javaEnv.registerTypeWithKryoSerializer(clazz, serializer)
   }
 
-
-  /**
-   * Registers a default serializer for the given class and its sub-classes at Kryo.
-   */
-  def registerDefaultKryoSerializer(clazz: Class[_], serializer: Class[_ <: Serializer[_]]) {
-    javaEnv.addDefaultKryoSerializer(clazz, serializer)
-  }
-
-  /**
-   * Registers a default serializer for the given class and its sub-classes at Kryo.
-   *
-   * Note that the serializer instance must be serializable (as defined by java.io.Serializable),
-   * because it may be distributed to the worker nodes by java serialization.
-   */
-  def registerDefaultKryoSerializer(clazz: Class[_], serializer: Serializer[_]): Unit = {
-    javaEnv.addDefaultKryoSerializer(clazz, serializer)
-  }
-
   /**
    * Registers the given type with the serialization stack. If the type is eventually
    * serialized as a POJO, then the type is registered with the POJO serializer. If the
@@ -121,6 +248,68 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
     javaEnv.registerType(typeClass)
   }
 
+  // --------------------------------------------------------------------------------------------
+  // Data stream creations
+  // --------------------------------------------------------------------------------------------
+
+  /**
+   * Creates a new DataStream that contains a sequence of numbers. This source is a parallel source.
+   * If you manually set the parallelism to `1` the emitted elements are in order.
+   */
+  def generateSequence(from: Long, to: Long): DataStream[Long] = {
+    new DataStream[java.lang.Long](javaEnv.generateSequence(from, to))
+      .asInstanceOf[DataStream[Long]]
+  }
+
+  /**
+   * Creates a DataStream that contains the given elements. The elements must all be of the
+   * same type.
+   *
+   * Note that this operation will result in a non-parallel data source, i.e. a data source with
+   * a parallelism of one.
+   */
+  def fromElements[T: ClassTag: TypeInformation](data: T*): DataStream[T] = {
+    val typeInfo = implicitly[TypeInformation[T]]
+    fromCollection(data)(implicitly[ClassTag[T]], typeInfo)
+  }
+
+  /**
+   * Creates a DataStream from the given non-empty [[Seq]]. The elements need to be serializable
+   * because the framework may move the elements into the cluster if needed.
+   *
+   * Note that this operation will result in a non-parallel data source, i.e. a data source with
+   * a parallelism of one.
+   */
+  def fromCollection[T: ClassTag: TypeInformation](data: Seq[T]): DataStream[T] = {
+    require(data != null, "Data must not be null.")
+    val typeInfo = implicitly[TypeInformation[T]]
+
+    val sourceFunction = new FromElementsFunction[T](scala.collection.JavaConversions
+      .asJavaCollection(data))
+
+    javaEnv.addSource(sourceFunction).returns(typeInfo)
+  }
+
+  /**
+   * Creates a DataStream from the given [[Iterator]].
+   *
+   * Note that this operation will result in a non-parallel data source, i.e. a data source with
+   * a parallelism of one.
+   */
+  def fromCollection[T: ClassTag : TypeInformation] (data: Iterator[T]): DataStream[T] = {
+    val typeInfo = implicitly[TypeInformation[T]]
+    javaEnv.fromCollection(data.asJava, typeInfo)
+  }
+
+  /**
+   * Creates a DataStream from the given [[SplittableIterator]].
+   */
+  def fromParallelCollection[T: ClassTag : TypeInformation] (data: SplittableIterator[T]):
+  DataStream[T] = {
+    val typeInfo = implicitly[TypeInformation[T]]
+    javaEnv.fromParallelCollection(data, typeInfo)
+  }
+
   /**
    * Creates a DataStream that represents the Strings produced by reading the
    * given file line wise. The file will be read with the system's default
@@ -129,6 +318,52 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
    */
   def readTextFile(filePath: String): DataStream[String] =
     javaEnv.readTextFile(filePath)
+
+  /**
+   * Creates a data stream that represents the Strings produced by reading the given file
+   * line wise. The character set with the given name will be used to read the files.
+   */
+  def readTextFile(filePath: String, charsetName: String): DataStream[String] =
+    javaEnv.readTextFile(filePath, charsetName)
+
+  /**
+   * Creates a data stream that represents the strings produced by reading the given file
+   * line wise. This method is similar to the standard text file reader, but it produces
+   * a data stream with mutable StringValue objects, rather than Java Strings.
+   * StringValues can be used to tune implementations to be less object and garbage
+   * collection heavy. The file will be read with the system's default character set.
+   */
+  def readTextFileWithValue(filePath: String): DataStream[StringValue] =
+      javaEnv.readTextFileWithValue(filePath)
+
+  /**
+   * Creates a data stream that represents the strings produced by reading the given file
+   * line wise. This method is similar to the standard text file reader, but it produces
+   * a data stream with mutable StringValue objects, rather than Java Strings.
+   * StringValues can be used to tune implementations to be less object and garbage
+   * collection heavy. The boolean flag indicates whether to skip lines that cannot
+   * be read with the given character set.
+   */
+  def readTextFileWithValue(filePath: String, charsetName : String, skipInvalidLines : Boolean):
+    DataStream[StringValue] =
+    javaEnv.readTextFileWithValue(filePath, charsetName, skipInvalidLines)
+
+  /**
+   * Reads the given file with the given input format. The file path should be passed
+   * as a URI (e.g., "file:///some/local/file" or "hdfs://host:port/file/path").
+   */
+  def readFile[T: ClassTag : TypeInformation](inputFormat: FileInputFormat[T], filePath: String):
+    DataStream[T] =
+    javaEnv.readFile(inputFormat, filePath)
+
+  /**
+   * Creates a data stream that represents the primitive type produced by reading the given file
+   * line wise. The file path should be passed as a URI (e.g., "file:///some/local/file" or
+   * "hdfs://host:port/file/path").
+   */
+  def readFileOfPrimitives[T: ClassTag : TypeInformation](filePath: String,
+    delimiter: String = "\n", typeClass: Class[T]): DataStream[T] =
+    javaEnv.readFileOfPrimitives(filePath, delimiter, typeClass)
 
   /**
    * Creates a DataStream that contains the contents of file created while
@@ -145,59 +380,21 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
   /**
    * Creates a new DataStream that contains the strings received infinitely
    * from socket. Received strings are decoded by the system's default
-   * character set.
-   *
+   * character set. The maximum retry interval is specified in seconds, in case
+   * of temporary service outage reconnection is initiated every second.
    */
-  def socketTextStream(hostname: String, port: Int, delimiter: Char): DataStream[String] =
-    javaEnv.socketTextStream(hostname, port, delimiter)
-
-  /**
-   * Creates a new DataStream that contains the strings received infinitely
-   * from socket. Received strings are decoded by the system's default
-   * character set, uses '\n' as delimiter.
-   *
-   */
-  def socketTextStream(hostname: String, port: Int): DataStream[String] =
+  def socketTextStream(hostname: String, port: Int, delimiter: Char = '\n', maxRetry: Long = 0):
+    DataStream[String] =
     javaEnv.socketTextStream(hostname, port)
 
   /**
-   * Creates a new DataStream that contains a sequence of numbers.
-   *
+   * Generic method to create an input data stream with a specific input format.
+   * Since all data streams need specific information about their types, this method needs to
+   * determine the type of the data produced by the input format. It will attempt to determine the
+   * data type by reflection, unless the input format implements the ResultTypeQueryable interface.
    */
-  def generateSequence(from: Long, to: Long): DataStream[Long] = {
-    new DataStream[java.lang.Long](javaEnv.generateSequence(from, to)).
-      asInstanceOf[DataStream[Long]]
-  }
-
-  /**
-   * Creates a DataStream that contains the given elements. The elements must all be of the
-   * same type and must be serializable.
-   *
-   * * Note that this operation will result in a non-parallel data source, i.e. a data source with
-   * a degree of parallelism of one.
-   */
-  def fromElements[T: ClassTag: TypeInformation](data: T*): DataStream[T] = {
-    val typeInfo = implicitly[TypeInformation[T]]
-    fromCollection(data)(implicitly[ClassTag[T]], typeInfo)
-  }
-
-  /**
-   * Creates a DataStream from the given non-empty [[Seq]]. The elements need to be serializable
-   * because the framework may move the elements into the cluster if needed.
-   *
-   * Note that this operation will result in a non-parallel data source, i.e. a data source with
-   * a degree of parallelism of one.
-   */
-  def fromCollection[T: ClassTag: TypeInformation](
-    data: Seq[T]): DataStream[T] = {
-    Validate.notNull(data, "Data must not be null.")
-    val typeInfo = implicitly[TypeInformation[T]]
-
-    val sourceFunction = new FromElementsFunction[T](scala.collection.JavaConversions
-        .asJavaCollection(data))
-        
-    javaEnv.addSource(sourceFunction, typeInfo)
-  }
+  def createInput[T: ClassTag : TypeInformation](inputFormat: InputFormat[T, _]): DataStream[T] =
+    javaEnv.createInput(inputFormat)
 
   /**
    * Create a DataStream using a user defined source function for arbitrary
@@ -209,24 +406,25 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
    *
    */
   def addSource[T: ClassTag: TypeInformation](function: SourceFunction[T]): DataStream[T] = {
-    Validate.notNull(function, "Function must not be null.")
-    val cleanFun = StreamExecutionEnvironment.clean(function)
+    require(function != null, "Function must not be null.")
+    val cleanFun = scalaClean(function)
     val typeInfo = implicitly[TypeInformation[T]]
-    javaEnv.addSource(cleanFun, typeInfo)
+    javaEnv.addSource(cleanFun).returns(typeInfo)
   }
-  
-   /**
+
+  /**
    * Create a DataStream using a user defined source function for arbitrary
    * source functionality.
    *
    */
-  def addSource[T: ClassTag: TypeInformation](function: Collector[T] => Unit): DataStream[T] = {
-    Validate.notNull(function, "Function must not be null.")
+  def addSource[T: ClassTag: TypeInformation](function: SourceContext[T] => Unit): DataStream[T] = {
+    require(function != null, "Function must not be null.")
     val sourceFunction = new SourceFunction[T] {
-      val cleanFun = StreamExecutionEnvironment.clean(function)
-      override def invoke(out: Collector[T]) {
-        cleanFun(out)
+      val cleanFun = scalaClean(function)
+      override def run(ctx: SourceContext[T]) {
+        cleanFun(ctx)
       }
+      override def cancel() = {}
     }
     addSource(sourceFunction)
   }
@@ -259,16 +457,40 @@ class StreamExecutionEnvironment(javaEnv: JavaEnv) {
    * executed.
    *
    */
-  def getExecutionPlan() = javaEnv.getStreamGraph.getStreamingPlanAsJSON
+  def getExecutionPlan = javaEnv.getExecutionPlan
 
+  /**
+   * Getter of the {@link org.apache.flink.streaming.api.graph.StreamGraph} of the streaming job.
+   *
+   * @return The StreamGraph representing the transformations
+   */
+  def getStreamGraph = javaEnv.getStreamGraph
+
+  /**
+   * Returns a "closure-cleaned" version of the given function. Cleans only if closure cleaning
+   * is not disabled in the {@link org.apache.flink.api.common.ExecutionConfig}
+   */
+  private[flink] def scalaClean[F <: AnyRef](f: F): F = {
+    if (getConfig.isClosureCleanerEnabled) {
+      ClosureCleaner.clean(f, true)
+    } else {
+      ClosureCleaner.ensureSerializable(f)
+    }
+    f
+  }
 }
 
 object StreamExecutionEnvironment {
-  
-  private[flink] def clean[F <: AnyRef](f: F, checkSerializable: Boolean = true): F = {
-    ClosureCleaner.clean(f, checkSerializable)
-    f
-  }
+
+  /**
+   * Sets the default parallelism that will be used for the local execution
+   * environment created by {@link #createLocalEnvironment()}.
+   *
+   * @param parallelism
+   * The parallelism to use as the default local parallelism.
+   */
+  def setDefaultLocalParallelism(parallelism: Int) : Unit =
+    StreamExecutionEnvironment.setDefaultLocalParallelism(parallelism)
 
   /**
    * Creates an execution environment that represents the context in which the program is
@@ -286,16 +508,16 @@ object StreamExecutionEnvironment {
    * of parallelism of the local environment is the number of hardware contexts (CPU cores/threads).
    */
   def createLocalEnvironment(
-    degreeOfParallelism: Int =  Runtime.getRuntime.availableProcessors()):
+    parallelism: Int =  Runtime.getRuntime.availableProcessors()):
   StreamExecutionEnvironment = {
-    new StreamExecutionEnvironment(JavaEnv.createLocalEnvironment(degreeOfParallelism))
+    new StreamExecutionEnvironment(JavaEnv.createLocalEnvironment(parallelism))
   }
 
   /**
    * Creates a remote execution environment. The remote environment sends (parts of) the program to
    * a cluster for execution. Note that all file paths used in the program must be accessible from
-   * the cluster. The execution will use the cluster's default degree of parallelism, unless the
-   * parallelism is set explicitly via [[StreamExecutionEnvironment.setDegreeOfParallelism()]].
+   * the cluster. The execution will use the cluster's default parallelism, unless the
+   * parallelism is set explicitly via [[StreamExecutionEnvironment.setParallelism()]].
    *
    * @param host The host name or address of the master (JobManager),
    *             where the program should be executed.
@@ -314,12 +536,12 @@ object StreamExecutionEnvironment {
   /**
    * Creates a remote execution environment. The remote environment sends (parts of) the program
    * to a cluster for execution. Note that all file paths used in the program must be accessible
-   * from the cluster. The execution will use the specified degree of parallelism.
+   * from the cluster. The execution will use the specified parallelism.
    *
    * @param host The host name or address of the master (JobManager),
    *             where the program should be executed.
    * @param port The port of the master (JobManager), where the program should be executed.
-   * @param degreeOfParallelism The degree of parallelism to use during the execution.
+   * @param parallelism The parallelism to use during the execution.
    * @param jarFiles The JAR files with code that needs to be shipped to the cluster. If the
    *                 program uses
    *                 user-defined functions, user-defined input formats, or any libraries,
@@ -329,10 +551,10 @@ object StreamExecutionEnvironment {
   def createRemoteEnvironment(
     host: String,
     port: Int,
-    degreeOfParallelism: Int,
+    parallelism: Int,
     jarFiles: String*): StreamExecutionEnvironment = {
     val javaEnv = JavaEnv.createRemoteEnvironment(host, port, jarFiles: _*)
-    javaEnv.setDegreeOfParallelism(degreeOfParallelism)
+    javaEnv.setParallelism(parallelism)
     new StreamExecutionEnvironment(javaEnv)
   }
 }

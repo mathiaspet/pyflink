@@ -20,6 +20,7 @@ package org.apache.flink.test.compiler.examples;
 
 import java.util.Arrays;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.common.distributions.SimpleDistribution;
 import org.apache.flink.api.common.operators.Order;
@@ -31,14 +32,14 @@ import org.apache.flink.api.java.record.operators.FileDataSink;
 import org.apache.flink.api.java.record.operators.FileDataSource;
 import org.apache.flink.api.java.record.operators.MapOperator;
 import org.apache.flink.api.java.record.operators.ReduceOperator;
-import org.apache.flink.compiler.plan.Channel;
-import org.apache.flink.compiler.plan.OptimizedPlan;
-import org.apache.flink.compiler.plan.SingleInputPlanNode;
-import org.apache.flink.compiler.plan.SinkPlanNode;
+import org.apache.flink.optimizer.plan.Channel;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plan.SingleInputPlanNode;
+import org.apache.flink.optimizer.plan.SinkPlanNode;
 import org.apache.flink.runtime.operators.DriverStrategy;
 import org.apache.flink.runtime.operators.shipping.ShipStrategyType;
 import org.apache.flink.runtime.operators.util.LocalStrategy;
-import org.apache.flink.test.compiler.util.CompilerTestBase;
+import org.apache.flink.optimizer.util.CompilerTestBase;
 import org.apache.flink.test.recordJobs.wordcount.WordCount;
 import org.apache.flink.test.recordJobs.wordcount.WordCount.CountWords;
 import org.apache.flink.test.recordJobs.wordcount.WordCount.TokenizeLine;
@@ -62,8 +63,10 @@ public class WordCountCompilerTest extends CompilerTestBase {
 	private void checkWordCount(boolean estimates) {
 		try {
 			WordCount wc = new WordCount();
+			ExecutionConfig ec = new ExecutionConfig();
 			Plan p = wc.getPlan(DEFAULT_PARALLELISM_STRING, IN_FILE, OUT_FILE);
-			
+			p.setExecutionConfig(ec);
+
 			OptimizedPlan plan;
 			if (estimates) {
 				FileDataSource source = getContractResolver(p).getNode("Input Lines");
@@ -133,9 +136,11 @@ public class WordCountCompilerTest extends CompilerTestBase {
 			
 			Ordering ordering = new Ordering(0, StringValue.class, Order.DESCENDING);
 			out.setGlobalOrder(ordering, new SimpleDistribution(new StringValue[] {new StringValue("N")}));
-			
+
+			ExecutionConfig ec = new ExecutionConfig();
 			Plan p = new Plan(out, "WordCount Example");
 			p.setDefaultParallelism(DEFAULT_PARALLELISM);
+			p.setExecutionConfig(ec);
 	
 			OptimizedPlan plan;
 			if (estimates) {

@@ -26,6 +26,8 @@ import static org.apache.flink.runtime.testutils.CommonTestUtils.isProcessAlive;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.PoisonPill;
+import org.apache.flink.configuration.ConfigConstants;
+import org.apache.flink.runtime.StreamingMode;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.net.NetUtils;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
@@ -101,7 +103,7 @@ public class JobManagerProcessReapingTest {
 				try {
 					jobManagerRef = JobManager.getJobManagerRemoteReference(
 							new InetSocketAddress("localhost", jobManagerPort),
-							localSystem, new FiniteDuration(5, TimeUnit.SECONDS));
+							localSystem, new FiniteDuration(25, TimeUnit.SECONDS));
 					break;
 				}
 				catch (Throwable t) {
@@ -178,7 +180,11 @@ public class JobManagerProcessReapingTest {
 		public static void main(String[] args) {
 			try {
 				int port = Integer.parseInt(args[0]);
-				JobManager.runJobManager(new Configuration(), ExecutionMode.CLUSTER(), "localhost", port);
+
+				Configuration config = new Configuration();
+				config.setInteger(ConfigConstants.JOB_MANAGER_WEB_PORT_KEY, -1);
+
+				JobManager.runJobManager(config, JobManagerMode.CLUSTER, StreamingMode.BATCH_ONLY, "localhost", port);
 				System.exit(0);
 			}
 			catch (Throwable t) {

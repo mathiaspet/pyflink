@@ -55,7 +55,7 @@ under the License.
 
 		<dependency>
 			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-streaming-connectors</artifactId>
+			<artifactId>flink-connector-twitter</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 
@@ -98,6 +98,7 @@ under the License.
 						</goals>
 						<configuration>
 							<artifactItems>
+								<!-- For WordCount example data -->
 								<artifactItem>
 									<groupId>org.apache.flink</groupId>
 									<artifactId>flink-java-examples</artifactId>
@@ -106,6 +107,16 @@ under the License.
 									<overWrite>false</overWrite>
 									<outputDirectory>${project.build.directory}/classes</outputDirectory>
 									<includes>org/apache/flink/examples/java/wordcount/util/WordCountData.class</includes>
+								</artifactItem>
+								<!-- For JSON utilities -->
+								<artifactItem>
+									<groupId>org.apache.flink</groupId>
+									<artifactId>flink-connector-twitter</artifactId>
+									<version>${project.version}</version>
+									<type>jar</type>
+									<overWrite>false</overWrite>
+									<outputDirectory>${project.build.directory}/classes</outputDirectory>
+									<includes>org/apache/flink/streaming/connectors/json/*</includes>
 								</artifactItem>
 							</artifactItems>
 						</configuration>
@@ -117,9 +128,17 @@ under the License.
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
-				
+				<version>2.4</version><!--$NO-MVN-MAN-VER$-->
 				<executions>
-
+					<!-- Default Execution -->
+					<execution>
+						<id>default</id>
+						<phase>package</phase>
+						<goals>
+							<goal>test-jar</goal>
+						</goals>
+					</execution>
+					
 					<!-- Iteration -->
 					<execution>
 						<id>Iteration</id>
@@ -182,7 +201,8 @@ under the License.
 
 							<includes>
 								<include>org/apache/flink/streaming/examples/twitter/*.class</include>
-								<include>org/apache/flink/streaming/examples/twitter/util/*.class</include>						
+								<include>org/apache/flink/streaming/examples/twitter/util/*.class</include>
+								<include>org/apache/flink/streaming/connectors/json/*.class</include>
 							</includes>
 						</configuration>
 					</execution>
@@ -257,6 +277,31 @@ under the License.
 						</configuration>
 					</execution>
 
+					<!-- WindowWordCount -->
+					<execution>
+						<id>WindowWordCount</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>WindowWordCount</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.streaming.examples.windowing.WindowWordCount</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>org/apache/flink/streaming/examples/windowing/WindowWordCount.class</include>
+								<include>org/apache/flink/streaming/examples/wordcount/WordCount.class</include>
+								<include>org/apache/flink/streaming/examples/wordcount/WordCount$*.class</include>
+								<include>org/apache/flink/examples/java/wordcount/util/WordCountData.class</include>
+							</includes>
+						</configuration>
+					</execution>
+
 					<!-- SocketTextStreamWordCount -->
 					<execution>
 						<id>SocketTextStreamWordCount</id>
@@ -275,30 +320,8 @@ under the License.
 
 							<includes>
 								<include>org/apache/flink/streaming/examples/socket/SocketTextStreamWordCount.class</include>
-								<include>org/apache/flink/streaming/examples/wordcount/WordCount$Tokenizer.class</include>
-							</includes>
-						</configuration>
-					</execution>
-
-					<!-- StockPrices -->
-					<execution>
-						<id>StockPrices</id>
-						<phase>package</phase>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-						<configuration>
-							<classifier>StockPrices</classifier>
-
-							<archive>
-								<manifestEntries>
-									<program-class>org.apache.flink.streaming.examples.windowing.StockPrices</program-class>
-								</manifestEntries>
-							</archive>
-
-							<includes>
-								<include>org/apache/flink/streaming/examples/windowing/StockPrices.class</include>
-								<include>org/apache/flink/streaming/examples/windowing/StockPrices$*.class</include>
+								<include>org/apache/flink/streaming/examples/wordcount/WordCount.class</include>
+								<include>org/apache/flink/streaming/examples/wordcount/WordCount$*.class</include>
 							</includes>
 						</configuration>
 					</execution>
@@ -322,6 +345,29 @@ under the License.
 							<includes>
 								<include>org/apache/flink/streaming/examples/windowing/TopSpeedWindowing.class</include>
 								<include>org/apache/flink/streaming/examples/windowing/TopSpeedWindowing$*.class</include>
+							</includes>
+						</configuration>
+					</execution>
+
+					<!-- SessionWindowing -->
+					<execution>
+						<id>SessionWindowing</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>SessionWindowing</classifier>
+
+							<archive>
+								<manifestEntries>
+									<program-class>org.apache.flink.streaming.examples.windowing.SessionWindowing</program-class>
+								</manifestEntries>
+							</archive>
+
+							<includes>
+								<include>org/apache/flink/streaming/examples/windowing/SessionWindowing.class</include>
+								<include>org/apache/flink/streaming/examples/windowing/SessionWindowing$*.class</include>
 							</includes>
 						</configuration>
 					</execution>
@@ -361,13 +407,6 @@ under the License.
 						<jvmArg>-Xms128m</jvmArg>
 						<jvmArg>-Xmx512m</jvmArg>
 					</jvmArgs>
-					<compilerPlugins>
-					   <compilerPlugin>
-						   <groupId>org.scalamacros</groupId>
-						   <artifactId>paradise_${scala.version}</artifactId>
-						   <version>${scala.macros.version}</version>
-					   </compilerPlugin>
-				   </compilerPlugins>
 				</configuration>
 			</plugin>
 			
@@ -457,18 +496,6 @@ under the License.
 					<outputFile>${project.basedir}/scalastyle-output.xml</outputFile>
 					<outputEncoding>UTF-8</outputEncoding>
 				</configuration>
-			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<executions>
-					<execution>
-						<goals>
-							<goal>test-jar</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 		</plugins>
 		

@@ -18,17 +18,19 @@
 
 package org.apache.flink.api.java.operators;
 
-import org.apache.flink.api.common.functions.FlatCombineFunction;
+import org.apache.flink.api.common.functions.GroupCombineFunction;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Operator;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.operators.Ordering;
+import org.apache.flink.api.common.operators.SingleInputSemanticProperties;
 import org.apache.flink.api.common.operators.UnaryOperatorInformation;
 import org.apache.flink.api.common.operators.base.GroupReduceOperatorBase;
 import org.apache.flink.api.common.operators.base.MapOperatorBase;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.functions.RichGroupReduceFunction;
+import org.apache.flink.api.java.functions.SemanticPropUtil;
 import org.apache.flink.api.java.operators.translation.KeyExtractingMapper;
 import org.apache.flink.api.java.operators.translation.PlanUnwrappingReduceGroupOperator;
 import org.apache.flink.api.java.operators.translation.PlanUnwrappingSortedReduceGroupOperator;
@@ -85,10 +87,12 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 		this.defaultName = defaultName;
 
 		checkCombinability();
+
+		UdfOperatorUtils.analyzeSingleInputUdf(this, GroupReduceFunction.class, defaultName, function, grouper.keys);
 	}
 
 	private void checkCombinability() {
-		if (function instanceof FlatCombineFunction &&
+		if (function instanceof GroupCombineFunction &&
 				function.getClass().getAnnotation(RichGroupReduceFunction.Combinable.class) != null) {
 			this.combinable = true;
 		}
@@ -111,7 +115,7 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 	
 	public GroupReduceOperator<IN, OUT> setCombinable(boolean combinable) {
 		// sanity check that the function is a subclass of the combine interface
-		if (combinable && !(function instanceof FlatCombineFunction)) {
+		if (combinable && !(function instanceof GroupCombineFunction)) {
 			throw new IllegalArgumentException("The function does not implement the combine interface.");
 		}
 		
@@ -119,7 +123,27 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 		
 		return this;
 	}
-	
+
+	@Override
+	public SingleInputSemanticProperties getSemanticProperties() {
+
+		SingleInputSemanticProperties props = super.getSemanticProperties();
+
+		// offset semantic information by extracted key fields
+		if(props != null &&
+				this.grouper != null &&
+				this.grouper.keys instanceof Keys.SelectorFunctionKeys) {
+
+			int offset = ((Keys.SelectorFunctionKeys<?,?>) this.grouper.keys).getKeyType().getTotalFields();
+			if(this.grouper instanceof SortedGrouping) {
+				offset += ((SortedGrouping<?>) this.grouper).getSortSelectionFunctionKey().getKeyType().getTotalFields();
+			}
+			props = SemanticPropUtil.addSourceFieldOffset(props, this.getInputType().getTotalFields(), offset);
+		}
+
+		return props;
+	}
+
 	// --------------------------------------------------------------------------------------------
 	//  Translation
 	// --------------------------------------------------------------------------------------------
@@ -138,8 +162,8 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 			
 			po.setCombinable(combinable);
 			po.setInput(input);
-			// the degree of parallelism for a non grouped reduce can only be 1
-			po.setDegreeOfParallelism(1);
+			// the parallelism for a non grouped reduce can only be 1
+			po.setParallelism(1);
 			return po;
 		}
 	
@@ -165,14 +189,14 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 				}
 				po.setGroupOrder(o);
 
-				po.setDegreeOfParallelism(this.getParallelism());
+				po.setParallelism(this.getParallelism());
 				po.setCustomPartitioner(grouper.getCustomPartitioner());
 				return po;
 			} else {
 				PlanUnwrappingReduceGroupOperator<IN, OUT, ?> po = translateSelectorFunctionReducer(
 							selectorKeys, function, getInputType(), getResultType(), name, input, isCombinable());
 
-				po.setDegreeOfParallelism(this.getParallelism());
+				po.setParallelism(this.getParallelism());
 				po.setCustomPartitioner(grouper.getCustomPartitioner());
 				return po;
 			}
@@ -186,7 +210,7 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 
 			po.setCombinable(combinable);
 			po.setInput(input);
-			po.setDegreeOfParallelism(getParallelism());
+			po.setParallelism(getParallelism());
 			po.setCustomPartitioner(grouper.getCustomPartitioner());
 			
 			// set group order
@@ -233,7 +257,7 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 		mapper.setInput(input);
 		
 		// set the mapper's parallelism to the input parallelism to make sure it is chained
-		mapper.setDegreeOfParallelism(input.getDegreeOfParallelism());
+		mapper.setParallelism(input.getParallelism());
 		
 		return reducer;
 	}
@@ -261,7 +285,7 @@ public class GroupReduceOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT
 		mapper.setInput(input);
 
 		// set the mapper's parallelism to the input parallelism to make sure it is chained
-		mapper.setDegreeOfParallelism(input.getDegreeOfParallelism());
+		mapper.setParallelism(input.getParallelism());
 
 		return reducer;
 	}

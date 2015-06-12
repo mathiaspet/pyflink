@@ -17,17 +17,21 @@
 
 package org.apache.flink.streaming.api.datastream;
 
+import org.apache.flink.api.common.functions.FoldFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.functions.RichReduceFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.streaming.api.function.aggregation.AggregationFunction;
-import org.apache.flink.streaming.api.invokable.operator.GroupedReduceInvokable;
-import org.apache.flink.streaming.partitioner.StreamPartitioner;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.streaming.api.functions.aggregation.AggregationFunction;
+import org.apache.flink.streaming.api.operators.StreamGroupedFold;
+import org.apache.flink.streaming.api.operators.StreamGroupedReduce;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 
 /**
  * A GroupedDataStream represents a {@link DataStream} which has been
  * partitioned by the given {@link KeySelector}. Operators like {@link #reduce},
- * {@link #batchReduce} etc. can be applied on the {@link GroupedDataStream} to
+ * {@link #fold} etc. can be applied on the {@link GroupedDataStream} to
  * get additional functionality by the grouping.
  * 
  * @param <OUT>
@@ -37,8 +41,15 @@ public class GroupedDataStream<OUT> extends DataStream<OUT> {
 
 	KeySelector<OUT, ?> keySelector;
 
-	protected GroupedDataStream(DataStream<OUT> dataStream, KeySelector<OUT, ?> keySelector) {
-		super(dataStream.partitionBy(keySelector));
+	/**
+	 * Creates a new {@link GroupedDataStream}, group inclusion is determined using
+	 * a {@link KeySelector} on the elements of the {@link DataStream}.
+	 *
+	 * @param dataStream Base stream of data
+	 * @param keySelector Function for determining group inclusion
+	 */
+	public GroupedDataStream(DataStream<OUT> dataStream, KeySelector<OUT, ?> keySelector) {
+		super(dataStream.partitionByHash(keySelector));
 		this.keySelector = keySelector;
 	}
 
@@ -55,9 +66,7 @@ public class GroupedDataStream<OUT> extends DataStream<OUT> {
 	 * Applies a reduce transformation on the grouped data stream grouped on by
 	 * the given key position. The {@link ReduceFunction} will receive input
 	 * values based on the key value. Only input values with the same key will
-	 * go to the same reducer.The user can also extend
-	 * {@link RichReduceFunction} to gain access to other features provided by
-	 * the {@link RichFuntion} interface.
+	 * go to the same reducer.
 	 * 
 	 * @param reducer
 	 *            The {@link ReduceFunction} that will be called for every
@@ -66,8 +75,32 @@ public class GroupedDataStream<OUT> extends DataStream<OUT> {
 	 */
 	@Override
 	public SingleOutputStreamOperator<OUT, ?> reduce(ReduceFunction<OUT> reducer) {
-		return transform("Grouped Reduce", getType(), new GroupedReduceInvokable<OUT>(clean(reducer),
-				keySelector));
+		return transform("Grouped Reduce", getType(), new StreamGroupedReduce<OUT>(
+				clean(reducer), keySelector));
+	}
+
+	/**
+	 * Applies a fold transformation on the grouped data stream grouped on by
+	 * the given key position. The {@link FoldFunction} will receive input
+	 * values based on the key value. Only input values with the same key will
+	 * go to the same folder.
+	 * 
+	 * @param folder
+	 *            The {@link FoldFunction} that will be called for every element
+	 *            of the input values with the same key.
+	 * @param initialValue
+	 *            The initialValue passed to the folders for each key.
+	 * @return The transformed DataStream.
+	 */
+
+	@Override
+	public <R> SingleOutputStreamOperator<R, ?> fold(R initialValue, FoldFunction<OUT, R> folder) {
+
+		TypeInformation<R> outType = TypeExtractor.getFoldReturnTypes(clean(folder), getType(),
+				Utils.getCallLocationName(), false);
+
+		return transform("Grouped Fold", outType, new StreamGroupedFold<OUT, R>(clean(folder),
+				keySelector, initialValue, outType));
 	}
 
 	/**
@@ -183,18 +216,16 @@ public class GroupedDataStream<OUT> extends DataStream<OUT> {
 	@Override
 	protected SingleOutputStreamOperator<OUT, ?> aggregate(AggregationFunction<OUT> aggregate) {
 
-		GroupedReduceInvokable<OUT> invokable = new GroupedReduceInvokable<OUT>(clean(aggregate),
-				keySelector);
+		StreamGroupedReduce<OUT> operator = new StreamGroupedReduce<OUT>(clean(aggregate), keySelector);
 
-		SingleOutputStreamOperator<OUT, ?> returnStream = transform("Grouped Aggregation", getType(),
-				invokable);
+		SingleOutputStreamOperator<OUT, ?> returnStream = transform("Grouped Aggregation",
+				getType(), operator);
 
 		return returnStream;
 	}
 
 	@Override
 	protected DataStream<OUT> setConnectionType(StreamPartitioner<OUT> partitioner) {
-		System.out.println("Setting the partitioning after groupBy can affect the grouping");
 		return super.setConnectionType(partitioner);
 	}
 

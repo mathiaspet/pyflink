@@ -29,6 +29,7 @@ import org.apache.flink.api.common.operators.base.ReduceOperatorBase;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.common.functions.RichReduceFunction;
+import org.apache.flink.api.java.io.DiscardingOutputFormat;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
@@ -45,8 +46,8 @@ public class ReduceTranslationTests implements java.io.Serializable {
 	@Test
 	public void translateNonGroupedReduce() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 			
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 			
@@ -54,7 +55,7 @@ public class ReduceTranslationTests implements java.io.Serializable {
 				public Tuple3<Double, StringValue, LongValue> reduce(Tuple3<Double, StringValue, LongValue> value1, Tuple3<Double, StringValue, LongValue> value2) {
 					return value1;
 				}
-			}).print();
+			}).output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 			
 			Plan p = env.createProgramPlan();
 			
@@ -69,8 +70,8 @@ public class ReduceTranslationTests implements java.io.Serializable {
 			// check keys
 			assertTrue(reducer.getKeyColumns(0) == null || reducer.getKeyColumns(0).length == 0);
 			
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == 1 || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == 1 || reducer.getParallelism() == -1);
 			
 			assertTrue(reducer.getInput() instanceof GenericDataSourceBase<?, ?>);
 		}
@@ -84,8 +85,8 @@ public class ReduceTranslationTests implements java.io.Serializable {
 	@Test
 	public void translateGroupedReduceNoMapper() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 			
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 			
@@ -96,7 +97,7 @@ public class ReduceTranslationTests implements java.io.Serializable {
 						return value1;
 					}
 				})
-				.print();
+				.output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 			
 			Plan p = env.createProgramPlan();
 			
@@ -108,8 +109,8 @@ public class ReduceTranslationTests implements java.io.Serializable {
 			assertEquals(initialData.getType(), reducer.getOperatorInfo().getInputType());
 			assertEquals(initialData.getType(), reducer.getOperatorInfo().getOutputType());
 			
-			// DOP was not configured on the operator
-			assertTrue(reducer.getDegreeOfParallelism() == DOP || reducer.getDegreeOfParallelism() == -1);
+			// parallelism was not configured on the operator
+			assertTrue(reducer.getParallelism() == parallelism || reducer.getParallelism() == -1);
 			
 			// check keys
 			assertArrayEquals(new int[] {2}, reducer.getKeyColumns(0));
@@ -127,8 +128,8 @@ public class ReduceTranslationTests implements java.io.Serializable {
 	@Test
 	public void translateGroupedReduceWithkeyExtractor() {
 		try {
-			final int DOP = 8;
-			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(DOP);
+			final int parallelism = 8;
+			ExecutionEnvironment env = ExecutionEnvironment.createLocalEnvironment(parallelism);
 			
 			DataSet<Tuple3<Double, StringValue, LongValue>> initialData = getSourceDataSet(env);
 			
@@ -143,7 +144,7 @@ public class ReduceTranslationTests implements java.io.Serializable {
 						return value1;
 					}
 				}).setParallelism(4)
-				.print();
+				.output(new DiscardingOutputFormat<Tuple3<Double, StringValue, LongValue>>());
 			
 			Plan p = env.createProgramPlan();
 			
@@ -154,10 +155,10 @@ public class ReduceTranslationTests implements java.io.Serializable {
 			PlanUnwrappingReduceOperator<?, ?> reducer = (PlanUnwrappingReduceOperator<?, ?>) keyProjector.getInput();
 			MapOperatorBase<?, ?, ?> keyExtractor = (MapOperatorBase<?, ?, ?>) reducer.getInput();
 			
-			// check the DOPs
-			assertEquals(1, keyExtractor.getDegreeOfParallelism());
-			assertEquals(4, reducer.getDegreeOfParallelism());
-			assertEquals(4, keyProjector.getDegreeOfParallelism());
+			// check the parallelisms
+			assertEquals(1, keyExtractor.getParallelism());
+			assertEquals(4, reducer.getParallelism());
+			assertEquals(4, keyProjector.getParallelism());
 			
 			// check types
 			TypeInformation<?> keyValueInfo = new TupleTypeInfo<Tuple2<StringValue, Tuple3<Double,StringValue,LongValue>>>(

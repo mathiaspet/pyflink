@@ -18,13 +18,6 @@
 
 package org.apache.flink.runtime.executiongraph;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.flink.api.common.io.StrictlyLocalAssignment;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.core.io.InputSplitAssigner;
@@ -36,16 +29,22 @@ import org.apache.flink.runtime.jobgraph.AbstractJobVertex;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSet;
 import org.apache.flink.runtime.jobgraph.IntermediateDataSetID;
 import org.apache.flink.runtime.jobgraph.JobEdge;
-import org.apache.flink.runtime.jobgraph.JobID;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.jobmanager.scheduler.CoLocationGroup;
-import org.apache.flink.runtime.jobmanager.scheduler.Scheduler;
 import org.apache.flink.runtime.jobmanager.scheduler.NoResourceAvailableException;
+import org.apache.flink.runtime.jobmanager.scheduler.Scheduler;
 import org.apache.flink.runtime.jobmanager.scheduler.SlotSharingGroup;
+import org.apache.flink.runtime.util.SerializableObject;
 import org.slf4j.Logger;
-
 import scala.concurrent.duration.FiniteDuration;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class ExecutionJobVertex implements Serializable {
 	
@@ -54,7 +53,7 @@ public class ExecutionJobVertex implements Serializable {
 	/** Use the same log for all ExecutionGraph classes */
 	private static final Logger LOG = ExecutionGraph.LOG;
 	
-	private final Object stateMonitor = new Object();
+	private final SerializableObject stateMonitor = new SerializableObject();
 	
 	private final ExecutionGraph graph;
 	
@@ -81,7 +80,6 @@ public class ExecutionJobVertex implements Serializable {
 	private List<LocatableInputSplit>[] inputSplitsPerSubtask;
 	
 	private InputSplitAssigner splitAssigner;
-	
 	
 	public ExecutionJobVertex(ExecutionGraph graph, AbstractJobVertex jobVertex,
 							int defaultParallelism, FiniteDuration timeout) throws JobException {
@@ -118,11 +116,14 @@ public class ExecutionJobVertex implements Serializable {
 		
 		// create the intermediate results
 		this.producedDataSets = new IntermediateResult[jobVertex.getNumberOfProducedIntermediateDataSets()];
+
 		for (int i = 0; i < jobVertex.getProducedDataSets().size(); i++) {
-			IntermediateDataSet set = jobVertex.getProducedDataSets().get(i);
-			this.producedDataSets[i] = new IntermediateResult(set.getId(), this, numTaskVertices);
+			final IntermediateDataSet result = jobVertex.getProducedDataSets().get(i);
+
+			this.producedDataSets[i] = new IntermediateResult(
+					result.getId(), this, numTaskVertices, result.getResultType());
 		}
-		
+
 		// create all task vertices
 		for (int i = 0; i < numTaskVertices; i++) {
 			ExecutionVertex vertex = new ExecutionVertex(this, i, this.producedDataSets, timeout, createTimestamp);
@@ -374,6 +375,11 @@ public class ExecutionJobVertex implements Serializable {
 			catch (Throwable t) {
 				throw new RuntimeException("Re-creating the input split assigner failed: " + t.getMessage(), t);
 			}
+
+			// Reset intermediate results
+			for (IntermediateResult result : producedDataSets) {
+				result.resetForNewExecution();
+			}
 		}
 	}
 	
@@ -468,7 +474,7 @@ public class ExecutionJobVertex implements Serializable {
 		for (InputSplit split : splits) {
 			// check that split has exactly one local host
 			if(!(split instanceof LocatableInputSplit)) {
-				new JobException("Invalid InputSplit type " + split.getClass().getCanonicalName() + ". " +
+				throw new JobException("Invalid InputSplit type " + split.getClass().getCanonicalName() + ". " +
 						"Strictly local assignment requires LocatableInputSplit");
 			}
 			LocatableInputSplit lis = (LocatableInputSplit) split;

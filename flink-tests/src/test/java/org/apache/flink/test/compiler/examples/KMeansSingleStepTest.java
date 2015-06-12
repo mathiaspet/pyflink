@@ -22,17 +22,18 @@ import static org.junit.Assert.*;
 
 import java.util.Arrays;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.common.operators.util.FieldList;
 import org.apache.flink.api.java.record.operators.FileDataSource;
-import org.apache.flink.compiler.plan.OptimizedPlan;
-import org.apache.flink.compiler.plan.SingleInputPlanNode;
-import org.apache.flink.compiler.plan.SinkPlanNode;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plan.SingleInputPlanNode;
+import org.apache.flink.optimizer.plan.SinkPlanNode;
 import org.apache.flink.runtime.operators.DriverStrategy;
 import org.apache.flink.runtime.operators.shipping.ShipStrategyType;
 import org.apache.flink.runtime.operators.util.LocalStrategy;
-import org.apache.flink.test.compiler.util.CompilerTestBase;
-import org.apache.flink.test.compiler.util.OperatorResolver;
+import org.apache.flink.optimizer.util.CompilerTestBase;
+import org.apache.flink.optimizer.util.OperatorResolver;
 import org.apache.flink.test.recordJobs.kmeans.KMeansSingleStep;
 import org.junit.Assert;
 import org.junit.Test;
@@ -56,7 +57,7 @@ public class KMeansSingleStepTest extends CompilerTestBase {
 		
 		KMeansSingleStep kmi = new KMeansSingleStep();
 		Plan p = kmi.getPlan(String.valueOf(DEFAULT_PARALLELISM), IN_FILE, IN_FILE, OUT_FILE, String.valueOf(20));
-		
+		p.setExecutionConfig(new ExecutionConfig());
 		// set the statistics
 		OperatorResolver cr = getContractResolver(p);
 		FileDataSource pointsSource = cr.getNode(DATAPOINTS);
@@ -73,7 +74,7 @@ public class KMeansSingleStepTest extends CompilerTestBase {
 		
 		KMeansSingleStep kmi = new KMeansSingleStep();
 		Plan p = kmi.getPlan(String.valueOf(DEFAULT_PARALLELISM), IN_FILE, IN_FILE, OUT_FILE, String.valueOf(20));
-		
+		p.setExecutionConfig(new ExecutionConfig());
 		OptimizedPlan plan = compileNoStats(p);
 		checkPlan(plan);
 	}

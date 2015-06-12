@@ -17,6 +17,18 @@
 # limitations under the License.
 ################################################################################
 
+constructFlinkClassPath() {
+
+    for jarfile in "$FLINK_LIB_DIR"/*.jar ; do
+        if [[ $FLINK_CLASSPATH = "" ]]; then
+            FLINK_CLASSPATH=$jarfile;
+        else
+            FLINK_CLASSPATH=$FLINK_CLASSPATH:$jarfile
+        fi
+    done
+
+    echo $FLINK_CLASSPATH
+}
 
 # These are used to mangle paths that are passed to java when using 
 # cygwin. Cygwin paths are like linux paths, i.e. /path/to/somewhere
@@ -25,7 +37,7 @@
 manglePath() {
     UNAME=$(uname -s)
     if [ "${UNAME:0:6}" == "CYGWIN" ]; then
-        echo `cygpath -w $1`
+        echo `cygpath -w "$1"`
     else
         echo $1
     fi
@@ -35,7 +47,7 @@ manglePathList() {
     UNAME=$(uname -s)
     # a path list, for example a java classpath
     if [ "${UNAME:0:6}" == "CYGWIN" ]; then
-        echo `cygpath -wp $1`
+        echo `cygpath -wp "$1"`
     else
         echo $1
     fi
@@ -189,9 +201,6 @@ fi
 # KEY_JOBM_HEAP_MB and KEY_TASKM_HEAP_MB for that!
 JVM_ARGS=""
 
-# Default classpath 
-CLASSPATH=`manglePathList $( echo $FLINK_LIB_DIR/*.jar . | sed 's/ /:/g' )`
-
 # Check if deprecated HADOOP_HOME is set.
 if [ -n "$HADOOP_HOME" ]; then
     # HADOOP_HOME is set. Check if its a Hadoop 1.x or 2.x HADOOP_HOME path
@@ -210,12 +219,9 @@ INTERNAL_HADOOP_CLASSPATHS="$HADOOP_CLASSPATH:$HADOOP_CONF_DIR:$YARN_CONF_DIR"
 # Auxilliary function which extracts the name of host from a line which
 # also potentialy includes topology information and the taskManager type
 extractHostName() {
-    # extract first part of string (before any whitespace characters)
-    SLAVE=$1
-    # Remove types and possible comments
-    if [[ "$SLAVE" =~ ^([0-9a-zA-Z/.-]+).*$ ]]; then
-            SLAVE=${BASH_REMATCH[1]}
-    fi
+    # handle comments: extract first part of string (before first # character)
+    SLAVE=`echo $1 | cut -d'#' -f 1`
+
     # Extract the hostname from the network hierarchy
     if [[ "$SLAVE" =~ ^.*/([0-9a-zA-Z.-]+)$ ]]; then
             SLAVE=${BASH_REMATCH[1]}

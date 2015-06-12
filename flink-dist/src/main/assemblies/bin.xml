@@ -28,7 +28,7 @@ under the License.
 	<includeBaseDirectory>true</includeBaseDirectory>
 	<baseDirectory>flink-${project.version}</baseDirectory>
 
-	<!-- copy all jar files and their dependencies -->
+	<!-- Include flink-python.jar in lib/ -->
 	<dependencySets>
 		<dependencySet>
 			<outputDirectory>lib</outputDirectory>
@@ -37,20 +37,21 @@ under the License.
 			<useProjectArtifact>false</useProjectArtifact>
 			<useProjectAttachments>false</useProjectAttachments>
 			<useTransitiveFiltering>true</useTransitiveFiltering>
-			
-			<excludes>
-				<exclude>org.apache.flink:flink-java-examples</exclude>
-				<exclude>org.apache.flink:flink-scala-examples</exclude>
-				<exclude>org.apache.flink:flink-streaming-examples</exclude>
-				<!--
-				<exclude>**/*javadoc*</exclude>
-				<exclude>**/*sources*</exclude>
-				-->
-			</excludes>
+
+			<includes>
+				<include>org.apache.flink:flink-python</include>
+			</includes>
 		</dependencySet>
 	</dependencySets>
 
 	<files>
+		<!-- copy fat jar -->
+		<file>
+			<source>target/flink-dist-${project.version}.jar</source>
+			<outputDirectory>lib/</outputDirectory>
+			<fileMode>0644</fileMode>
+		</file>
+
 		<file>
 			<source>src/main/resources/flink-conf.yaml</source>
 			<outputDirectory>conf</outputDirectory>
@@ -65,15 +66,23 @@ under the License.
 			<outputDirectory>bin</outputDirectory>
 			<fileMode>0755</fileMode>
 		</fileSet>
-
+		<!-- flink scala shell-->
+		<fileSet>
+			<directory>../flink-staging/flink-scala-shell/start-script/</directory>
+			<outputDirectory>bin</outputDirectory>
+			<fileMode>755</fileMode>
+		</fileSet>
+		<fileSet>
+			<!-- copy yarn start scripts -->
+			<directory>src/main/flink-bin/yarn-bin</directory>
+			<outputDirectory>bin</outputDirectory>
+			<fileMode>0755</fileMode>
+		</fileSet>
 		<fileSet>
 			<!-- copy default configuration -->
 			<directory>src/main/flink-bin/conf</directory>
 			<outputDirectory>conf</outputDirectory>
 			<fileMode>0644</fileMode>
-			<excludes>
-				<exclude>log4j-yarn-session.properties</exclude>
-			</excludes>
 		</fileSet>
 
 		<fileSet>
@@ -127,6 +136,7 @@ under the License.
 			</excludes>
 		</fileSet>
 
+
 		<fileSet>
 			<!-- copy jar files of java examples -->
 			<directory>../flink-examples/flink-java-examples/target</directory>
@@ -139,6 +149,7 @@ under the License.
 				<exclude>flink-java-examples-${project.version}.jar</exclude>
 				<exclude>original-flink-java-examples-${project.version}.jar</exclude>
 				<exclude>flink-java-examples-${project.version}-sources.jar</exclude>
+				<exclude>flink-java-examples-${project.version}-tests.jar</exclude>
 			</excludes>
 		</fileSet>
 		<fileSet>

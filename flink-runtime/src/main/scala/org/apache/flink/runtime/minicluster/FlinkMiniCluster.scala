@@ -24,11 +24,16 @@ import akka.pattern.Patterns.gracefulStop
 import akka.pattern.ask
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
+import org.apache.flink.api.common.JobSubmissionResult
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
+import org.apache.flink.runtime.StreamingMode
 import org.apache.flink.runtime.akka.AkkaUtils
+import org.apache.flink.runtime.client.{JobExecutionException, JobClient, SerializedJobExecutionResult}
+import org.apache.flink.runtime.jobgraph.JobGraph
 import org.apache.flink.runtime.messages.TaskManagerMessages.NotifyWhenRegisteredAtJobManager
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Await}
 
 /**
@@ -40,10 +45,16 @@ import scala.concurrent.{Future, Await}
  * @param userConfiguration Configuration object with the user provided configuration values
  * @param singleActorSystem true if all actors (JobManager and TaskManager) shall be run in the same
  *                          [[ActorSystem]], otherwise false
+ * @param streamingMode True, if the system should be started in streaming mode, false if
+ *                      in pure batch mode.
  */
 abstract class FlinkMiniCluster(val userConfiguration: Configuration,
-                                val singleActorSystem: Boolean) {
+                                val singleActorSystem: Boolean,
+                                val streamingMode: StreamingMode) {
 
+  def this(userConfiguration: Configuration, singleActorSystem: Boolean) 
+         = this(userConfiguration, singleActorSystem, StreamingMode.BATCH_ONLY)
+  
   protected val LOG = LoggerFactory.getLogger(classOf[FlinkMiniCluster])
 
   // --------------------------------------------------------------------------
@@ -52,7 +63,7 @@ abstract class FlinkMiniCluster(val userConfiguration: Configuration,
 
   // NOTE: THIS MUST BE getByName("localhost"), which is 127.0.0.1 and
   // not getLocalHost(), which may be 127.0.1.1
-  val HOSTNAME = InetAddress.getByName("localhost").getHostAddress()
+  val hostname = InetAddress.getByName("localhost").getHostAddress()
 
   val timeout = AkkaUtils.getTimeout(userConfiguration)
 
@@ -96,7 +107,7 @@ abstract class FlinkMiniCluster(val userConfiguration: Configuration,
       val port = configuration.getInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY,
         ConfigConstants.DEFAULT_JOB_MANAGER_IPC_PORT)
 
-      AkkaUtils.getAkkaConfig(configuration, Some((HOSTNAME, port)))
+      AkkaUtils.getAkkaConfig(configuration, Some((hostname, port)))
     }
   }
 
@@ -111,7 +122,7 @@ abstract class FlinkMiniCluster(val userConfiguration: Configuration,
 
     val resolvedPort = if(port != 0) port + index else port
 
-    AkkaUtils.getAkkaConfig(configuration, Some((HOSTNAME, resolvedPort)))
+    AkkaUtils.getAkkaConfig(configuration, Some((hostname, resolvedPort)))
   }
 
   def startTaskManagerActorSystem(index: Int): ActorSystem = {
@@ -162,10 +173,8 @@ abstract class FlinkMiniCluster(val userConfiguration: Configuration,
   def awaitTermination(): Unit = {
     jobManagerActorSystem.awaitTermination()
 
-    if(!singleActorSystem) {
-      taskManagerActorSystems foreach {
-        _.awaitTermination()
-      }
+    taskManagerActorSystems foreach {
+      _.awaitTermination()
     }
   }
 
@@ -177,5 +186,28 @@ abstract class FlinkMiniCluster(val userConfiguration: Configuration,
     }
 
     Await.ready(Future.sequence(futures), timeout)
+  }
+
+  @throws(classOf[JobExecutionException])
+  def submitJobAndWait(jobGraph: JobGraph, printUpdates: Boolean)
+                                                                : SerializedJobExecutionResult = {
+
+    submitJobAndWait(jobGraph, printUpdates, timeout)
+  }
+  
+  @throws(classOf[JobExecutionException])
+  def submitJobAndWait(jobGraph: JobGraph, printUpdates: Boolean, timeout: FiniteDuration)
+                                                                 : SerializedJobExecutionResult = {
+
+    val clientActorSystem = if (singleActorSystem) jobManagerActorSystem
+    else JobClient.startJobClientActorSystem(configuration)
+
+    JobClient.submitJobAndWait(clientActorSystem, jobManagerActor, jobGraph, timeout, printUpdates)
+  }
+
+  @throws(classOf[JobExecutionException])
+  def submitJobDetached(jobGraph: JobGraph) : JobSubmissionResult = {
+    JobClient.submitJobDetached(jobManagerActor, jobGraph, timeout)
+    new JobSubmissionResult(jobGraph.getJobID)
   }
 }

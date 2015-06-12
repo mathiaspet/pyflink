@@ -18,20 +18,21 @@
 
 package org.apache.flink.test.compiler.iterations;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.common.operators.util.FieldList;
-import org.apache.flink.compiler.dag.TempMode;
-import org.apache.flink.compiler.plan.DualInputPlanNode;
-import org.apache.flink.compiler.plan.OptimizedPlan;
-import org.apache.flink.compiler.plan.SinkPlanNode;
-import org.apache.flink.compiler.plan.SourcePlanNode;
-import org.apache.flink.compiler.plan.WorksetIterationPlanNode;
-import org.apache.flink.compiler.plandump.PlanJSONDumpGenerator;
-import org.apache.flink.compiler.plantranslate.NepheleJobGraphGenerator;
+import org.apache.flink.optimizer.dag.TempMode;
+import org.apache.flink.optimizer.plan.DualInputPlanNode;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plan.SinkPlanNode;
+import org.apache.flink.optimizer.plan.SourcePlanNode;
+import org.apache.flink.optimizer.plan.WorksetIterationPlanNode;
+import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
+import org.apache.flink.optimizer.plantranslate.JobGraphGenerator;
 import org.apache.flink.runtime.operators.DriverStrategy;
 import org.apache.flink.runtime.operators.shipping.ShipStrategyType;
 import org.apache.flink.runtime.operators.util.LocalStrategy;
-import org.apache.flink.test.compiler.util.CompilerTestBase;
+import org.apache.flink.optimizer.util.CompilerTestBase;
 import org.apache.flink.test.recordJobs.graph.ConnectedComponentsWithCoGroup;
 import org.junit.Assert;
 import org.junit.Test;
@@ -62,7 +63,7 @@ public class ConnectedComponentsCoGroupTest extends CompilerTestBase {
 
 		Plan plan = cc.getPlan(String.valueOf(DEFAULT_PARALLELISM),
 				IN_FILE, IN_FILE, OUT_FILE, String.valueOf(100));
-
+		plan.setExecutionConfig(new ExecutionConfig());
 		OptimizedPlan optPlan = compileNoStats(plan);
 		OptimizerPlanNodeResolver or = getOptimizerPlanNodeResolver(optPlan);
 		
@@ -130,7 +131,7 @@ public class ConnectedComponentsCoGroupTest extends CompilerTestBase {
 		// check the caches
 		Assert.assertTrue(TempMode.CACHED == neighborsJoin.getInput2().getTempMode());
 		
-		NepheleJobGraphGenerator jgg = new NepheleJobGraphGenerator();
+		JobGraphGenerator jgg = new JobGraphGenerator();
 		jgg.compileJobGraph(optPlan);
 	}
 }

@@ -46,8 +46,6 @@ under the License.
     <script src="js/bootstrap.js"></script>
     
     <!-- Scripts from Flink -->
-	<script type="text/javascript" src="js/jquery.flot.min.js"></script>
-	<script type="text/javascript" src="js/helpers.js"></script>
 	<script type="text/javascript" src="js/jcanvas.min.js"></script>
     <script type="text/javascript" src="js/timeline.js"></script>
     <script type="text/javascript" src="js/helpers.js"></script>
@@ -59,7 +57,7 @@ under the License.
 		$.ajax({ url : "menu?get=analyze", type : "GET", cache: false, success : function(html) {
 			$("#side-menu").empty();
 			$("#side-menu").append(html);
-		}, dataType : "html",
+		}, dataType : "html"
 		});
 	});
   	</script>
@@ -146,6 +144,15 @@ under the License.
 		   	The job does not have any accumulators
 		   </div>
 		</div>
+
+       <div class="panel panel-primary">
+         <div class="panel-heading">
+           <div class="panel-title">Job Configuration</div>
+         </div>
+         <div id="config" class="panel-body">
+           Unable to retrieve job configuration
+         </div>
+       </div>
 
     </div><!-- /#page-wrapper -->
 

@@ -31,15 +31,27 @@ public final class ConfigConstants {
 	// ---------------------------- Parallelism -------------------------------
 
 	/**
-	 * The config parameter defining the default degree of parallelism for jobs.
+	 * The config parameter defining the default parallelism for jobs.
 	 */
-	public static final String DEFAULT_PARALLELIZATION_DEGREE_KEY = "parallelization.degree.default";
-	
+	public static final String DEFAULT_PARALLELISM_KEY = "parallelism.default";
+
+	/**
+	 * The deprecated config parameter defining the default parallelism for jobs.
+	 */
+	@Deprecated
+	public static final String DEFAULT_PARALLELISM_KEY_OLD = "parallelization.degree.default";
+
 	/**
 	 * Config parameter for the number of re-tries for failed tasks. Setting this
 	 * value to 0 effectively disables fault tolerance.
 	 */
 	public static final String DEFAULT_EXECUTION_RETRIES_KEY = "execution-retries.default";
+
+	/**
+	 * Config parameter for the delay between execution retries. The value must be specified in the
+	 * notation "10 s" or "1 min" (style of Scala Finite Durations)
+	 */
+	public static final String DEFAULT_EXECUTION_RETRY_DELAY_KEY = "execution-retries.delay";
 	
 	// -------------------------------- Runtime -------------------------------
 	
@@ -116,8 +128,7 @@ public final class ConfigConstants {
 	 * The key for the config parameter defining whether the memory manager allocates memory lazy.
 	 */
 	public static final String TASK_MANAGER_MEMORY_LAZY_ALLOCATION_KEY = "taskmanager.memory.lazyalloc";
-	
-	
+
 	/**
 	 * The config parameter defining the number of buffers used in the network stack. This defines the
 	 * number of possible tasks and shuffles.
@@ -125,9 +136,21 @@ public final class ConfigConstants {
 	public static final String TASK_MANAGER_NETWORK_NUM_BUFFERS_KEY = "taskmanager.network.numberOfBuffers";
 
 	/**
-	 * The config parameter defining the size of the buffers used in the network stack.
+	 * Deprecated config parameter defining the size of the buffers used in the network stack.
 	 */
+	@Deprecated
 	public static final String TASK_MANAGER_NETWORK_BUFFER_SIZE_KEY = "taskmanager.network.bufferSizeInBytes";
+
+	/**
+	 * Config parameter defining the size of memory buffers used by the network stack and the memory manager.
+	 */
+	public static final String TASK_MANAGER_MEMORY_SEGMENT_SIZE_KEY = "taskmanager.memory.segment-size";
+	
+	/**
+	 * The implementation to use for spillable/spilled intermediate results, which have both
+	 * synchronous and asynchronous implementations: "sync" or "async".
+	 */
+	public static final String TASK_MANAGER_NETWORK_DEFAULT_IO_MODE = "taskmanager.network.defaultIOMode";
 
 	/**
 	 * The config parameter defining the number of task slots of a task manager.
@@ -167,11 +190,6 @@ public final class ConfigConstants {
 	 * A value of 0 indicates infinite waiting.
 	 */
 	public static final String FS_STREAM_OPENING_TIMEOUT_KEY = "taskmanager.runtime.fs_timeout";
-	
-	/**
-	 * The parameter defining the polling interval (in seconds) for the JobClient.
-	 */
-	public static final String JOBCLIENT_POLLING_INTERVAL_KEY = "jobclient.polling.interval";
 
 	// ------------------------ YARN Configuration ------------------------
 
@@ -184,8 +202,46 @@ public final class ConfigConstants {
 	 * Upper bound for heap cutoff on YARN.
 	 * The "yarn.heap-cutoff-ratio" is removing a certain ratio from the heap.
 	 * This value is limiting this cutoff to a absolute value.
+	 *
+	 * THE VALUE IS NO LONGER IN USE.
 	 */
+	@Deprecated
 	public static final String YARN_HEAP_LIMIT_CAP = "yarn.heap-limit-cap";
+
+	/**
+	 * Minimum amount of memory to remove from the heap space as a safety margin.
+	 */
+	public static final String YARN_HEAP_CUTOFF_MIN = "yarn.heap-cutoff-min";
+
+
+	/**
+	 * Reallocate failed YARN containers.
+	 */
+	public static final String YARN_REALLOCATE_FAILED_CONTAINERS = "yarn.reallocate-failed";
+
+	/**
+	 * The maximum number of failed YARN containers before entirely stopping
+	 * the YARN session / job on YARN.
+	 *
+	 * By default, we take the number of of initially requested containers.
+	 */
+	public static final String YARN_MAX_FAILED_CONTAINERS = "yarn.maximum-failed-containers";
+
+	/**
+	 * Set the number of retries for failed YARN ApplicationMasters/JobManagers.
+	 * This value is usually limited by YARN.
+	 *
+	 * By default, its 1.
+	 */
+	public static final String YARN_APPLICATION_ATTEMPTS = "yarn.application-attempts";
+
+	/**
+	 * The heartbeat intervall between the Application Master and the YARN Resource Manager.
+	 *
+	 * The default value is 5 (seconds).
+	 */
+	public static final String YARN_HEARTBEAT_DELAY_SECONDS = "yarn.heartbeat-delay";
+
 
 	// ------------------------ Hadoop Configuration ------------------------
 
@@ -204,7 +260,7 @@ public final class ConfigConstants {
 	 */
 	public static final String PATH_HADOOP_CONFIG = "fs.hdfs.hadoopconf";
 	
-	// ------------------------ File System Bahavior ------------------------
+	// ------------------------ File System Behavior ------------------------
 
 	/**
 	 * Key to specify whether the file systems should simply overwrite existing files.
@@ -239,7 +295,7 @@ public final class ConfigConstants {
 	// ------------------------- JobManager Web Frontend ----------------------
 	
 	/**
-	 * The port for the pact web-frontend server.
+	 * The port for the runtime monitor web-frontend server.
 	 */
 	public static final String JOB_MANAGER_WEB_PORT_KEY = "jobmanager.web.port";
 
@@ -286,6 +342,9 @@ public final class ConfigConstants {
 
 	// ------------------------------ AKKA ------------------------------------
 
+	/**
+	 * Timeout for the startup of the actor system
+	 */
 	public static final String AKKA_STARTUP_TIMEOUT = "akka.startup-timeout";
 
 	/**
@@ -344,9 +403,26 @@ public final class ConfigConstants {
 	public static final String AKKA_ASK_TIMEOUT = "akka.ask.timeout";
 
 	/**
-	 * Timeout for all blocking calls
+	 * Timeout for all blocking calls that look up remote actors
 	 */
 	public static final String AKKA_LOOKUP_TIMEOUT = "akka.lookup.timeout";
+
+	/**
+	 * Exit JVM on fatal Akka errors
+	 */
+	public static final String AKKA_JVM_EXIT_ON_FATAL_ERROR = "akka.jvm-exit-on-fatal-error";
+	
+	// ----------------------------- Streaming --------------------------------
+	
+	/**
+	 * State backend for checkpoints;
+	 */
+	public static final String STATE_BACKEND = "state.backend";
+	
+	/**
+	 * Directory for saving streaming checkpoints
+	 */
+	public static final String STATE_BACKEND_FS_DIR = "state.backend.fs.checkpointdir";
 	
 	// ----------------------------- Miscellaneous ----------------------------
 	
@@ -364,9 +440,9 @@ public final class ConfigConstants {
 	// ---------------------------- Parallelism -------------------------------
 	
 	/**
-	 * The default degree of parallelism for operations.
+	 * The default parallelism for operations.
 	 */
-	public static final int DEFAULT_PARALLELIZATION_DEGREE = 1;
+	public static final int DEFAULT_PARALLELISM = 1;
 	
 	/**
 	 * The default number of execution retries.
@@ -384,12 +460,6 @@ public final class ConfigConstants {
 	 * The default network port to connect to for communication with the job manager.
 	 */
 	public static final int DEFAULT_JOB_MANAGER_IPC_PORT = 6123;
-	
-	/**
-	 * Default number of seconds after which a task manager is marked as failed.
-	 */
-	// 30 seconds (its enough to get to mars, should be enough to detect failure)
-	public static final int DEFAULT_JOB_MANAGER_DEAD_TASKMANAGER_TIMEOUT = 30*1000;
 
 	/**
 	 * Default number of retries for failed BLOB fetches.
@@ -427,11 +497,6 @@ public final class ConfigConstants {
 	 * The default fraction of the free memory allocated by the task manager's memory manager.
 	 */
 	public static final float DEFAULT_MEMORY_MANAGER_MEMORY_FRACTION = 0.7f;
-	
-	/**
-	 * The default setting for the memory manager lazy allocation feature.
-	 */
-	public static final boolean DEFAULT_TASK_MANAGER_MEMORY_LAZY_ALLOCATION = false;
 
 	/**
 	 * Default number of buffers used in the network stack.
@@ -441,7 +506,19 @@ public final class ConfigConstants {
 	/**
 	 * Default size of network stack buffers.
 	 */
+	@Deprecated
 	public static final int DEFAULT_TASK_MANAGER_NETWORK_BUFFER_SIZE = 32768;
+
+	/**
+	 * Default size of memory segments in the network stack and the memory manager.
+	 */
+	public static final int DEFAULT_TASK_MANAGER_MEMORY_SEGMENT_SIZE = 32768;
+
+	/**
+	 * The implementation to use for spillable/spilled intermediate results, which have both
+	 * synchronous and asynchronous implementations: "sync" or "async".
+	 */
+	public static final String DEFAULT_TASK_MANAGER_NETWORK_DEFAULT_IO_MODE = "sync";
 
 	/**
 	 * Flag indicating whether to start a thread, which repeatedly logs the memory usage of the JVM.
@@ -454,19 +531,9 @@ public final class ConfigConstants {
 	public static final long DEFAULT_TASK_MANAGER_DEBUG_MEMORY_USAGE_LOG_INTERVAL_MS = 5000L;
 
 	/**
-	 * The default number of task slots per task manager
-	 */
-	public static final int DEFAULT_TASK_MANAGER_NUM_TASK_SLOTS = -1;
-
-	/**
 	 * The default task manager's maximum registration duration
 	 */
 	public static final String DEFAULT_TASK_MANAGER_MAX_REGISTRATION_DURATION = "Inf";
-	
-	/**
-	 * The default value for the JobClient's polling interval. 2 Seconds.
-	 */
-	public static final int DEFAULT_JOBCLIENT_POLLING_INTERVAL = 2;
 	
 	/**
 	 * The default value for the maximum spilling fan in/out.
@@ -482,6 +549,21 @@ public final class ConfigConstants {
 	 * The default timeout for filesystem stream opening: infinite (means max long milliseconds).
 	 */
 	public static final int DEFAULT_FS_STREAM_OPENING_TIMEOUT = 0;
+
+	// ------------------------ YARN Configuration ------------------------
+
+
+	/**
+	 * Minimum amount of Heap memory to subtract from the requested TaskManager size.
+	 * We came up with these values experimentally.
+	 * Flink fails when the cutoff is set only to 500 mb.
+	 */
+	public static final int DEFAULT_YARN_MIN_HEAP_CUTOFF = 600;
+
+	/**
+	 * Relative amount of memory to subtract from the requested memory.
+	 */
+	public static final float DEFAULT_YARN_HEAP_CUTOFF_RATIO = 0.25f;
 	
 	
 	// ------------------------ File System Behavior ------------------------
@@ -518,6 +600,8 @@ public final class ConfigConstants {
 	// ------------------------- JobManager Web Frontend ----------------------
 	
 	/**
+	 * The config key for the port of the JobManager web frontend.
+	 * Setting this value to {@code -1} disables the web frontend.
 	 */
 	public static final int DEFAULT_JOB_MANAGER_WEB_FRONTEND_PORT = 8081;
 
@@ -576,6 +660,9 @@ public final class ConfigConstants {
 
 	public static String DEFAULT_AKKA_LOOKUP_TIMEOUT = "10 s";
 	
+	// ----------------------------- Streaming Values --------------------------
+	
+	public static String DEFAULT_STATE_BACKEND = "jobmanager";
 
 	// ----------------------------- LocalExecution ----------------------------
 
@@ -583,6 +670,9 @@ public final class ConfigConstants {
 	 * Sets the number of local task managers
 	 */
 	public static final String LOCAL_INSTANCE_MANAGER_NUMBER_TASK_MANAGER = "localinstancemanager.numtaskmanager";
+
+
+	public static final String LOCAL_INSTANCE_MANAGER_START_WEBSERVER = "localinstancemanager.start-webserver";
 	
 	// ------------------------------------------------------------------------
 	

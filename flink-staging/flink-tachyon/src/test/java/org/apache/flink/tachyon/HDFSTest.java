@@ -41,14 +41,14 @@ import java.io.StringWriter;
 
 /**
  * This test should logically be located in the 'flink-runtime' tests. However, this project
- * has already all dependencies required (flink-java-examples). Also, the DOPOneExecEnv is here.
+ * has already all dependencies required (flink-java-examples). Also, the ParallelismOneExecEnv is here.
  */
 public class HDFSTest {
 
-	private String hdfsURI;
+	protected String hdfsURI;
 	private MiniDFSCluster hdfsCluster;
 	private org.apache.hadoop.fs.Path hdPath;
-	private org.apache.hadoop.fs.FileSystem hdfs;
+	protected org.apache.hadoop.fs.FileSystem hdfs;
 
 	@Before
 	public void createHDFS() {

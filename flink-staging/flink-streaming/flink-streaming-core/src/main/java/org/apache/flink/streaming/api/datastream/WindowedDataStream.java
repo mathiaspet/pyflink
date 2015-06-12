@@ -18,8 +18,9 @@
 package org.apache.flink.streaming.api.datastream;
 
 import org.apache.flink.api.common.ExecutionConfig;
-import org.apache.flink.api.common.functions.Function;
+import org.apache.flink.api.common.functions.FoldFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.functions.RichFoldFunction;
 import org.apache.flink.api.common.functions.RichReduceFunction;
 import org.apache.flink.api.common.typeinfo.BasicArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -29,31 +30,44 @@ import org.apache.flink.api.java.ClosureCleaner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.operators.Keys;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
-import org.apache.flink.streaming.api.function.RichWindowMapFunction;
-import org.apache.flink.streaming.api.function.WindowMapFunction;
-import org.apache.flink.streaming.api.function.aggregation.AggregationFunction;
-import org.apache.flink.streaming.api.function.aggregation.AggregationFunction.AggregationType;
-import org.apache.flink.streaming.api.function.aggregation.ComparableAggregator;
-import org.apache.flink.streaming.api.function.aggregation.SumAggregator;
-import org.apache.flink.streaming.api.invokable.StreamInvokable;
-import org.apache.flink.streaming.api.invokable.operator.windowing.GroupedStreamDiscretizer;
-import org.apache.flink.streaming.api.invokable.operator.windowing.GroupedTimeDiscretizer;
-import org.apache.flink.streaming.api.invokable.operator.windowing.GroupedWindowBufferInvokable;
-import org.apache.flink.streaming.api.invokable.operator.windowing.StreamDiscretizer;
-import org.apache.flink.streaming.api.invokable.operator.windowing.WindowBufferInvokable;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.streaming.api.functions.RichWindowMapFunction;
+import org.apache.flink.streaming.api.functions.WindowMapFunction;
+import org.apache.flink.streaming.api.functions.aggregation.AggregationFunction;
+import org.apache.flink.streaming.api.functions.aggregation.AggregationFunction.AggregationType;
+import org.apache.flink.streaming.api.functions.aggregation.ComparableAggregator;
+import org.apache.flink.streaming.api.functions.aggregation.SumAggregator;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.windowing.GroupedActiveDiscretizer;
+import org.apache.flink.streaming.api.operators.windowing.GroupedStreamDiscretizer;
+import org.apache.flink.streaming.api.operators.windowing.GroupedWindowBuffer;
+import org.apache.flink.streaming.api.operators.windowing.StreamDiscretizer;
+import org.apache.flink.streaming.api.operators.windowing.StreamWindowBuffer;
 import org.apache.flink.streaming.api.windowing.StreamWindow;
 import org.apache.flink.streaming.api.windowing.StreamWindowTypeInfo;
 import org.apache.flink.streaming.api.windowing.WindowEvent;
+import org.apache.flink.streaming.api.windowing.WindowUtils;
+import org.apache.flink.streaming.api.windowing.WindowUtils.WindowTransformation;
 import org.apache.flink.streaming.api.windowing.helper.Time;
 import org.apache.flink.streaming.api.windowing.helper.WindowingHelper;
+import org.apache.flink.streaming.api.windowing.policy.CentralActiveTrigger;
 import org.apache.flink.streaming.api.windowing.policy.CloneableEvictionPolicy;
 import org.apache.flink.streaming.api.windowing.policy.CloneableTriggerPolicy;
+import org.apache.flink.streaming.api.windowing.policy.CountTriggerPolicy;
 import org.apache.flink.streaming.api.windowing.policy.EvictionPolicy;
-import org.apache.flink.streaming.api.windowing.policy.TimeTriggerPolicy;
+import org.apache.flink.streaming.api.windowing.policy.KeepAllEvictionPolicy;
 import org.apache.flink.streaming.api.windowing.policy.TriggerPolicy;
 import org.apache.flink.streaming.api.windowing.policy.TumblingEvictionPolicy;
 import org.apache.flink.streaming.api.windowing.windowbuffer.BasicWindowBuffer;
-import org.apache.flink.streaming.api.windowing.windowbuffer.CompletePreAggregator;
+import org.apache.flink.streaming.api.windowing.windowbuffer.JumpingCountGroupedPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.JumpingCountPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.JumpingTimeGroupedPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.JumpingTimePreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.PreAggregator;
+import org.apache.flink.streaming.api.windowing.windowbuffer.SlidingCountGroupedPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.SlidingCountPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.SlidingTimeGroupedPreReducer;
+import org.apache.flink.streaming.api.windowing.windowbuffer.SlidingTimePreReducer;
 import org.apache.flink.streaming.api.windowing.windowbuffer.TumblingGroupedPreReducer;
 import org.apache.flink.streaming.api.windowing.windowbuffer.TumblingPreReducer;
 import org.apache.flink.streaming.api.windowing.windowbuffer.WindowBuffer;
@@ -62,7 +76,7 @@ import org.apache.flink.streaming.util.keys.KeySelectorUtil;
 /**
  * A {@link WindowedDataStream} represents a data stream that has been
  * discretised into windows. User defined function such as
- * {@link #reduceWindow(ReduceFunction)}, {@link #mapWindow()} or aggregations
+ * {@link #reduceWindow(ReduceFunction)}, {@link #mapWindow(WindowMapFunction)} or aggregations
  * can be applied to the windows. The results of these transformations are also
  * WindowedDataStreams of the same discretisation unit.
  * 
@@ -70,16 +84,6 @@ import org.apache.flink.streaming.util.keys.KeySelectorUtil;
  *            The output type of the {@link WindowedDataStream}
  */
 public class WindowedDataStream<OUT> {
-
-	protected enum WindowTransformation {
-		REDUCEWINDOW, MAPWINDOW, NONE;
-		private Function UDF;
-
-		public WindowTransformation with(Function UDF) {
-			this.UDF = UDF;
-			return this;
-		}
-	}
 
 	protected DataStream<OUT> dataStream;
 
@@ -145,6 +149,7 @@ public class WindowedDataStream<OUT> {
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public WindowedDataStream<OUT> every(WindowingHelper policyHelper) {
+		policyHelper.setExecutionConfig(getExecutionConfig());
 		WindowedDataStream<OUT> ret = this.copy();
 		if (ret.evictionHelper == null) {
 			ret.evictionHelper = ret.triggerHelper;
@@ -237,6 +242,9 @@ public class WindowedDataStream<OUT> {
 	 * @return The discretised stream
 	 */
 	public DataStream<StreamWindow<OUT>> getDiscretizedStream() {
+		if (getEviction() instanceof KeepAllEvictionPolicy) {
+			throw new RuntimeException("Cannot get discretized stream for full stream window");
+		}
 		return discretize(WindowTransformation.NONE, new BasicWindowBuffer<OUT>())
 				.getDiscretizedStream();
 	}
@@ -263,19 +271,70 @@ public class WindowedDataStream<OUT> {
 	 */
 	public DiscretizedStream<OUT> reduceWindow(ReduceFunction<OUT> reduceFunction) {
 
-		WindowTransformation transformation = WindowTransformation.REDUCEWINDOW
-				.with(reduceFunction);
-
-		WindowBuffer<OUT> windowBuffer = getWindowBuffer(transformation, getTrigger(),
-				getEviction(), discretizerKey);
-
-		DiscretizedStream<OUT> discretized = discretize(transformation, windowBuffer);
-
-		if (windowBuffer instanceof CompletePreAggregator) {
-			return discretized;
+		// We check whether we should apply parallel time discretization, which
+		// is a more complex exploiting the monotonic properties of time
+		// policies
+		if (WindowUtils.isTimeOnly(getTrigger(), getEviction()) && discretizerKey == null
+				&& dataStream.getParallelism() > 1) {
+			return timeReduce(reduceFunction);
 		} else {
-			return discretized.reduceWindow(reduceFunction);
+			WindowTransformation transformation = WindowTransformation.REDUCEWINDOW
+					.with(clean(reduceFunction));
+
+			WindowBuffer<OUT> windowBuffer = getWindowBuffer(transformation);
+
+			DiscretizedStream<OUT> discretized = discretize(transformation, windowBuffer);
+
+			if (windowBuffer instanceof PreAggregator) {
+				return discretized;
+			} else {
+				return discretized.reduceWindow(reduceFunction);
+			}
 		}
+	}
+
+	/**
+	 * Applies a fold transformation on the windowed data stream by folding the
+	 * current window at every trigger.The user can also extend the
+	 * {@link RichFoldFunction} to gain access to other features provided by the
+	 * {@link org.apache.flink.api.common.functions.RichFunction} interface.
+	 * This version of foldWindow uses user supplied typeinformation for
+	 * serializaton. Use this only when the system is unable to detect type
+	 * information.
+	 * 
+	 * @param foldFunction
+	 *            The fold function that will be applied to the windows.
+	 * @param initialValue
+	 *            Initial value given to foldFunction
+	 * @param outType
+	 *            The output type of the operator
+	 * @return The transformed DataStream
+	 */
+	public <R> DiscretizedStream<R> foldWindow(R initialValue, FoldFunction<OUT, R> foldFunction,
+			TypeInformation<R> outType) {
+
+		return discretize(WindowTransformation.FOLDWINDOW.with(clean(foldFunction)),
+				new BasicWindowBuffer<OUT>()).foldWindow(initialValue, foldFunction, outType);
+
+	}
+
+	/**
+	 * Applies a fold transformation on the windowed data stream by folding the
+	 * current window at every trigger.The user can also extend the
+	 * {@link RichFoldFunction} to gain access to other features provided by the
+	 * {@link org.apache.flink.api.common.functions.RichFunction} interface.
+	 * 
+	 * @param foldFunction
+	 *            The fold function that will be applied to the windows.
+	 * @param initialValue
+	 *            Initial value given to foldFunction
+	 * @return The transformed DataStream
+	 */
+	public <R> DiscretizedStream<R> foldWindow(R initialValue, FoldFunction<OUT, R> foldFunction) {
+
+		TypeInformation<R> outType = TypeExtractor.getFoldReturnTypes(clean(foldFunction),
+				getType());
+		return foldWindow(initialValue, foldFunction, outType);
 	}
 
 	/**
@@ -291,9 +350,9 @@ public class WindowedDataStream<OUT> {
 	 *            The function that will be applied to the windows.
 	 * @return The transformed DataStream
 	 */
-	public <R> WindowedDataStream<R> mapWindow(WindowMapFunction<OUT, R> windowMapFunction) {
-		return discretize(WindowTransformation.MAPWINDOW.with(windowMapFunction),
-				new BasicWindowBuffer<OUT>()).mapWindow(windowMapFunction);
+	public <R> DiscretizedStream<R> mapWindow(WindowMapFunction<OUT, R> windowMapFunction) {
+		return discretize(WindowTransformation.MAPWINDOW.with(clean(windowMapFunction)),
+				getWindowBuffer(WindowTransformation.MAPWINDOW)).mapWindow(windowMapFunction);
 	}
 
 	/**
@@ -314,87 +373,221 @@ public class WindowedDataStream<OUT> {
 	 *            The output type of the operator.
 	 * @return The transformed DataStream
 	 */
-	public <R> WindowedDataStream<R> mapWindow(WindowMapFunction<OUT, R> windowMapFunction,
+	public <R> DiscretizedStream<R> mapWindow(WindowMapFunction<OUT, R> windowMapFunction,
 			TypeInformation<R> outType) {
 
 		return discretize(WindowTransformation.MAPWINDOW.with(windowMapFunction),
-				new BasicWindowBuffer<OUT>()).mapWindow(windowMapFunction, outType);
+				getWindowBuffer(WindowTransformation.MAPWINDOW)).mapWindow(windowMapFunction,
+				outType);
 	}
 
 	private DiscretizedStream<OUT> discretize(WindowTransformation transformation,
 			WindowBuffer<OUT> windowBuffer) {
 
-		StreamInvokable<OUT, WindowEvent<OUT>> discretizer = getDiscretizer(getTrigger(),
-				getEviction(), discretizerKey);
+		OneInputStreamOperator<OUT, WindowEvent<OUT>> discretizer = getDiscretizer();
 
-		StreamInvokable<WindowEvent<OUT>, StreamWindow<OUT>> bufferInvokable = getBufferInvokable(
-				windowBuffer, discretizerKey);
+		OneInputStreamOperator<WindowEvent<OUT>, StreamWindow<OUT>> bufferOperator = getBufferOperator(windowBuffer);
 
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		TypeInformation<WindowEvent<OUT>> bufferEventType = new TupleTypeInfo(WindowEvent.class,
 				getType(), BasicTypeInfo.INT_TYPE_INFO);
 
-		int parallelism = getDiscretizerParallelism();
+		int parallelism = getDiscretizerParallelism(transformation);
 
 		return new DiscretizedStream<OUT>(dataStream
-				.transform("Stream Discretizer", bufferEventType, discretizer)
+				.transform(discretizer.getClass().getSimpleName(), bufferEventType, discretizer)
 				.setParallelism(parallelism)
-				.transform("WindowBuffer", new StreamWindowTypeInfo<OUT>(getType()),
-						bufferInvokable).setParallelism(parallelism), groupByKey, transformation,
-				false);
+				.transform(windowBuffer.getClass().getSimpleName(),
+						new StreamWindowTypeInfo<OUT>(getType()), bufferOperator)
+				.setParallelism(parallelism), groupByKey, transformation, false);
 
 	}
 
-	private int getDiscretizerParallelism() {
-		return isLocal || (discretizerKey != null) ? dataStream.environment
-				.getDegreeOfParallelism() : 1;
+	/**
+	 * Returns the parallelism for the stream discretizer. The returned
+	 * parallelism is either 1 for for non-parallel global policies (or when the
+	 * input stream is non-parallel), environment parallelism for the policies
+	 * that can run in parallel (such as, any ditributed policy, reduce by count
+	 * or time).
+	 * 
+	 * @param transformation
+	 *            The applied transformation
+	 * @return The parallelism for the stream discretizer
+	 */
+	private int getDiscretizerParallelism(WindowTransformation transformation) {
+		return isLocal
+				|| (transformation == WindowTransformation.REDUCEWINDOW && WindowUtils
+						.isParallelPolicy(getTrigger(), getEviction(), dataStream.getParallelism()))
+				|| (discretizerKey != null) ? dataStream.environment.getParallelism() : 1;
+
 	}
 
-	private StreamInvokable<OUT, WindowEvent<OUT>> getDiscretizer(TriggerPolicy<OUT> trigger,
-			EvictionPolicy<OUT> eviction, KeySelector<OUT, ?> discretizerKey) {
+	/**
+	 * Dedicated method for applying parallel time reduce transformations on
+	 * windows
+	 * 
+	 * @param reduceFunction
+	 *            Reduce function to apply
+	 * @return The transformed stream
+	 */
+	protected DiscretizedStream<OUT> timeReduce(ReduceFunction<OUT> reduceFunction) {
 
-		if (discretizerKey == null) {
-			return new StreamDiscretizer<OUT>(trigger, eviction);
-		} else if (trigger instanceof TimeTriggerPolicy
-				&& ((TimeTriggerPolicy<OUT>) trigger).timestampWrapper.isDefaultTimestamp()) {
-			return new GroupedTimeDiscretizer<OUT>(discretizerKey,
-					(TimeTriggerPolicy<OUT>) trigger, (CloneableEvictionPolicy<OUT>) eviction);
+		WindowTransformation transformation = WindowTransformation.REDUCEWINDOW
+				.with(clean(reduceFunction));
+
+		// We get the windowbuffer and set it to emit empty windows with
+		// sequential IDs. This logic is necessary to merge windows created in
+		// parallel.
+		WindowBuffer<OUT> windowBuffer = getWindowBuffer(transformation).emitEmpty().sequentialID();
+
+		// If there is a groupby for the reduce operation we apply it before the
+		// discretizers, because we will forward everything afterwards to
+		// exploit task chaining
+		if (groupByKey != null) {
+			dataStream = dataStream.groupBy(groupByKey);
 		}
 
-		else {
-			return new GroupedStreamDiscretizer<OUT>(discretizerKey,
-					(CloneableTriggerPolicy<OUT>) trigger, (CloneableEvictionPolicy<OUT>) eviction);
+		// We discretize the stream and call the timeReduce function of the
+		// discretized stream, we also pass the type of the windowbuffer
+		DiscretizedStream<OUT> discretized = discretize(transformation, windowBuffer);
+
+		if (getEviction() instanceof KeepAllEvictionPolicy
+				&& !(windowBuffer instanceof PreAggregator)) {
+			throw new RuntimeException(
+					"Error in preaggregator logic, parallel time reduce should always be preaggregated");
 		}
+
+		return discretized.timeReduce(reduceFunction);
 
 	}
 
-	private StreamInvokable<WindowEvent<OUT>, StreamWindow<OUT>> getBufferInvokable(
-			WindowBuffer<OUT> windowBuffer, KeySelector<OUT, ?> discretizerKey) {
+	/**
+	 * Based on the defined policies, returns the stream discretizer to be used
+	 */
+	private OneInputStreamOperator<OUT, WindowEvent<OUT>> getDiscretizer() {
 		if (discretizerKey == null) {
-			return new WindowBufferInvokable<OUT>(windowBuffer);
+			return new StreamDiscretizer<OUT>(getTrigger(), getEviction());
+		} else if (getTrigger() instanceof CentralActiveTrigger) {
+			return new GroupedActiveDiscretizer<OUT>(discretizerKey,
+					(CentralActiveTrigger<OUT>) getTrigger(),
+					(CloneableEvictionPolicy<OUT>) getEviction());
 		} else {
-			return new GroupedWindowBufferInvokable<OUT>(windowBuffer, discretizerKey);
+			return new GroupedStreamDiscretizer<OUT>(discretizerKey,
+					(CloneableTriggerPolicy<OUT>) getTrigger(),
+					(CloneableEvictionPolicy<OUT>) getEviction());
+		}
+
+	}
+
+	private OneInputStreamOperator<WindowEvent<OUT>, StreamWindow<OUT>> getBufferOperator(
+			WindowBuffer<OUT> windowBuffer) {
+		if (discretizerKey == null) {
+			return new StreamWindowBuffer<OUT>(windowBuffer);
+		} else {
+			return new GroupedWindowBuffer<OUT>(windowBuffer, discretizerKey);
 		}
 	}
 
+	/**
+	 * Based on the given policies returns the WindowBuffer used to store the
+	 * elements in the window. This is the module that also encapsulates the
+	 * pre-aggregator logic when it is applicable, reducing the space cost, and
+	 * trigger latency.
+	 * 
+	 */
 	@SuppressWarnings("unchecked")
-	private WindowBuffer<OUT> getWindowBuffer(WindowTransformation transformation,
-			TriggerPolicy<OUT> trigger, EvictionPolicy<OUT> eviction,
-			KeySelector<OUT, ?> discretizerKey) {
+	private WindowBuffer<OUT> getWindowBuffer(WindowTransformation transformation) {
+		TriggerPolicy<OUT> trigger = getTrigger();
+		EvictionPolicy<OUT> eviction = getEviction();
 
-		if (transformation == WindowTransformation.REDUCEWINDOW
-				&& eviction instanceof TumblingEvictionPolicy) {
-			if (groupByKey == null) {
-				return new TumblingPreReducer<OUT>(
-						clean((ReduceFunction<OUT>) transformation.UDF), getType()
-								.createSerializer(getExecutionConfig()));
-			} else {
-				return new TumblingGroupedPreReducer<OUT>(
-						clean((ReduceFunction<OUT>) transformation.UDF), groupByKey,
-						getType().createSerializer(getExecutionConfig()));
+		if (transformation == WindowTransformation.REDUCEWINDOW) {
+			if (WindowUtils.isTumblingPolicy(trigger, eviction)) {
+				if (eviction instanceof KeepAllEvictionPolicy) {
+					if (groupByKey == null) {
+						return new TumblingPreReducer<OUT>(
+								(ReduceFunction<OUT>) transformation.getUDF(), getType()
+										.createSerializer(getExecutionConfig())).noEvict();
+					} else {
+						return new TumblingGroupedPreReducer<OUT>(
+								(ReduceFunction<OUT>) transformation.getUDF(), groupByKey,
+								getType().createSerializer(getExecutionConfig())).noEvict();
+					}
+				} else {
+					if (groupByKey == null) {
+						return new TumblingPreReducer<OUT>(
+								(ReduceFunction<OUT>) transformation.getUDF(), getType()
+										.createSerializer(getExecutionConfig()));
+					} else {
+						return new TumblingGroupedPreReducer<OUT>(
+								(ReduceFunction<OUT>) transformation.getUDF(), groupByKey,
+								getType().createSerializer(getExecutionConfig()));
+					}
+				}
+			} else if (WindowUtils.isSlidingCountPolicy(trigger, eviction)) {
+				if (groupByKey == null) {
+					return new SlidingCountPreReducer<OUT>(
+							clean((ReduceFunction<OUT>) transformation.getUDF()), dataStream
+									.getType().createSerializer(getExecutionConfig()),
+							WindowUtils.getWindowSize(eviction), WindowUtils.getSlideSize(trigger),
+							((CountTriggerPolicy<?>) trigger).getStart());
+				} else {
+					return new SlidingCountGroupedPreReducer<OUT>(
+							clean((ReduceFunction<OUT>) transformation.getUDF()), dataStream
+									.getType().createSerializer(getExecutionConfig()), groupByKey,
+							WindowUtils.getWindowSize(eviction), WindowUtils.getSlideSize(trigger),
+							((CountTriggerPolicy<?>) trigger).getStart());
+				}
+
+			} else if (WindowUtils.isSlidingTimePolicy(trigger, eviction)) {
+				if (groupByKey == null) {
+					return new SlidingTimePreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), dataStream.getType()
+									.createSerializer(getExecutionConfig()),
+							WindowUtils.getWindowSize(eviction), WindowUtils.getSlideSize(trigger),
+							WindowUtils.getTimeStampWrapper(trigger));
+				} else {
+					return new SlidingTimeGroupedPreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), dataStream.getType()
+									.createSerializer(getExecutionConfig()), groupByKey,
+							WindowUtils.getWindowSize(eviction), WindowUtils.getSlideSize(trigger),
+							WindowUtils.getTimeStampWrapper(trigger));
+				}
+
+			} else if (WindowUtils.isJumpingCountPolicy(trigger, eviction)) {
+				if (groupByKey == null) {
+					return new JumpingCountPreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), getType()
+									.createSerializer(getExecutionConfig()),
+							WindowUtils.getSlideSize(trigger) - WindowUtils.getWindowSize(eviction));
+				} else {
+					return new JumpingCountGroupedPreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), groupByKey, getType()
+									.createSerializer(getExecutionConfig()),
+							WindowUtils.getSlideSize(trigger) - WindowUtils.getWindowSize(eviction));
+				}
+			} else if (WindowUtils.isJumpingTimePolicy(trigger, eviction)) {
+				if (groupByKey == null) {
+					return new JumpingTimePreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), getType()
+									.createSerializer(getExecutionConfig()),
+							WindowUtils.getSlideSize(trigger), WindowUtils.getWindowSize(eviction),
+							WindowUtils.getTimeStampWrapper(trigger));
+				} else {
+					return new JumpingTimeGroupedPreReducer<OUT>(
+							(ReduceFunction<OUT>) transformation.getUDF(), groupByKey, getType()
+									.createSerializer(getExecutionConfig()),
+							WindowUtils.getSlideSize(trigger), WindowUtils.getWindowSize(eviction),
+							WindowUtils.getTimeStampWrapper(trigger));
+				}
 			}
 		}
-		return new BasicWindowBuffer<OUT>();
+
+		if (eviction instanceof KeepAllEvictionPolicy) {
+			throw new RuntimeException(
+					"Full stream policy can only be used with operations that support preaggregations, such as reduce or aggregations");
+		} else {
+			return new BasicWindowBuffer<OUT>();
+		}
 	}
 
 	/**
@@ -417,7 +610,7 @@ public class WindowedDataStream<OUT> {
 	 * stream's underlying type. A dot can be used to drill down into objects,
 	 * as in {@code "field1.getInnerField2()" }.
 	 * 
-	 * @param positionToSum
+	 * @param field
 	 *            The field to sum
 	 * @return The transformed DataStream.
 	 */
@@ -634,7 +827,7 @@ public class WindowedDataStream<OUT> {
 
 		if (evictionHelper != null) {
 			return evictionHelper.toEvict();
-		} else if (userEvicter == null) {
+		} else if (userEvicter == null || userEvicter instanceof TumblingEvictionPolicy) {
 			if (triggerHelper instanceof Time) {
 				return triggerHelper.toEvict();
 			} else {
@@ -677,16 +870,5 @@ public class WindowedDataStream<OUT> {
 
 	protected WindowedDataStream<OUT> copy() {
 		return new WindowedDataStream<OUT>(this);
-	}
-
-	protected static class WindowKey<R> implements KeySelector<StreamWindow<R>, Integer> {
-
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		public Integer getKey(StreamWindow<R> value) throws Exception {
-			return value.windowID;
-		}
-
 	}
 }

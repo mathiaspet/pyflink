@@ -20,6 +20,7 @@ package org.apache.flink.api.scala.operators.translation
 import org.apache.flink.api.common.functions.{RichCoGroupFunction, RichMapFunction,
 RichJoinFunction}
 import org.apache.flink.api.common.operators.GenericDataSinkBase
+import org.apache.flink.api.java.io.DiscardingOutputFormat
 import org.apache.flink.api.java.operators.translation.WrappingFunction
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -46,11 +47,11 @@ class DeltaIterationTranslationTest {
       val AGGREGATOR_NAME = "AggregatorName"
       val ITERATION_KEYS = Array(2)
       val NUM_ITERATIONS = 13
-      val DEFAULT_DOP = 133
-      val ITERATION_DOP = 77
+      val DEFAULT_PARALLELISM = 133
+      val ITERATION_PARALLELISM = 77
 
       val env = ExecutionEnvironment.getExecutionEnvironment
-      env.setDegreeOfParallelism(DEFAULT_DOP)
+      env.setParallelism(DEFAULT_PARALLELISM)
 
       val initialSolutionSet = env.fromElements((3.44, 5L, "abc"))
       val initialWorkSet = env.fromElements((1.23, "abc"))
@@ -64,15 +65,15 @@ class DeltaIterationTranslationTest {
           (joined, joined.map(new NextWorksetMapper).name(BEFORE_NEXT_WORKSET_MAP))
       }
       result.name(ITERATION_NAME)
-        .setParallelism(ITERATION_DOP)
+        .setParallelism(ITERATION_PARALLELISM)
         .registerAggregator(AGGREGATOR_NAME, new LongSumAggregator)
 
-      result.print()
+      result.output(new DiscardingOutputFormat[(Double, Long, String)])
       result.writeAsText("/dev/null")
 
       val p: Plan = env.createProgramPlan(JOB_NAME)
       assertEquals(JOB_NAME, p.getJobName)
-      assertEquals(DEFAULT_DOP, p.getDefaultParallelism)
+      assertEquals(DEFAULT_PARALLELISM, p.getDefaultParallelism)
       var sink1: GenericDataSinkBase[_] = null
       var sink2: GenericDataSinkBase[_] = null
       val sinks = p.getDataSinks.iterator
@@ -85,7 +86,7 @@ class DeltaIterationTranslationTest {
       assertEquals(iteration, sink2.getInput)
       assertEquals(NUM_ITERATIONS, iteration.getMaximumNumberOfIterations)
       assertArrayEquals(ITERATION_KEYS, iteration.getSolutionSetKeyFields)
-      assertEquals(ITERATION_DOP, iteration.getDegreeOfParallelism)
+      assertEquals(ITERATION_PARALLELISM, iteration.getParallelism)
       assertEquals(ITERATION_NAME, iteration.getName)
 
       val nextWorksetMapper: MapOperatorBase[_, _, _] =

@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.flink.api.common.accumulators;
 
 import java.io.Serializable;
@@ -41,7 +40,8 @@ public class AccumulatorHelper {
 			if (ownAccumulator == null) {
 				// Take over counter from chained task
 				target.put(otherEntry.getKey(), otherEntry.getValue());
-			} else {
+			}
+			else {
 				// Both should have the same type
 				AccumulatorHelper.compareAccumulatorTypes(otherEntry.getKey(),
 						ownAccumulator.getClass(), otherEntry.getValue().getClass());
@@ -69,13 +69,27 @@ public class AccumulatorHelper {
 	 * Compare both classes and throw {@link UnsupportedOperationException} if
 	 * they differ
 	 */
+	@SuppressWarnings("rawtypes")
 	public static void compareAccumulatorTypes(Object name,
-			@SuppressWarnings("rawtypes") Class<? extends Accumulator> first,
-			@SuppressWarnings("rawtypes") Class<? extends Accumulator> second)
-			throws UnsupportedOperationException {
+												Class<? extends Accumulator> first,
+												Class<? extends Accumulator> second)
+			throws UnsupportedOperationException
+	{
+		if (first == null || second == null) {
+			throw new NullPointerException();
+		}
+
 		if (first != second) {
-			throw new UnsupportedOperationException("The accumulator object '" + name
-					+ "' was created with two different types: " + first + " and " + second);
+			if (!first.getName().equals(second.getName())) {
+				throw new UnsupportedOperationException("The accumulator object '" + name
+					+ "' was created with two different types: " + first.getName() + " and " + second.getName());
+			} else {
+				// damn, name is the same, but different classloaders
+				throw new UnsupportedOperationException("The accumulator object '" + name
+						+ "' was created with two different classes: " + first + " and " + second
+						+ " Both have the same type (" + first.getName() + ") but different classloaders: "
+						+ first.getClassLoader() + " and " + second.getClassLoader());
+			}
 		}
 	}
 
@@ -109,12 +123,13 @@ public class AccumulatorHelper {
 		return builder.toString();
 	}
 
-	public static void resetAndClearAccumulators(
-			Map<String, Accumulator<?, ?>> accumulators) {
-		for (Map.Entry<String, Accumulator<?, ?>> entry : accumulators.entrySet()) {
-			entry.getValue().resetLocal();
+	public static void resetAndClearAccumulators(Map<String, Accumulator<?, ?>> accumulators) {
+		if (accumulators != null) {
+			for (Map.Entry<String, Accumulator<?, ?>> entry : accumulators.entrySet()) {
+				entry.getValue().resetLocal();
+			}
+			accumulators.clear();
 		}
-		accumulators.clear();
 	}
 
 	public static Map<String, Accumulator<?, ?>> copy(final Map<String, Accumulator<?,

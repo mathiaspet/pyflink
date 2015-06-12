@@ -19,6 +19,7 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.aggregation.Aggregations;
 import org.apache.flink.api.java.io.CsvInputFormat;
+import org.apache.flink.api.java.io.PrintingOutputFormat;
 import org.apache.flink.api.java.operators.AggregateOperator;
 import org.apache.flink.api.java.operators.CrossOperator.DefaultCross;
 import org.apache.flink.api.java.operators.CrossOperator.ProjectCross;
@@ -249,7 +250,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		for (int x = 0; x < types.getArity(); x++) {
 			classes[x] = types.getField(x).getClass();
 		}
-		sets.put(id, env.createInput(new CsvInputFormat(new Path(path), lineDelimiter, fieldDelimiter, classes), getForObject(types)).name("CsvSource"));
+		sets.put(id, env.createInput(new CsvInputFormat(new Path(path), lineDelimiter, fieldDelimiter, getForObject(types)), getForObject(types)).name("CsvSource"));
 	}
 
 	private void createTextSource() throws IOException {
@@ -301,7 +302,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		int parentID = (Integer) receiver.getRecord(true);
 		DataSet parent = (DataSet) sets.get(parentID);
 		boolean toError = (Boolean) receiver.getRecord();
-		(toError ? parent.printToErr() : parent.print()).name("PrintSink");
+		parent.output(new PrintingOutputFormat(toError));
 	}
 
 	private void createBroadcastVariable() throws IOException {

@@ -30,6 +30,7 @@ import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.operators.BinaryOperatorInformation;
+import org.apache.flink.api.common.operators.DualInputSemanticProperties;
 import org.apache.flink.api.common.operators.Operator;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.common.operators.Ordering;
@@ -40,6 +41,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.Utils;
+import org.apache.flink.api.java.functions.SemanticPropUtil;
 import org.apache.flink.api.java.operators.DeltaIteration.SolutionSetPlaceHolder;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.operators.Keys.ExpressionKeys;
@@ -122,11 +124,36 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 
 		this.keys1 = keys1;
 		this.keys2 = keys2;
+
+		UdfOperatorUtils.analyzeDualInputUdf(this, CoGroupFunction.class, defaultName, function, keys1, keys2);
 	}
 	
 	@Override
 	protected CoGroupFunction<I1, I2, OUT> getFunction() {
 		return function;
+	}
+
+	@Override
+	public DualInputSemanticProperties getSemanticProperties() {
+
+		DualInputSemanticProperties props = super.getSemanticProperties();
+
+		// offset semantic information by extracted key fields
+		if(props != null &&
+					(this.keys1 instanceof Keys.SelectorFunctionKeys ||
+					this.keys2 instanceof Keys.SelectorFunctionKeys)) {
+
+			int numFields1 = this.getInput1Type().getTotalFields();
+			int numFields2 = this.getInput2Type().getTotalFields();
+			int offset1 = (this.keys1 instanceof Keys.SelectorFunctionKeys) ?
+					((Keys.SelectorFunctionKeys<?,?>) this.keys1).getKeyType().getTotalFields() : 0;
+			int offset2 = (this.keys2 instanceof Keys.SelectorFunctionKeys) ?
+					((Keys.SelectorFunctionKeys<?,?>) this.keys2).getKeyType().getTotalFields() : 0;
+
+			props = SemanticPropUtil.addSourceFieldOffsets(props, numFields1, numFields2, offset1, offset2);
+		}
+
+		return props;
 	}
 
 	protected Keys<I1> getKeys1() {
@@ -191,7 +218,7 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 			po = translateSelectorFunctionCoGroup(selectorKeys1, selectorKeys2, function,
 					getInput1Type(), getInput2Type(), getResultType(), name, input1, input2);
 
-			po.setDegreeOfParallelism(getParallelism());
+			po.setParallelism(getParallelism());
 			po.setCustomPartitioner(customPartitioner);
 		}
 		else if (keys2 instanceof Keys.SelectorFunctionKeys) {
@@ -204,7 +231,7 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 			po = translateSelectorFunctionCoGroupRight(logicalKeyPositions1, selectorKeys2, function,
 							getInput1Type(), getInput2Type(), getResultType(), name, input1, input2);
 
-			po.setDegreeOfParallelism(getParallelism());
+			po.setParallelism(getParallelism());
 			po.setCustomPartitioner(customPartitioner);
 		}
 		else if (keys1 instanceof Keys.SelectorFunctionKeys) {
@@ -242,7 +269,7 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 		}
 		
 		// configure shared characteristics
-		po.setDegreeOfParallelism(getParallelism());
+		po.setParallelism(getParallelism());
 		po.setCustomPartitioner(customPartitioner);
 		
 		if (groupSortKeyOrderFirst.size() > 0) {
@@ -292,9 +319,9 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 
 		keyMapper1.setInput(input1);
 		keyMapper2.setInput(input2);
-		// set dop
-		keyMapper1.setDegreeOfParallelism(input1.getDegreeOfParallelism());
-		keyMapper2.setDegreeOfParallelism(input2.getDegreeOfParallelism());
+		// set parallelism
+		keyMapper1.setParallelism(input1.getParallelism());
+		keyMapper2.setParallelism(input2.getParallelism());
 
 		return cogroup;
 	}
@@ -338,8 +365,8 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 		cogroup.setSecondInput(keyMapper2);
 
 		keyMapper2.setInput(input2);
-		// set dop
-		keyMapper2.setDegreeOfParallelism(input2.getDegreeOfParallelism());
+		// set parallelism
+		keyMapper2.setParallelism(input2.getParallelism());
 
 		return cogroup;
 	}
@@ -382,8 +409,8 @@ public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OU
 		cogroup.setSecondInput(input2);
 
 		keyMapper1.setInput(input1);
-		// set dop
-		keyMapper1.setDegreeOfParallelism(input1.getDegreeOfParallelism());
+		// set parallelism
+		keyMapper1.setParallelism(input1.getParallelism());
 
 		return cogroup;
 	}

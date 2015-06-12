@@ -17,31 +17,30 @@
  */
 package org.apache.flink.api.scala
 
-import java.lang
-import org.apache.commons.lang3.Validate
 import org.apache.flink.api.common.InvalidProgramException
+import org.apache.flink.api.common.accumulators.SerializedListAccumulator
 import org.apache.flink.api.common.aggregators.Aggregator
 import org.apache.flink.api.common.functions._
 import org.apache.flink.api.common.io.{FileOutputFormat, OutputFormat}
 import org.apache.flink.api.common.operators.Order
+import org.apache.flink.api.common.operators.base.CrossOperatorBase.CrossHint
+import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
 import org.apache.flink.api.common.operators.base.PartitionOperatorBase.PartitionMethod
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.Utils.CountHelper
 import org.apache.flink.api.java.aggregation.Aggregations
 import org.apache.flink.api.java.functions.{FirstReducer, KeySelector}
 import org.apache.flink.api.java.io.{DiscardingOutputFormat, PrintingOutputFormat, TextOutputFormat}
-import org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint
-import org.apache.flink.api.common.operators.base.CrossOperatorBase.CrossHint
 import org.apache.flink.api.java.operators.Keys.ExpressionKeys
 import org.apache.flink.api.java.operators._
-import org.apache.flink.api.java.{DataSet => JavaDataSet, SortPartitionOperator, Utils}
-import org.apache.flink.api.scala.operators.{ScalaCsvOutputFormat, ScalaAggregateOperator}
+import org.apache.flink.api.java.{DataSet => JavaDataSet, Utils}
+import org.apache.flink.api.scala.operators.{ScalaAggregateOperator, ScalaCsvOutputFormat}
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.{FileSystem, Path}
-import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.util.{AbstractID, Collector}
+
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
-
 
 /**
  * The DataSet, the basic abstraction of Flink. This represents a collection of elements of a
@@ -71,7 +70,7 @@ import scala.reflect.ClassTag
  * are named similarly. All functions are available in package
  * `org.apache.flink.api.common.functions`.
  *
- * The elements are partitioned depending on the degree of parallelism of the
+ * The elements are partitioned depending on the parallelism of the
  * [[ExecutionEnvironment]] or of one specific DataSet.
  *
  * Most of the operations have an implicit [[TypeInformation]] parameter. This is supplied by
@@ -84,12 +83,12 @@ import scala.reflect.ClassTag
  * @tparam T The type of the DataSet, i.e., the type of the elements of the DataSet.
  */
 class DataSet[T: ClassTag](set: JavaDataSet[T]) {
-  Validate.notNull(set, "Java DataSet must not be null.")
+  require(set != null, "Java DataSet must not be null.")
 
   /**
    * Returns the TypeInformation for the elements of this DataSet.
    */
-  def getType: TypeInformation[T] = set.getType
+  def getType(): TypeInformation[T] = set.getType
 
   /**
    * Returns the execution environment associated with the current DataSet.
@@ -148,13 +147,13 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
   }
 
   /**
-   * Sets the degree of parallelism of this operation. This must be greater than 1.
+   * Sets the parallelism of this operation. This must be greater than 1.
    */
-  def setParallelism(dop: Int) = {
+  def setParallelism(parallelism: Int) = {
     javaSet match {
-      case ds: DataSource[_] => ds.setParallelism(dop)
-      case op: Operator[_, _] => op.setParallelism(dop)
-      case di: DeltaIterationResultSet[_, _] => di.getIterationHead.parallelism(dop)
+      case ds: DataSource[_] => ds.setParallelism(parallelism)
+      case op: Operator[_, _] => op.setParallelism(parallelism)
+      case di: DeltaIterationResultSet[_, _] => di.getIterationHead.parallelism(parallelism)
       case _ =>
         throw new UnsupportedOperationException("Operator " + javaSet.toString + " cannot have " +
           "parallelism.")
@@ -163,7 +162,7 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
   }
 
   /**
-   * Returns the degree of parallelism of this operation.
+   * Returns the parallelism of this operation.
    */
   def getParallelism: Int = javaSet match {
     case ds: DataSource[_] => ds.getParallelism
@@ -519,9 +518,9 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * @see org.apache.flink.api.java.Utils.CountHelper
    */
   @throws(classOf[Exception])
-  def count: Long = {
+  def count(): Long = {
     val id = new AbstractID().toString
-    javaSet.flatMap(new CountHelper[T](id)).output(new DiscardingOutputFormat[lang.Long])
+    javaSet.flatMap(new CountHelper[T](id)).output(new DiscardingOutputFormat[java.lang.Long])
     val res = getExecutionEnvironment.execute()
     res.getAccumulatorResult[Long](id)
   }
@@ -530,16 +529,33 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * Convenience method to get the elements of a DataSet as a List
    * As DataSet can contain a lot of data, this method should be used with caution.
    *
-   * @return A List containing the elements of the DataSet
+   * @return A Seq containing the elements of the DataSet
    *
    * @see org.apache.flink.api.java.Utils.CollectHelper
    */
   @throws(classOf[Exception])
-  def collect: List[T] = {
+  def collect(): Seq[T] = {
     val id = new AbstractID().toString
-    javaSet.flatMap(new Utils.CollectHelper[T](id)).output(new DiscardingOutputFormat[T])
+    val serializer = getType().createSerializer(getExecutionEnvironment.getConfig)
+    
+    javaSet.flatMap(new Utils.CollectHelper[T](id, serializer))
+           .output(new DiscardingOutputFormat[T])
+    
     val res = getExecutionEnvironment.execute()
-    res.getAccumulatorResult(id).asInstanceOf[List[T]]
+
+    val accResult: java.util.ArrayList[Array[Byte]] = res.getAccumulatorResult(id)
+
+    try {
+      SerializedListAccumulator.deserializeList(accResult, serializer).asScala
+    }
+    catch {
+      case e: ClassNotFoundException => {
+        throw new RuntimeException("Cannot find type class of collected data type.", e)
+      }
+      case e: java.io.IOException => {
+        throw new RuntimeException("Serialization error while deserializing collected data", e)
+      }
+    }
   }
 
   /**
@@ -621,6 +637,62 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
     wrap(new GroupReduceOperator[T, R](javaSet,
       implicitly[TypeInformation[R]],
       reducer,
+      getCallLocationName()))
+  }
+
+  /**
+   *  Applies a CombineFunction on a grouped [[DataSet]].  A
+   *  CombineFunction is similar to a GroupReduceFunction but does not
+   *  perform a full data exchange. Instead, the CombineFunction calls
+   *  the combine method once per partition for combining a group of
+   *  results. This operator is suitable for combining values into an
+   *  intermediate format before doing a proper groupReduce where the
+   *  data is shuffled across the node for further reduction. The
+   *  GroupReduce operator can also be supplied with a combiner by
+   *  implementing the RichGroupReduce function. The combine method of
+   *  the RichGroupReduce function demands input and output type to be
+   *  the same. The CombineFunction, on the other side, can have an
+   *  arbitrary output type.
+   */
+  def combineGroup[R: TypeInformation: ClassTag](
+      combiner: GroupCombineFunction[T, R]): DataSet[R] = {
+    if (combiner == null) {
+      throw new NullPointerException("Combine function must not be null.")
+    }
+    wrap(new GroupCombineOperator[T, R](javaSet,
+      implicitly[TypeInformation[R]],
+      combiner,
+      getCallLocationName()))
+  }
+
+  /**
+   *  Applies a CombineFunction on a grouped [[DataSet]].  A
+   *  CombineFunction is similar to a GroupReduceFunction but does not
+   *  perform a full data exchange. Instead, the CombineFunction calls
+   *  the combine method once per partition for combining a group of
+   *  results. This operator is suitable for combining values into an
+   *  intermediate format before doing a proper groupReduce where the
+   *  data is shuffled across the node for further reduction. The
+   *  GroupReduce operator can also be supplied with a combiner by
+   *  implementing the RichGroupReduce function. The combine method of
+   *  the RichGroupReduce function demands input and output type to be
+   *  the same. The CombineFunction, on the other side, can have an
+   *  arbitrary output type.
+   */
+  def combineGroup[R: TypeInformation: ClassTag](
+      fun: (Iterator[T], Collector[R]) => Unit): DataSet[R] = {
+    if (fun == null) {
+      throw new NullPointerException("Combine function must not be null.")
+    }
+    val combiner = new GroupCombineFunction[T, R] {
+      val cleanFun = clean(fun)
+      def combine(in: java.lang.Iterable[T], out: Collector[R]) {
+        cleanFun(in.iterator().asScala, out)
+      }
+    }
+    wrap(new GroupCombineOperator[T, R](javaSet,
+      implicitly[TypeInformation[R]],
+      combiner,
       getCallLocationName()))
   }
 
@@ -732,7 +804,6 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * This will not create a new DataSet, it will just attach the field names which will be
    * used for grouping when executing a grouped operation.
    *
-   * This only works on CaseClass DataSets.
    */
   def groupBy(firstField: String, otherFields: String*): GroupedDataSet[T] = {
     new GroupedDataSet[T](
@@ -1014,7 +1085,7 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
 //   * operators that are composed of multiple steps.
 //   */
 //  def runOperation[R: ClassTag](operation: CustomUnaryOperation[T, R]): DataSet[R] = {
-//    Validate.notNull(operation, "The custom operator must not be null.")
+//    require(operation != null, "The custom operator must not be null.")
 //    operation.setInput(this.set)
 //    wrap(operation.createResult)
 //  }
@@ -1217,7 +1288,7 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
       rowDelimiter: String = ScalaCsvOutputFormat.DEFAULT_LINE_DELIMITER,
       fieldDelimiter: String = ScalaCsvOutputFormat.DEFAULT_FIELD_DELIMITER,
       writeMode: FileSystem.WriteMode = null): DataSink[T] = {
-    Validate.isTrue(javaSet.getType.isTupleType, "CSV output can only be used with Tuple DataSets.")
+    require(javaSet.getType.isTupleType, "CSV output can only be used with Tuple DataSets.")
     val of = new ScalaCsvOutputFormat[Product](new Path(filePath), rowDelimiter, fieldDelimiter)
     if (writeMode != null) {
       of.setWriteMode(writeMode)
@@ -1233,8 +1304,8 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
       outputFormat: FileOutputFormat[T],
       filePath: String,
       writeMode: FileSystem.WriteMode = null): DataSink[T] = {
-    Validate.notNull(filePath, "File path must not be null.")
-    Validate.notNull(outputFormat, "Output format must not be null.")
+    require(filePath != null, "File path must not be null.")
+    require(outputFormat != null, "Output format must not be null.")
     outputFormat.setOutputFilePath(new Path(filePath))
     if (writeMode != null) {
       outputFormat.setWriteMode(writeMode)
@@ -1248,21 +1319,80 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
   def output(outputFormat: OutputFormat[T]): DataSink[T] = {
     javaSet.output(outputFormat)
   }
-
+  
   /**
-   * Writes a DataSet to the standard output stream (stdout). This uses [[AnyRef.toString]] on
-   * each element.
+   * Prints the elements in a DataSet to the standard output stream [[System.out]] of the
+   * JVM that calls the print() method. For programs that are executed in a cluster, this
+   * method needs to gather the contents of the DataSet back to the client, to print it
+   * there.
+   *
+   * The string written for each element is defined by the [[AnyRef.toString]] method.
+   *
+   * This method immediately triggers the program execution, similar to the
+   * [[collect()]] and [[count()]] methods.
    */
-  def print(): DataSink[T] = {
-    output(new PrintingOutputFormat[T](false))
+  def print(): Unit = {
+    javaSet.print()
+  }
+  
+  /**
+   * Prints the elements in a DataSet to the standard error stream [[System.err]] of the
+   * JVM that calls the print() method. For programs that are executed in a cluster, this
+   * method needs to gather the contents of the DataSet back to the client, to print it
+   * there.
+   *
+   * The string written for each element is defined by the [[AnyRef.toString]] method.
+   *
+   * This method immediately triggers the program execution, similar to the
+   * [[collect()]] and [[count()]] methods.
+   */
+  def printToErr(): Unit = {
+    javaSet.printToErr()
   }
 
   /**
-   * Writes a DataSet to the standard error stream (stderr).This uses [[AnyRef.toString]] on
-   * each element.
+   * Writes a DataSet to the standard output streams (stdout) of the TaskManagers that execute
+   * the program (or more specifically, the data sink operators). On a typical cluster setup, the
+   * data will appear in the TaskManagers' <i>.out</i> files.
+   *
+   * To print the data to the console or stdout stream of the client process instead, use the
+   * [[print()]] method.
+   *
+   * For each element of the DataSet the result of [[AnyRef.toString()]] is written.
+   *
+   * @param prefix The string to prefix each line of the output with. This helps identifying outputs
+   *               from different printing sinks.   
+   * @return The DataSink operator that writes the DataSet.
    */
-  def printToErr(): DataSink[T] = {
-    output(new PrintingOutputFormat[T](true))
+  def printOnTaskManager(prefix: String): DataSink[T] = {
+    javaSet.printOnTaskManager(prefix)
+  }
+  
+  /**
+   * *
+   * Writes a DataSet to the standard output stream (stdout) with a sink identifier prefixed.
+   * This uses [[AnyRef.toString]] on each element.
+   * @param sinkIdentifier The string to prefix the output with.
+   * 
+   * @deprecated Use [[printOnTaskManager(String)]] instead.
+   */
+  @Deprecated
+  @deprecated
+  def print(sinkIdentifier: String): DataSink[T] = {
+    output(new PrintingOutputFormat[T](sinkIdentifier, false))
+  }
+
+  /**
+   * Writes a DataSet to the standard error stream (stderr) with a sink identifier prefixed.
+   * This uses [[AnyRef.toString]] on each element.
+   * @param sinkIdentifier The string to prefix the output with.
+   * 
+   * @deprecated Use [[printOnTaskManager(String)]] instead.
+   */
+  @Deprecated
+  @deprecated
+  def printToErr(sinkIdentifier: String): DataSink[T] = {
+      output(new PrintingOutputFormat[T](sinkIdentifier, true))
   }
 }
 

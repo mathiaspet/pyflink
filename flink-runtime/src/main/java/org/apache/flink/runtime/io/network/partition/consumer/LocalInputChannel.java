@@ -18,19 +18,24 @@
 
 package org.apache.flink.runtime.io.network.partition.consumer;
 
-import com.google.common.base.Optional;
 import org.apache.flink.runtime.event.task.TaskEvent;
-import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
 import org.apache.flink.runtime.io.network.TaskEventDispatcher;
+import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
+import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
-import org.apache.flink.runtime.io.network.partition.IntermediateResultPartitionManager;
-import org.apache.flink.runtime.io.network.partition.queue.IntermediateResultPartitionQueueIterator;
-import org.apache.flink.runtime.jobgraph.IntermediateResultPartitionID;
+import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
+import org.apache.flink.runtime.io.network.partition.ProducerFailedException;
+import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
+import org.apache.flink.runtime.io.network.partition.ResultSubpartitionView;
 import org.apache.flink.runtime.util.event.NotificationListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Tuple2;
 
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -42,24 +47,41 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 
 	private static final Logger LOG = LoggerFactory.getLogger(LocalInputChannel.class);
 
-	private final IntermediateResultPartitionManager partitionManager;
+	private final Object requestLock = new Object();
 
+	/** The local partition manager. */
+	private final ResultPartitionManager partitionManager;
+
+	/** Task event dispatcher for backwards events. */
 	private final TaskEventDispatcher taskEventDispatcher;
 
-	private IntermediateResultPartitionQueueIterator queueIterator;
+	/** The consumed subpartition */
+	private volatile ResultSubpartitionView subpartitionView;
 
-	private boolean isReleased;
+	private volatile boolean isReleased;
 
 	private volatile Buffer lookAhead;
 
-	public LocalInputChannel(
-			SingleInputGate gate, int channelIndex,
-			ExecutionAttemptID producerExecutionId,
-			IntermediateResultPartitionID partitionId,
-			IntermediateResultPartitionManager partitionManager,
+	LocalInputChannel(
+			SingleInputGate inputGate,
+			int channelIndex,
+			ResultPartitionID partitionId,
+			ResultPartitionManager partitionManager,
 			TaskEventDispatcher taskEventDispatcher) {
 
-		super(gate, channelIndex, producerExecutionId, partitionId);
+		this(inputGate, channelIndex, partitionId, partitionManager, taskEventDispatcher,
+				new Tuple2<Integer, Integer>(0, 0));
+	}
+
+	LocalInputChannel(
+			SingleInputGate inputGate,
+			int channelIndex,
+			ResultPartitionID partitionId,
+			ResultPartitionManager partitionManager,
+			TaskEventDispatcher taskEventDispatcher,
+			Tuple2<Integer, Integer> initialAndMaxBackoff) {
+
+		super(inputGate, channelIndex, partitionId, initialAndMaxBackoff);
 
 		this.partitionManager = checkNotNull(partitionManager);
 		this.taskEventDispatcher = checkNotNull(taskEventDispatcher);
@@ -70,29 +92,76 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 	// ------------------------------------------------------------------------
 
 	@Override
-	public void requestIntermediateResultPartition(int queueIndex) throws IOException {
-		if (queueIterator == null) {
-			LOG.debug("Requesting LOCAL queue {} from partition {} produced by {}.", queueIndex, partitionId,
-						producerExecutionId);
+	void requestSubpartition(int subpartitionIndex) throws IOException, InterruptedException {
+		// The lock is required to request only once in the presence of retriggered requests.
+		synchronized (requestLock) {
+			if (subpartitionView == null) {
+				LOG.debug("{}: Requesting LOCAL subpartition {} of partition {}.",
+						this, subpartitionIndex, partitionId);
 
-			queueIterator = partitionManager.getIntermediateResultPartitionIterator(
-					producerExecutionId, partitionId, queueIndex, Optional.of(inputGate.getBufferProvider()));
+				try {
+					subpartitionView = partitionManager.createSubpartitionView(
+							partitionId, subpartitionIndex, inputGate.getBufferProvider());
+				}
+				catch (PartitionNotFoundException notFound) {
+					if (increaseBackoff()) {
+						inputGate.retriggerPartitionRequest(partitionId.getPartitionId());
+						return;
+					}
+					else {
+						throw notFound;
+					}
+				}
 
-			getNextLookAhead();
+				if (subpartitionView == null) {
+					throw new IOException("Error requesting subpartition.");
+				}
+
+				getNextLookAhead();
+			}
+		}
+	}
+
+	/**
+	 * Retriggers a subpartition request.
+	 */
+	void retriggerSubpartitionRequest(Timer timer, final int subpartitionIndex) throws IOException, InterruptedException {
+		synchronized (requestLock) {
+			checkState(subpartitionView == null, "Already requested partition.");
+
+			timer.schedule(new TimerTask() {
+				@Override
+				public void run() {
+					try {
+						requestSubpartition(subpartitionIndex);
+					}
+					catch (Throwable t) {
+						setError(t);
+					}
+				}
+			}, getCurrentBackoff());
 		}
 	}
 
 	@Override
-	public Buffer getNextBuffer() throws IOException {
-		checkState(queueIterator != null, "Queried for a buffer before requesting a queue.");
+	Buffer getNextBuffer() throws IOException, InterruptedException {
+		checkError();
+		checkState(subpartitionView != null, "Queried for a buffer before requesting the subpartition.");
 
 		// After subscribe notification
 		if (lookAhead == null) {
-			lookAhead = queueIterator.getNextBuffer();
+			lookAhead = subpartitionView.getNextBuffer();
 		}
 
 		Buffer next = lookAhead;
 		lookAhead = null;
+
+		if (!next.isBuffer() && EventSerializer
+				.fromBuffer(next, getClass().getClassLoader())
+				.getClass() == EndOfPartitionEvent.class) {
+
+				return next;
+		}
 
 		getNextLookAhead();
 
@@ -104,10 +173,11 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 	// ------------------------------------------------------------------------
 
 	@Override
-	public void sendTaskEvent(TaskEvent event) throws IOException {
-		checkState(queueIterator != null, "Tried to send task event to producer before requesting a queue.");
+	void sendTaskEvent(TaskEvent event) throws IOException {
+		checkError();
+		checkState(subpartitionView != null, "Tried to send task event to producer before requesting the subpartition.");
 
-		if (!taskEventDispatcher.publish(producerExecutionId, partitionId, event)) {
+		if (!taskEventDispatcher.publish(partitionId, event)) {
 			throw new IOException("Error while publishing event " + event + " to producer. The producer could not be found.");
 		}
 	}
@@ -117,8 +187,15 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 	// ------------------------------------------------------------------------
 
 	@Override
-	public boolean isReleased() {
+	boolean isReleased() {
 		return isReleased;
+	}
+
+	@Override
+	void notifySubpartitionConsumed() throws IOException {
+		if (subpartitionView != null) {
+			subpartitionView.notifySubpartitionConsumed();
+		}
 	}
 
 	/**
@@ -126,16 +203,16 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 	 * iterator.
 	 */
 	@Override
-	public void releaseAllResources() throws IOException {
+	void releaseAllResources() throws IOException {
 		if (!isReleased) {
 			if (lookAhead != null) {
 				lookAhead.recycle();
 				lookAhead = null;
 			}
 
-			if (queueIterator != null) {
-				queueIterator.discard();
-				queueIterator = null;
+			if (subpartitionView != null) {
+				subpartitionView.releaseAllResources();
+				subpartitionView = null;
 			}
 
 			isReleased = true;
@@ -144,7 +221,7 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 
 	@Override
 	public String toString() {
-		return "LOCAL " + super.toString();
+		return "LocalInputChannel [" + partitionId + "]";
 	}
 
 	// ------------------------------------------------------------------------
@@ -153,21 +230,46 @@ public class LocalInputChannel extends InputChannel implements NotificationListe
 
 	@Override
 	public void onNotification() {
-		notifyAvailableBuffer();
+		if (isReleased) {
+			return;
+		}
+
+		try {
+			getNextLookAhead();
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	// ------------------------------------------------------------------------
 
-	private void getNextLookAhead() throws IOException {
+	private void getNextLookAhead() throws IOException, InterruptedException {
+
+		final ResultSubpartitionView view = subpartitionView;
+
+		if (view == null) {
+			return;
+		}
+
 		while (true) {
-			lookAhead = queueIterator.getNextBuffer();
+			lookAhead = view.getNextBuffer();
 
 			if (lookAhead != null) {
 				notifyAvailableBuffer();
 				break;
 			}
 
-			if (queueIterator.subscribe(this) || queueIterator.isConsumed()) {
+			if (view.registerListener(this)) {
+				return;
+			}
+			else if (view.isReleased()) {
+				Throwable cause = view.getFailureCause();
+
+				if (cause != null) {
+					setError(new ProducerFailedException(cause));
+				}
+
 				return;
 			}
 		}

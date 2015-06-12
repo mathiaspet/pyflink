@@ -18,9 +18,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
-	<modelVersion>4.0.0</modelVersion>
+    <modelVersion>4.0.0</modelVersion>
 
 	<parent>
 		<groupId>org.apache.flink</groupId>
@@ -28,6 +28,7 @@ under the License.
 		<version>0.9-SNAPSHOT</version>
 		<relativePath>..</relativePath>
 	</parent>
+
 
 	<artifactId>flink-staging</artifactId>
 	<name>flink-staging</name>
@@ -42,7 +43,8 @@ under the License.
 		<module>flink-hbase</module>
 		<module>flink-gelly</module>
 		<module>flink-hcatalog</module>
-		<module>flink-expressions</module>
+		<module>flink-table</module>
+		<module>flink-ml</module>
 		<module>flink-language-binding</module>
 	</modules>
 	
@@ -63,6 +65,28 @@ under the License.
 				<module>flink-tachyon</module>
 			</modules>
 		</profile>
-	</profiles>
+		<profile>
+			<id>include-tez</id>
+			<modules>
+				<module>flink-tez</module>
+			</modules>
+		</profile>
+		<profile>
+			<id>scala-2.10</id>
+			<activation>
 
+				<property>
+					<!-- this is the default scala profile -->
+					<name>!scala-2.11</name>
+				</property>
+			</activation>
+			<properties>
+				<scala.version>2.10.4</scala.version>
+				<scala.binary.version>2.10</scala.binary.version>
+			</properties>
+			<modules>
+				<module>flink-scala-shell</module>
+			</modules>
+		</profile>
+	</profiles>
 </project>

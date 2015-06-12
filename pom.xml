@@ -7,9 +7,7 @@ regarding copyright ownership.  The ASF licenses this file
 to you under the Apache License, Version 2.0 (the
 "License"); you may not use this file except in compliance
 with the License.  You may obtain a copy of the License at
-
   http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing,
 software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+		 xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
 	<parent>
 		<groupId>org.apache</groupId>
@@ -52,12 +50,12 @@ under the License.
 	</scm>
 
 	<modules>
-		<module>flink-shaded</module>
+		<module>flink-shaded-hadoop</module>
 		<module>flink-core</module>
 		<module>flink-java</module>
 		<module>flink-scala</module>
 		<module>flink-runtime</module>
-		<module>flink-compiler</module>
+		<module>flink-optimizer</module>
 		<module>flink-examples</module>
 		<module>flink-clients</module>
 		<module>flink-tests</module>
@@ -71,9 +69,9 @@ under the License.
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<shading-artifact.name>error</shading-artifact.name>
 		<hadoop-one.version>1.2.1</hadoop-one.version>
 		<hadoop-two.version>2.2.0</hadoop-two.version>
-		<scala.version>2.10.4</scala.version>
 		<!-- Need to use a user property here because the surefire/failsafe
 			 forkCount is not exposed as a property. With this we can set
 			 it on the "mvn" commandline in travis. -->
@@ -81,13 +79,13 @@ under the License.
 		<flink.reuseForks>true</flink.reuseForks>
 		<log4j.configuration>log4j-test.properties</log4j.configuration>
 		<slf4j.version>1.7.7</slf4j.version>
-		<guava.version>17.0</guava.version>
-		<scala.version>2.10.4</scala.version>
+		<guava.version>18.0</guava.version>
 		<akka.version>2.3.7</akka.version>
-		<scala.binary.version>2.10</scala.binary.version>
 		<scala.macros.version>2.0.1</scala.macros.version>
 		<kryoserialization.version>0.3.2</kryoserialization.version>
-		<protobuf.version>2.5.0</protobuf.version>
+		<chill.version>0.5.2</chill.version>
+		<asm.version>5.0.4</asm.version>
+		<tez.version>0.6.1</tez.version>
 	</properties>
 
 	<dependencies>
@@ -155,17 +153,19 @@ under the License.
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
-	
+
 	<!-- this section defines the module versions that are used if nothing else is specified. -->
 	<dependencyManagement>
+		<!-- WARN: 
+			DO NOT put 	guava, 
+						protobuf, 
+						asm,
+						netty
+					here. It will overwrite Hadoop's guava dependency (even though we handle it
+			separatly in the flink-shaded-hadoop module).
+			We can use all guava versions everywhere by adding it directly as a dependency to each project.
+		-->
 		<dependencies>
-		
-			<!-- ASM is used by us, Kryo, Hadoop, ... -->
-			<dependency>
-				<groupId>org.ow2.asm</groupId>
-				<artifactId>asm</artifactId>
-				<version>4.0</version>
-			</dependency>
 
 			<!-- Make sure we use a consistent jetty version throughout the project -->
 			<dependency>
@@ -200,21 +200,27 @@ under the License.
 				<artifactId>avro-ipc</artifactId>
 				<version>1.7.6</version>
 			</dependency>
-			
+
 			<!-- Make sure we use a consistent commons-cli version throughout the project -->
 			<dependency>
 				<groupId>commons-cli</groupId>
 				<artifactId>commons-cli</artifactId>
 				<version>1.2</version>
 			</dependency>
-			
+
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>2.4</version>
+			</dependency>
+
 			<!-- common-collections is used by us and by hadoop, so we need to define a common version -->
 			<dependency>
 				<groupId>commons-collections</groupId>
 				<artifactId>commons-collections</artifactId>
 				<version>3.2.1</version>
 			</dependency>
-			
+
 			<!-- Managed dependency required for HBase in flink-hbase -->
 			<dependency>
 				<groupId>org.javassist</groupId>
@@ -262,46 +268,52 @@ under the License.
 			</dependency>
 
 			<dependency>
+				<groupId>org.clapper</groupId>
+				<artifactId>grizzled-slf4j_${scala.binary.version}</artifactId>
+				<version>1.0.2</version>
+			</dependency>
+
+			<dependency>
 				<groupId>com.typesafe.akka</groupId>
-				<artifactId>akka-actor_2.10</artifactId>
+				<artifactId>akka-actor_${scala.binary.version}</artifactId>
 				<version>${akka.version}</version>
 			</dependency>
 
 			<dependency>
 				<groupId>com.typesafe.akka</groupId>
-				<artifactId>akka-remote_2.10</artifactId>
+				<artifactId>akka-remote_${scala.binary.version}</artifactId>
 				<version>${akka.version}</version>
 			</dependency>
 
 			<dependency>
 				<groupId>com.typesafe.akka</groupId>
-				<artifactId>akka-slf4j_2.10</artifactId>
+				<artifactId>akka-slf4j_${scala.binary.version}</artifactId>
 				<version>${akka.version}</version>
 			</dependency>
 
 			<dependency>
 				<groupId>com.typesafe.akka</groupId>
-				<artifactId>akka-camel_2.10</artifactId>
+				<artifactId>akka-camel_${scala.binary.version}</artifactId>
 				<version>${akka.version}</version>
 			</dependency>
 
 			<dependency>
 				<groupId>com.typesafe.akka</groupId>
-				<artifactId>akka-testkit_2.10</artifactId>
+				<artifactId>akka-testkit_${scala.binary.version}</artifactId>
 				<version>${akka.version}</version>
 				<scope>test</scope>
 			</dependency>
 
 			<dependency>
 				<groupId>org.scalatest</groupId>
-				<artifactId>scalatest_2.10</artifactId>
+				<artifactId>scalatest_${scala.binary.version}</artifactId>
 				<version>2.2.2</version>
 				<scope>test</scope>
 			</dependency>
 
 			<dependency>
 				<groupId>com.github.scopt</groupId>
-				<artifactId>scopt_2.10</artifactId>
+				<artifactId>scopt_${scala.binary.version}</artifactId>
 				<version>3.2.0</version>
 				<exclusions>
 					<exclusion>
@@ -310,294 +322,36 @@ under the License.
 					</exclusion>
 				</exclusions>
 			</dependency>
-
-
-			<!-- "Old" stable Hadoop = MapReduce v1 -->
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-core</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-
-			<!-- Hadoop 2 Dependencies -->
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-common</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>javax.servlet</groupId>
-						<artifactId>servlet-api</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>javax.servlet.jsp</groupId>
-						<artifactId>jsp-api</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-hdfs</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>javax.servlet</groupId>
-						<artifactId>servlet-api</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-client</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>javax.servlet</groupId>
-						<artifactId>servlet-api</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-mapreduce-client-core</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-yarn-common</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>com.google.inject.extensions</groupId>
-						<artifactId>guice-servlet</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>io.netty</groupId>
-						<artifactId>netty</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-yarn-client</artifactId>
-				<version>${hadoop.version}</version>
-				<exclusions>
-					<exclusion>
-						<groupId>asm</groupId>
-						<artifactId>asm</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-compiler</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>tomcat</groupId>
-						<artifactId>jasper-runtime</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-api-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jsp-2.1</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.mortbay.jetty</groupId>
-						<artifactId>jetty-util</artifactId>
-					</exclusion>
-					<exclusion>
-						<groupId>org.eclipse.jdt</groupId>
-						<artifactId>core</artifactId>
-					</exclusion>
-				</exclusions>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-yarn-common</artifactId>
-				<version>${hadoop.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-yarn-server-tests</artifactId>
-				<scope>test</scope>
-				<version>${hadoop.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>org.apache.hadoop</groupId>
-				<artifactId>hadoop-minicluster</artifactId>
-				<scope>test</scope>
-				<version>${hadoop.version}</version>
-			</dependency>
 		</dependencies>
 	</dependencyManagement>
 
 	<profiles>
+		<profile>
+			<id>scala-2.10</id>
+			<activation>
+				<property>
+					<!-- this is the default scala profile -->
+					<name>!scala-2.11</name>
+				</property>
+			</activation>
+			<properties>
+				<scala.version>2.10.4</scala.version>
+				<scala.binary.version>2.10</scala.binary.version>
+			</properties>
+		</profile>
+		<profile>
+			<id>scala-2.11</id>
+			<activation>
+				<property>
+					<name>scala-2.11</name>
+				</property>
+			</activation>
+			<properties>
+				<scala.version>2.11.4</scala.version>
+				<scala.binary.version>2.11</scala.binary.version>
+			</properties>
+		</profile>
+
 		<profile>
 			<id>hadoop-1</id>
 			<activation>
@@ -608,6 +362,7 @@ under the License.
 			</activation>
 			<properties>
 				<hadoop.version>${hadoop-one.version}</hadoop.version>
+				<shading-artifact.name>flink-shaded-hadoop1</shading-artifact.name>
 			</properties>
 		</profile>
 		<profile>
@@ -620,9 +375,16 @@ under the License.
 			</activation>
 			<properties>
 				<hadoop.version>${hadoop-two.version}</hadoop.version>
+				<shading-artifact.name>flink-shaded-hadoop2</shading-artifact.name>
 			</properties>
 		</profile>
 
+		<profile>
+			<id>include-tez</id>
+			<properties>
+				<hadoop.version>2.6.0</hadoop.version>
+			</properties>
+		</profile>
 		<profile>
 			<id>include-yarn</id>
 			<activation>
@@ -631,120 +393,13 @@ under the License.
 				<!--hadoop2--><name>!hadoop.profile</name>
 				</property>
 			</activation>
+			<properties>
+				<shading-artifact.name>flink-shaded-include-yarn</shading-artifact.name>
+			</properties>
 			<modules>
 				<module>flink-yarn</module>
 				<module>flink-yarn-tests</module>
 			</modules>
-		</profile>
-		<profile>
-			<id>hadoop-2.0.0-alpha</id>
-			<activation>
-				<property>
-					<name>hadoop.version</name>
-					<value>2.0.0-alpha</value>
-				</property>
-			</activation>
-			<properties>
-				<akka.version>2.2.1</akka.version>
-				<kryoserialization.version>0.3.1</kryoserialization.version>
-				<protobuf.version>2.4.1</protobuf.version>
-			</properties>
-			<dependencyManagement>
-				<dependencies>
-					<dependency>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-common</artifactId>
-						<version>${hadoop.version}</version>
-						<exclusions>
-							<!-- This is an additional exclusion (Netty) -->
-							<exclusion>
-								<groupId>org.jboss.netty</groupId>
-								<artifactId>netty</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>asm</groupId>
-								<artifactId>asm</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>tomcat</groupId>
-								<artifactId>jasper-compiler</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>tomcat</groupId>
-								<artifactId>jasper-runtime</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jetty</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>javax.servlet</groupId>
-								<artifactId>servlet-api</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jsp-api-2.1</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jsp-2.1</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jetty-util</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.eclipse.jdt</groupId>
-								<artifactId>core</artifactId>
-							</exclusion>
-						</exclusions>
-					</dependency>
-					<dependency>
-						<groupId>org.apache.hadoop</groupId>
-						<artifactId>hadoop-mapreduce-client-core</artifactId>
-						<version>${hadoop.version}</version>
-						<exclusions>
-							<!-- This is an additional exclusion (Netty) -->
-							<exclusion>
-								<groupId>org.jboss.netty</groupId>
-								<artifactId>netty</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>asm</groupId>
-								<artifactId>asm</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>tomcat</groupId>
-								<artifactId>jasper-compiler</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>tomcat</groupId>
-								<artifactId>jasper-runtime</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jetty</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jsp-api-2.1</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jsp-2.1</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.mortbay.jetty</groupId>
-								<artifactId>jetty-util</artifactId>
-							</exclusion>
-							<exclusion>
-								<groupId>org.eclipse.jdt</groupId>
-								<artifactId>core</artifactId>
-							</exclusion>
-						</exclusions>
-					</dependency>
-				</dependencies>
-			</dependencyManagement>
 		</profile>
 
 		<profile>
@@ -790,6 +445,86 @@ under the License.
 		</profile>
 
 		<profile>
+			<!-- used for aggregating  ScalaDoc with JavaDoc -->
+			<id>aggregate-scaladoc</id>
+			<build>
+				<plugins>
+
+					<!-- We need to clean compiled classes to make sure that genjavadoc
+					is called to generate our fake Java source from Scala source. -->
+					<plugin>
+						<artifactId>maven-clean-plugin</artifactId>
+						<version>2.5</version><!--$NO-MVN-MAN-VER$-->
+						<executions>
+							<execution>
+								<id>clean-target</id>
+								<phase>generate-sources</phase>
+								<goals>
+									<goal>clean</goal>
+								</goals>
+								<configuration>
+									<excludeDefaultDirectories>true</excludeDefaultDirectories>
+									<filesets>
+										<fileset>
+											<directory>${project.build.directory}</directory>
+											<includes>
+												<include>**/*.class</include>
+												<include>**/classes.*.timestamp</include>
+											</includes>
+										</fileset>
+									</filesets>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>net.alchim31.maven</groupId>
+						<artifactId>scala-maven-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>doc</id>
+								<phase>generate-sources</phase>
+								<goals>
+									<goal>compile</goal>
+								</goals>
+							</execution>
+						</executions>
+						<configuration>
+							<args>
+								<arg>-P:genjavadoc:out=${project.build.directory}/genjavadoc</arg>
+							</args>
+							<compilerPlugins>
+								<compilerPlugin>
+									<groupId>com.typesafe.genjavadoc</groupId>
+									<artifactId>genjavadoc-plugin_${scala.version}</artifactId>
+									<version>0.8</version>
+								</compilerPlugin>
+							</compilerPlugins>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>build-helper-maven-plugin</artifactId>
+						<executions>
+							<execution>
+								<phase>generate-sources</phase>
+								<goals>
+									<goal>add-source</goal>
+								</goals>
+								<configuration>
+									<sources>
+										<source>${project.build.directory}/genjavadoc</source>
+									</sources>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+
+		<profile>
 			<!-- used for SNAPSHOT and regular releases -->
 			<id>docs-and-source</id>
 			<build>
@@ -826,23 +561,24 @@ under the License.
 				</plugins>
 			</build>
 		</profile>
+		
 		<profile>
 			<id>release</id>
-				<build>
+			<build>
 				<plugins>
 					<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-gpg-plugin</artifactId>
-					<version>1.4</version>
-					<executions>
-						<execution>
-						<id>sign-artifacts</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>sign</goal>
-						</goals>
-						</execution>
-					</executions>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.4</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
 					</plugin>
 				</plugins>
 				<pluginManagement>
@@ -863,61 +599,39 @@ under the License.
 		</profile>
 		<profile>
 			<id>jdk8</id>
-				<activation>
-					<activeByDefault>false</activeByDefault>
-					<jdk>1.8</jdk>
-				</activation>
-				<modules>
-					<module>flink-java8</module>
-				</modules>
-				<build>
-					<plugins>
-						<plugin>
-							<groupId>org.apache.maven.plugins</groupId>
-							<artifactId>maven-javadoc-plugin</artifactId>
-							<version>2.9.1</version><!--$NO-MVN-MAN-VER$-->
-							<configuration>
-								<quiet>true</quiet>
-							</configuration>
-							<executions>
-								<execution>
-									<id>attach-javadocs</id>
-									<goals>
-										<goal>jar</goal>
-									</goals>
-									<configuration>
-										<additionalparam>-Xdoclint:none</additionalparam>
-									</configuration>
-								</execution>
-							</executions>
-						</plugin>
-					</plugins>
-				</build>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+				<jdk>1.8</jdk>
+			</activation>
+			<modules>
+				<module>flink-java8</module>
+			</modules>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<version>2.9.1</version><!--$NO-MVN-MAN-VER$-->
+						<configuration>
+							<quiet>true</quiet>
+						</configuration>
+						<executions>
+							<execution>
+								<id>attach-javadocs</id>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+								<configuration>
+									<additionalparam>-Xdoclint:none</additionalparam>
+									<detectOfflineLinks>false</detectOfflineLinks>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
 		</profile>
 	</profiles>
-
-	<reporting>
-		<plugins>
-			<!-- execution of Unit Tests -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-report-plugin</artifactId>
-				<version>2.17</version>
-			</plugin>
-
-			<!-- test coverage reports -->
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>cobertura-maven-plugin</artifactId>
-				<version>2.6</version>
-				<configuration>
-					<formats>
-						<format>html</format>
-					</formats>
-				</configuration>
-			</plugin>
-		</plugins>
-	</reporting>
 
 	<build>
 		<plugins>
@@ -934,43 +648,11 @@ under the License.
 					</archive>
 				</configuration>
 			</plugin>
-			
-			<!-- Relocate references to Google Guava classes into a different namespace -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.3</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<shadedArtifactAttached>false</shadedArtifactAttached>
-							<createDependencyReducedPom>false</createDependencyReducedPom>
-							<artifactSet>
-								<includes>
-									<include>org.apache.flink:${project.artifact}</include>
-								</includes>
-							</artifactSet>
-							<relocations>
-								<relocation>
-									<pattern>com.google</pattern>
-									<shadedPattern>org.apache.flink.shaded.com.google</shadedPattern>
-									<excludes>
-										<exclude>com.google.protobuf.**</exclude>
-									</excludes>
-								</relocation>
-							</relocations>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+
 			<plugin>
 				<groupId>org.apache.rat</groupId>
 				<artifactId>apache-rat-plugin</artifactId>
-				<version>0.10</version><!--$NO-MVN-MAN-VER$-->
+				<version>0.11</version><!--$NO-MVN-MAN-VER$-->
 				<inherited>false</inherited>
 				<executions>
 					<execution>
@@ -992,9 +674,7 @@ under the License.
 							to you under the Apache License, Version 2.0 (the
 							"License"); you may not use this file except in compliance
 							with the License.  You may obtain a copy of the License at
-
 							  http://www.apache.org/licenses/LICENSE-2.0
-
 							Unless required by applicable law or agreed to in writing,
 							software distributed under the License is distributed on an
 							"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -1002,7 +682,7 @@ under the License.
 							specific language governing permissions and limitations
 							under the License.
 						-->
-							<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+						<license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
 							<licenseFamilyCategory>AL2 </licenseFamilyCategory>
 							<licenseFamilyName>Apache License 2.0</licenseFamilyName>
 							<notes />
@@ -1023,6 +703,7 @@ under the License.
 						<exclude>**/*.log</exclude>
 						<!-- External web libraries. -->
 						<exclude>docs/**/bootstrap*</exclude>
+						<exclude>docs/img/*.svg</exclude>
 						<exclude>**/resources/**/font-awesome/**</exclude>
 						<exclude>**/resources/**/jquery*</exclude>
 						<exclude>**/resources/**/bootstrap*</exclude>
@@ -1031,9 +712,16 @@ under the License.
 						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/flot/*</exclude>
 						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/jcanvas.min.js</exclude>
 						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/timeline.js</exclude>
+						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/d3.min.js</exclude>
+						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/d3.layout.min.js</exclude>
+						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/js/rickshaw.*</exclude>
+						<exclude>flink-runtime/src/main/resources/web-docs-infoserver/css/rickshaw.*</exclude>
 						<!-- Test Data. -->
 						<exclude>flink-tests/src/test/resources/testdata/terainput.txt</exclude>
 						<exclude>flink-staging/flink-avro/src/test/resources/avro/*.avsc</exclude>
+						<exclude>out/test/flink-avro/avro/user.avsc</exclude>
+						<!-- TweetInputFormat Test Data-->
+						<exclude>flink-contrib/src/main/resources/HashTagTweetSample.json</exclude>
 						<exclude>flink-staging/flink-avro/src/test/resources/testdata.avro</exclude>
 						<exclude>flink-staging/flink-avro/src/test/java/org/apache/flink/api/io/avro/generated/*.java</exclude>
 						<exclude>flink-staging/flink-language-binding/flink-python/src/test/python/org/apache/flink/languagebinding/api/python/flink/test/data_csv</exclude>
@@ -1042,9 +730,11 @@ under the License.
 						<exclude>flink-staging/flink-language-binding/flink-python/src/main/python/org/apache/flink/languagebinding/api/python/dill/**</exclude>
 						<!-- Configuration Files. -->
 						<exclude>**/flink-bin/conf/slaves</exclude>
+                        <exclude>flink-contrib/docker-flink/flink/conf/slaves</exclude>
 						<!-- Administrative files in the main trunk. -->
 						<exclude>**/README.md</exclude>
 						<exclude>CHANGELOG</exclude>
+						<exclude>CONTRIBUTING.md</exclude>
 						<exclude>CONTRIBUTORS</exclude>
 						<exclude>DEPENDENCIES</exclude>
 						<!-- Build files -->
@@ -1165,6 +855,64 @@ under the License.
 					</execution>
 				</executions>
 			</plugin>
+
+			<!-- We use shading in all packages for relocating some classes, such as
+				Guava and ASM.
+				By doing so, users adding Flink as a dependency won't run into conflicts.
+				(For example users can use whatever guava version they want, because we don't
+				expose our guava dependency)
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>2.3</version>
+				<executions>
+					<execution>
+						<id>shade-flink</id>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<shadeTestJar>true</shadeTestJar>
+							<shadedArtifactAttached>false</shadedArtifactAttached>
+							<createDependencyReducedPom>true</createDependencyReducedPom>
+							<dependencyReducedPomLocation>${project.basedir}/target/dependency-reduced-pom.xml</dependencyReducedPomLocation>
+							<filters>
+								<!-- Globally exclude log4j.properties from our JAR files. -->
+								<filter>
+									<artifact>*</artifact>
+									<excludes>
+										<exclude>log4j.properties</exclude>
+										<exclude>log4j-test.properties</exclude>
+									</excludes>
+								</filter>
+							</filters>
+							<artifactSet>
+								<includes>
+									<include>com.google.guava:*</include>
+									<include>org.ow2.asm:*</include>
+								</includes>
+							</artifactSet>
+							<relocations>
+								<relocation>
+									<pattern>com.google</pattern>
+									<shadedPattern>org.apache.flink.shaded.com.google</shadedPattern>
+									<excludes>
+										<exclude>com.google.protobuf.**</exclude>
+										<exclude>com.google.inject.**</exclude>
+									</excludes>
+								</relocation>
+								<relocation>
+									<pattern>org.objectweb.asm</pattern>
+									<shadedPattern>org.apache.flink.shaded.org.objectweb.asm</shadedPattern>
+								</relocation>
+							</relocations>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 		</plugins>
 
 		<!--

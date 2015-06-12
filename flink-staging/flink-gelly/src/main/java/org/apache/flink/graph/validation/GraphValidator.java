@@ -20,7 +20,6 @@ package org.apache.flink.graph.validation;
 
 import java.io.Serializable;
 
-import org.apache.flink.api.java.DataSet;
 import org.apache.flink.graph.Graph;
 
 /**
@@ -31,9 +30,8 @@ import org.apache.flink.graph.Graph;
  * @param <EV> the edge value type
  */
 @SuppressWarnings("serial")
-public abstract class GraphValidator<K extends Comparable<K> & Serializable, VV extends Serializable, EV extends Serializable>
-		implements Serializable {
+public abstract class GraphValidator<K, VV, EV>	implements Serializable {
 
-	public abstract DataSet<Boolean> validate(Graph<K, VV, EV> graph);
+	public abstract boolean validate(Graph<K, VV, EV> graph) throws Exception;
 
 }

@@ -43,27 +43,30 @@ public class FlatMapOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT, Fl
 		
 		this.function = function;
 		this.defaultName = defaultName;
+
+		UdfOperatorUtils.analyzeSingleInputUdf(this, FlatMapFunction.class, defaultName, function, null);
 	}
 	
 	@Override
 	protected FlatMapFunction<IN, OUT> getFunction() {
 		return function;
 	}
-	
+
 	@Override
 	protected FlatMapOperatorBase<IN, OUT, FlatMapFunction<IN,OUT>> translateToDataFlow(Operator<IN> input) {
 		String name = getName() != null ? getName() : "FlatMap at "+defaultName;
 		// create operator
-		FlatMapOperatorBase<IN, OUT, FlatMapFunction<IN, OUT>> po = new FlatMapOperatorBase<IN, OUT, FlatMapFunction<IN, OUT>>(function, new UnaryOperatorInformation<IN, OUT>(getInputType(), getResultType()), name);
+		FlatMapOperatorBase<IN, OUT, FlatMapFunction<IN, OUT>> po = new FlatMapOperatorBase<IN, OUT, FlatMapFunction<IN, OUT>>(function,
+				new UnaryOperatorInformation<IN, OUT>(getInputType(), getResultType()), name);
 		// set input
 		po.setInput(input);
-		// set dop
+		// set parallelism
 		if(this.getParallelism() > 0) {
-			// use specified dop
-			po.setDegreeOfParallelism(this.getParallelism());
+			// use specified parallelism
+			po.setParallelism(this.getParallelism());
 		} else {
-			// if no dop has been specified, use dop of input operator to enable chaining
-			po.setDegreeOfParallelism(input.getDegreeOfParallelism());
+			// if no parallelism has been specified, use parallelism of input operator to enable chaining
+			po.setParallelism(input.getParallelism());
 		}
 		
 		return po;

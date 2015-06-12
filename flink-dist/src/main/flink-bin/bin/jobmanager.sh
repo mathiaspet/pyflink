@@ -20,38 +20,27 @@
 
 STARTSTOP=$1
 EXECUTIONMODE=$2
+STREAMINGMODE=$3
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
 . "$bin"/config.sh
 
-JAVA_VERSION=$($JAVA_RUN -version 2>&1 | sed 's/java version "\(.*\)\.\(.*\)\..*"/\1\2/; 1q')
+JAVA_VERSION=$($JAVA_RUN -version 2>&1 | sed 's/.*version "\(.*\)\.\(.*\)\..*"/\1\2/; 1q')
 
-if [ "$JAVA_VERSION" -lt 18 ]; then
-    JVM_ARGS="$JVM_ARGS -XX:MaxPermSize=256m"
+# Only set JVM 8 arguments if we have correctly extracted the version
+if [[ ${JAVA_VERSION} =~ ${IS_NUMBER} ]]; then
+    if [ "$JAVA_VERSION" -lt 18 ]; then
+        JVM_ARGS="$JVM_ARGS -XX:MaxPermSize=256m"
+    fi
 fi
-
-
 
 if [ "$FLINK_IDENT_STRING" = "" ]; then
     FLINK_IDENT_STRING="$USER"
 fi
 
-# auxilliary function to construct a the classpath for the jobManager
-constructJobManagerClassPath() {
-    for jarfile in "$FLINK_LIB_DIR"/*.jar ; do
-        if [[ $FLINK_JM_CLASSPATH = "" ]]; then
-            FLINK_JM_CLASSPATH=$jarfile;
-        else
-            FLINK_JM_CLASSPATH=$FLINK_JM_CLASSPATH:$jarfile
-        fi
-    done
-
-    echo $FLINK_JM_CLASSPATH
-}
-
-FLINK_JM_CLASSPATH=`manglePathList "$(constructJobManagerClassPath)"`
+FLINK_JM_CLASSPATH=`constructFlinkClassPath`
 
 log=$FLINK_LOG_DIR/flink-$FLINK_IDENT_STRING-jobmanager-$HOSTNAME.log
 out=$FLINK_LOG_DIR/flink-$FLINK_IDENT_STRING-jobmanager-$HOSTNAME.out
@@ -61,6 +50,17 @@ log_setting=(-Dlog.file="$log" -Dlog4j.configuration=file:"$FLINK_CONF_DIR"/log4
 case $STARTSTOP in
 
     (start)
+
+        if [ -z $EXECUTIONMODE ]; then
+            echo "Please specify 'start (cluster|local) [batch|streaming]' or 'stop'"
+            exit 1
+        fi
+
+        # Use batch mode as default
+        if [ -z $STREAMINGMODE ]; then
+            echo "Did not specify [batch|streaming] mode. Falling back to batch mode as default."
+            STREAMINGMODE="batch"
+        fi
 
         if [[ ! ${FLINK_JM_HEAP} =~ $IS_NUMBER ]]; then
             echo "ERROR: Configured job manager heap size is not a number. Cancelling job manager startup."
@@ -94,8 +94,8 @@ case $STARTSTOP in
         rotateLogFile $log
         rotateLogFile $out
 
-        echo Starting job manager
-        $JAVA_RUN $JVM_ARGS ${FLINK_ENV_JAVA_OPTS} "${log_setting[@]}" -classpath "$FLINK_JM_CLASSPATH:$INTERNAL_HADOOP_CLASSPATHS" org.apache.flink.runtime.jobmanager.JobManager --executionMode $EXECUTIONMODE --configDir "$FLINK_CONF_DIR"  > "$out" 2>&1 < /dev/null &
+        echo "Starting Job Manager"
+        $JAVA_RUN $JVM_ARGS ${FLINK_ENV_JAVA_OPTS} "${log_setting[@]}" -classpath "`manglePathList "$FLINK_JM_CLASSPATH:$INTERNAL_HADOOP_CLASSPATHS"`" org.apache.flink.runtime.jobmanager.JobManager --configDir "$FLINK_CONF_DIR" --executionMode $EXECUTIONMODE --streamingMode "$STREAMINGMODE" > "$out" 2>&1 < /dev/null &
         echo $! > $pid
 
     ;;
@@ -103,18 +103,18 @@ case $STARTSTOP in
     (stop)
         if [ -f $pid ]; then
             if kill -0 `cat $pid` > /dev/null 2>&1; then
-                echo Stopping job manager
+                echo "Stopping job manager"
                 kill `cat $pid`
             else
-                echo No job manager to stop
+                echo "No job manager to stop"
             fi
         else
-            echo No job manager to stop
+            echo "No job manager to stop"
         fi
     ;;
 
     (*)
-        echo Please specify start or stop
+        echo "Please specify 'start (cluster|local) [batch|streaming]' or 'stop'"
     ;;
 
 esac

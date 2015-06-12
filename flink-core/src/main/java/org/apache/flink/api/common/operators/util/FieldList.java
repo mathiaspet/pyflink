@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.lang3.Validate;
+import com.google.common.base.Preconditions;
 
 /**
  * Immutable ordered list of fields IDs.
@@ -42,7 +42,7 @@ public class FieldList extends FieldSet {
 	}
 	
 	public FieldList(Integer fieldId) {
-		super(Collections.singletonList(Validate.notNull(fieldId, "The fields ID must not be null.")));
+		super(Collections.singletonList(Preconditions.checkNotNull(fieldId, "The fields ID must not be null.")));
 	}
 	
 	public FieldList(int... columnIndexes) {
@@ -117,7 +117,7 @@ public class FieldList extends FieldSet {
 	public FieldList toFieldList() {
 		return this;
 	}
-	
+
 	// --------------------------------------------------------------------------------------------
 	
 	@Override
@@ -157,6 +157,19 @@ public class FieldList extends FieldSet {
 			}
 		}
 		return true;
+	}
+
+	public boolean isExactMatch(FieldList list) {
+		if (this.size() != list.size()) {
+			return false;
+		} else {
+			for (int i = 0; i < this.size(); i++) {
+				if (this.get(i) != list.get(i)) {
+					return false;
+				}
+			}
+			return true;
+		}
 	}
 	
 	// --------------------------------------------------------------------------------------------

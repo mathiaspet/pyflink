@@ -22,8 +22,8 @@ import org.apache.flink.api.scala.util.CollectionDataSets
 import org.apache.flink.api.scala.util.CollectionDataSets.MutableTuple3
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem.WriteMode
-import org.apache.flink.test.util.MultipleProgramsTestBase.ExecutionMode
-import org.apache.flink.test.util.{MultipleProgramsTestBase}
+import org.apache.flink.test.util.MultipleProgramsTestBase.TestExecutionMode
+import org.apache.flink.test.util.{TestBaseUtils, MultipleProgramsTestBase}
 import org.apache.flink.util.Collector
 import org.junit.{Test, After, Before, Rule}
 import org.junit.rules.TemporaryFolder
@@ -35,7 +35,7 @@ import scala.collection.JavaConverters._
 import org.apache.flink.api.scala._
 
 @RunWith(classOf[Parameterized])
-class FlatMapITCase(mode: ExecutionMode) extends MultipleProgramsTestBase(mode) {
+class FlatMapITCase(mode: TestExecutionMode) extends MultipleProgramsTestBase(mode) {
   private var resultPath: String = null
   private var expected: String = null
   private val _tempFolder = new TemporaryFolder()
@@ -50,7 +50,7 @@ class FlatMapITCase(mode: ExecutionMode) extends MultipleProgramsTestBase(mode) 
 
   @After
   def after(): Unit = {
-    compareResultsByLinesInMemory(expected, resultPath)
+    TestBaseUtils.compareResultsByLinesInMemory(expected, resultPath)
   }
 
   @Test

@@ -67,6 +67,8 @@ public class CrossOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OUT,
 		this.function = function;
 		this.defaultName = defaultName;
 		this.hint = hint;
+
+		UdfOperatorUtils.analyzeDualInputUdf(this, CrossFunction.class, defaultName, function, null, null);
 	}
 
 	@Override
@@ -95,7 +97,7 @@ public class CrossOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OUT,
 
 		po.setFirstInput(input1);
 		po.setSecondInput(input2);
-		po.setDegreeOfParallelism(getParallelism());
+		po.setParallelism(getParallelism());
 		po.setCrossHint(hint);
 
 		return po;

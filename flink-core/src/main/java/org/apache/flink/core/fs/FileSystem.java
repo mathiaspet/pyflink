@@ -106,6 +106,9 @@ public abstract class FileSystem {
 		 */
 		@Override
 		public boolean equals(final Object obj) {
+			if (obj == this) {
+				return true;
+			}
 
 			if (obj instanceof FSKey) {
 				final FSKey key = (FSKey) obj;
@@ -127,7 +130,6 @@ public abstract class FileSystem {
 		 */
 		@Override
 		public int hashCode() {
-
 			if (this.scheme != null) {
 				return this.scheme.hashCode();
 			}
@@ -166,17 +168,15 @@ public abstract class FileSystem {
 	 * @throws IOException
 	 *         thrown if a reference to the file system instance could not be obtained
 	 */
-	public static FileSystem getLocalFileSystem() throws IOException {
-
-		URI localUri;
-
+	public static FileSystem getLocalFileSystem() {
+		// this should really never fail.
 		try {
-			localUri = OperatingSystem.isWindows() ?  new URI("file:/") : new URI("file:///");
-		} catch (URISyntaxException e) {
-			throw new IOException("Cannot create URI for local file system");
+			URI localUri = OperatingSystem.isWindows() ? new URI("file:/") : new URI("file:///");
+			return get(localUri);
 		}
-
-		return get(localUri);
+		catch (Exception e) {
+			throw new RuntimeException("Cannot create URI for local file system");
+		}
 	}
 
 	/**
@@ -191,7 +191,7 @@ public abstract class FileSystem {
 	 *         thrown if a reference to the file system instance could not be obtained
 	 */
 	public static FileSystem get(URI uri) throws IOException {
-		FileSystem fs = null;
+		FileSystem fs;
 
 		synchronized (SYNCHRONIZATION_OBJECT) {
 

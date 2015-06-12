@@ -21,10 +21,10 @@ package org.apache.flink.runtime.io.network.api.reader;
 import org.apache.flink.core.io.IOReadableWritable;
 import org.apache.flink.runtime.io.network.api.serialization.RecordDeserializer;
 import org.apache.flink.runtime.io.network.api.serialization.RecordDeserializer.DeserializationResult;
+import org.apache.flink.runtime.io.network.api.serialization.SpillingAdaptiveSpanningRecordDeserializer;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.partition.consumer.BufferOrEvent;
 import org.apache.flink.runtime.io.network.partition.consumer.InputGate;
-import org.apache.flink.runtime.io.network.serialization.SpillingAdaptiveSpanningRecordDeserializer;
 
 import java.io.IOException;
 
@@ -43,6 +43,7 @@ abstract class AbstractRecordReader<T extends IOReadableWritable> extends Abstra
 
 	private boolean isFinished;
 
+	@SuppressWarnings("unchecked")
 	protected AbstractRecordReader(InputGate inputGate) {
 		super(inputGate);
 
@@ -78,16 +79,27 @@ abstract class AbstractRecordReader<T extends IOReadableWritable> extends Abstra
 				currentRecordDeserializer = recordDeserializers[bufferOrEvent.getChannelIndex()];
 				currentRecordDeserializer.setNextBuffer(bufferOrEvent.getBuffer());
 			}
-			else if (handleEvent(bufferOrEvent.getEvent())) {
-				if (inputGate.isFinished()) {
-					isFinished = true;
-
-					return false;
+			else {
+				// sanity check for leftover data in deserializers. events should only come between
+				// records, not in the middle of a fragment
+				if (recordDeserializers[bufferOrEvent.getChannelIndex()].hasUnfinishedData()) {
+					throw new IllegalStateException(
+							"Received an event in channel " + bufferOrEvent.getChannelIndex() + " while still having "
+							+ "data from a record. This indicates broken serialization logic. "
+							+ "If you are using custom serialization code (Writable or Value types), check their "
+							+ "serialization routines. In the case of Kryo, check the respective Kryo serializer.");
 				}
-				else if (hasReachedEndOfSuperstep()) {
-
-					return false;
-				} // else: More data is coming...
+				
+				if (handleEvent(bufferOrEvent.getEvent())) {
+					if (inputGate.isFinished()) {
+						isFinished = true;
+						return false;
+					}
+					else if (hasReachedEndOfSuperstep()) {
+						return false;
+					}
+					// else: More data is coming...
+				}
 			}
 		}
 	}

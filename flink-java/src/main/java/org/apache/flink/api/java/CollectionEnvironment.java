@@ -30,11 +30,21 @@ public class CollectionEnvironment extends ExecutionEnvironment {
 
 		// We need to reverse here. Object-Reuse enabled, means safe mode is disabled.
 		CollectionExecutor exec = new CollectionExecutor(getConfig());
-		return exec.execute(p);
+		this.lastJobExecutionResult = exec.execute(p);
+		return this.lastJobExecutionResult;
 	}
-	
+
+	/**
+	 * @deprecated Please use {@link #getParallelism}
+	 */
 	@Override
+	@Deprecated
 	public int getDegreeOfParallelism() {
+		return getParallelism();
+	}
+
+	@Override
+	public int getParallelism() {
 		return 1; // always serial
 	}
 	

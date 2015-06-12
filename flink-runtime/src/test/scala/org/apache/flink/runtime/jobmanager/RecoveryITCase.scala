@@ -49,6 +49,7 @@ WordSpecLike with Matchers with BeforeAndAfterAll {
     config.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, numSlots)
     config.setInteger(ConfigConstants.LOCAL_INSTANCE_MANAGER_NUMBER_TASK_MANAGER, numTaskManagers)
     config.setString(ConfigConstants.AKKA_WATCH_HEARTBEAT_PAUSE, heartbeatTimeout)
+    config.setString(ConfigConstants.DEFAULT_EXECUTION_RETRY_DELAY_KEY, heartbeatTimeout)
     new TestingCluster(config)
   }
 
@@ -77,13 +78,13 @@ WordSpecLike with Matchers with BeforeAndAfterAll {
 
       try {
         within(TestingUtils.TESTING_DURATION){
-          jm ! SubmitJob(jobGraph)
+          jm ! SubmitJob(jobGraph, false)
 
           expectMsg(Success(jobGraph.getJobID))
 
           val result = expectMsgType[JobResultSuccess]
 
-          result.jobID should equal(jobGraph.getJobID)
+          result.result.getJobId() should equal(jobGraph.getJobID)
         }
       } catch {
         case t: Throwable =>
@@ -120,13 +121,13 @@ WordSpecLike with Matchers with BeforeAndAfterAll {
 
       try {
         within(TestingUtils.TESTING_DURATION){
-          jm ! SubmitJob(jobGraph)
+          jm ! SubmitJob(jobGraph, false)
 
           expectMsg(Success(jobGraph.getJobID))
 
           val result = expectMsgType[JobResultSuccess]
 
-          result.jobID should equal(jobGraph.getJobID)
+          result.result.getJobId() should equal(jobGraph.getJobID)
         }
       } catch {
         case t: Throwable =>
@@ -164,7 +165,7 @@ WordSpecLike with Matchers with BeforeAndAfterAll {
 
       try {
         within(TestingUtils.TESTING_DURATION){
-          jm ! SubmitJob(jobGraph)
+          jm ! SubmitJob(jobGraph, false)
 
           expectMsg(Success(jobGraph.getJobID))
 
@@ -188,7 +189,7 @@ WordSpecLike with Matchers with BeforeAndAfterAll {
 
           val result = expectMsgType[JobResultSuccess]
 
-          result.jobID should equal(jobGraph.getJobID)
+          result.result.getJobId() should equal(jobGraph.getJobID)
         }
       } catch {
         case t: Throwable =>

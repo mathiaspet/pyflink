@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.Plan;
 import org.apache.flink.api.java.record.functions.JoinFunction;
 import org.apache.flink.api.java.record.io.CsvOutputFormat;
@@ -42,12 +43,12 @@ import org.apache.flink.util.Collector;
 @SuppressWarnings("deprecation")
 public class CollectionSourceTest extends RecordAPITestBase {
 
-	private static final int DOP = 4;
+	private static final int parallelism = 4;
 
 	protected String resultPath;
 
 	public CollectionSourceTest(){
-		setTaskManagerNumSlots(DOP);
+		setTaskManagerNumSlots(parallelism);
 	}
 
 	public static class Join extends JoinFunction {
@@ -111,6 +112,7 @@ public class CollectionSourceTest extends RecordAPITestBase {
 			.field(IntValue.class, 1);
 
 		Plan plan = new Plan(out, "CollectionDataSource");
+		plan.setExecutionConfig(new ExecutionConfig());
 		plan.setDefaultParallelism(numSubTasks);
 		return plan;
 	}
@@ -122,7 +124,7 @@ public class CollectionSourceTest extends RecordAPITestBase {
 
 	@Override
 	protected Plan getTestJob() {
-		return getPlan(DOP, resultPath);
+		return getPlan(parallelism, resultPath);
 	}
 
 	@Override

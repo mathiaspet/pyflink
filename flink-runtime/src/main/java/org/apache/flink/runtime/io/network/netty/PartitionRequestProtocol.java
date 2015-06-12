@@ -18,27 +18,28 @@
 
 package org.apache.flink.runtime.io.network.netty;
 
-import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelHandler;
 import org.apache.flink.runtime.io.network.TaskEventDispatcher;
-import org.apache.flink.runtime.io.network.partition.IntermediateResultPartitionProvider;
+import org.apache.flink.runtime.io.network.buffer.NetworkBufferPool;
+import org.apache.flink.runtime.io.network.partition.ResultPartitionProvider;
 
 import static org.apache.flink.runtime.io.network.netty.NettyMessage.NettyMessageEncoder;
 import static org.apache.flink.runtime.io.network.netty.NettyMessage.NettyMessageEncoder.createFrameLengthDecoder;
 
 class PartitionRequestProtocol implements NettyProtocol {
 
-	static final String CLIENT_REQUEST_HANDLER_NAME = "Client request handler";
-
 	private final NettyMessageEncoder messageEncoder = new NettyMessageEncoder();
 
 	private final NettyMessage.NettyMessageDecoder messageDecoder = new NettyMessage.NettyMessageDecoder();
 
-	private final IntermediateResultPartitionProvider partitionProvider;
+	private final ResultPartitionProvider partitionProvider;
 	private final TaskEventDispatcher taskEventDispatcher;
+	private final NetworkBufferPool networkbufferPool;
 
-	PartitionRequestProtocol(IntermediateResultPartitionProvider partitionProvider, TaskEventDispatcher taskEventDispatcher) {
+	PartitionRequestProtocol(ResultPartitionProvider partitionProvider, TaskEventDispatcher taskEventDispatcher, NetworkBufferPool networkbufferPool) {
 		this.partitionProvider = partitionProvider;
 		this.taskEventDispatcher = taskEventDispatcher;
+		this.networkbufferPool = networkbufferPool;
 	}
 
 	// +-------------------------------------------------------------------+
@@ -61,7 +62,7 @@ class PartitionRequestProtocol implements NettyProtocol {
 	// |               |                                   |               |
 	// |    +----------+----------+                        |               |
 	// |    | Frame decoder       |                        |               |
-	// |    +----------+----------+                        |
+	// |    +----------+----------+                        |               |
 	// |              /|\                                  |               |
 	// +---------------+-----------------------------------+---------------+
 	// |               | (1) client request               \|/
@@ -73,17 +74,19 @@ class PartitionRequestProtocol implements NettyProtocol {
 	// +-------------------------------------------------------------------+
 
 	@Override
-	public void setServerChannelPipeline(ChannelPipeline channelPipeline) {
+	public ChannelHandler[] getServerChannelHandlers() {
 		PartitionRequestQueue queueOfPartitionQueues = new PartitionRequestQueue();
+		PartitionRequestServerHandler serverHandler = new PartitionRequestServerHandler(
+				partitionProvider, taskEventDispatcher, queueOfPartitionQueues, networkbufferPool);
 
-		channelPipeline
-				.addLast("Message encoder", messageEncoder)
-				.addLast("Frame decoder", createFrameLengthDecoder())
-				.addLast("Client request decoder", messageDecoder)
-				.addLast("Server request handler", new PartitionRequestServerHandler(partitionProvider, taskEventDispatcher, queueOfPartitionQueues))
-				.addLast("Queue of queues", queueOfPartitionQueues);
+		return new ChannelHandler[] {
+				messageEncoder,
+				createFrameLengthDecoder(),
+				messageDecoder,
+				serverHandler,
+				queueOfPartitionQueues
+		};
 	}
-
 
 	//     +-----------+----------+            +----------------------+
 	//     | Remote input channel |            | request client       |
@@ -116,11 +119,11 @@ class PartitionRequestProtocol implements NettyProtocol {
 	// +-------------------------------------------------------------------+
 
 	@Override
-	public void setClientChannelPipeline(ChannelPipeline channelPipeline) {
-		channelPipeline
-				.addLast("Message encoder", messageEncoder)
-				.addLast("Frame decoder", createFrameLengthDecoder())
-				.addLast("Server response decoder", messageDecoder)
-				.addLast(CLIENT_REQUEST_HANDLER_NAME, new PartitionRequestClientHandler());
+	public ChannelHandler[] getClientChannelHandlers() {
+		return new ChannelHandler[] {
+				messageEncoder,
+				createFrameLengthDecoder(),
+				messageDecoder,
+				new PartitionRequestClientHandler()};
 	}
 }

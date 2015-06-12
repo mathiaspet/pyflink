@@ -17,20 +17,17 @@
  */
 package org.apache.flink.api.scala.operators
 
+import org.apache.flink.api.scala._
 import org.apache.flink.api.scala.ExecutionEnvironment
-import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem.WriteMode
-import org.apache.flink.test.util.MultipleProgramsTestBase.ExecutionMode
-import org.apache.flink.test.util.{MultipleProgramsTestBase, JavaProgramTestBase}
+import org.apache.flink.test.util.MultipleProgramsTestBase.TestExecutionMode
+import org.apache.flink.test.util.{TestBaseUtils, MultipleProgramsTestBase}
+
 import org.junit.{Test, After, Before, Rule}
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import org.apache.flink.api.scala._
-import org.junit.runners.Parameterized.Parameters
-import scala.collection.JavaConverters._
 
-import scala.collection.mutable
 
 // TODO case class Tuple2[T1, T2](_1: T1, _2: T2)
 // TODO case class Foo(a: Int, b: String
@@ -62,7 +59,7 @@ class PojoWithPojo(var myString: String, var myInt: Int, var nested: Nested) {
 }
 
 @RunWith(classOf[Parameterized])
-class ExamplesITCase(mode: ExecutionMode) extends MultipleProgramsTestBase(mode) {
+class ExamplesITCase(mode: TestExecutionMode) extends MultipleProgramsTestBase(mode) {
   private var resultPath: String = null
   private var expected: String = null
   private val _tempFolder = new TemporaryFolder()
@@ -77,7 +74,7 @@ class ExamplesITCase(mode: ExecutionMode) extends MultipleProgramsTestBase(mode)
 
   @After
   def after(): Unit = {
-    compareResultsByLinesInMemory(expected, resultPath)
+    TestBaseUtils.compareResultsByLinesInMemory(expected, resultPath)
   }
 
   @Test

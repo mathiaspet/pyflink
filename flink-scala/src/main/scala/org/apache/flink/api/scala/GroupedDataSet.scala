@@ -18,20 +18,18 @@
 package org.apache.flink.api.scala
 
 import org.apache.flink.api.common.InvalidProgramException
-import org.apache.flink.api.java.functions.{KeySelector, FirstReducer}
-import org.apache.flink.api.scala.operators.ScalaAggregateOperator
-import scala.collection.JavaConverters._
-import org.apache.commons.lang3.Validate
-import org.apache.flink.api.common.functions.{GroupReduceFunction, ReduceFunction}
+import org.apache.flink.api.common.functions.{GroupCombineFunction, GroupReduceFunction, Partitioner, ReduceFunction}
 import org.apache.flink.api.common.operators.Order
-import org.apache.flink.api.java.aggregation.Aggregations
-import org.apache.flink.api.java.operators._
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.java.aggregation.Aggregations
+import org.apache.flink.api.java.functions.{FirstReducer, KeySelector}
+import org.apache.flink.api.java.operators._
+import org.apache.flink.api.scala.operators.ScalaAggregateOperator
 import org.apache.flink.util.Collector
+
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.reflect.ClassTag
-import org.apache.flink.api.common.functions.Partitioner
-import com.google.common.base.Preconditions
 
 /**
  * A [[DataSet]] to which a grouping key was added. Operations work on groups of elements with the
@@ -196,7 +194,7 @@ class GroupedDataSet[T: ClassTag](
    * Sets a custom partitioner for the grouping.
    */
   def withPartitioner[K : TypeInformation](partitioner: Partitioner[K]) : GroupedDataSet[T] = {
-    Preconditions.checkNotNull(partitioner)
+    require(partitioner != null)
     keys.validateCustomPartitioner(partitioner, implicitly[TypeInformation[K]])
     this.partitioner = partitioner
     this
@@ -285,7 +283,7 @@ class GroupedDataSet[T: ClassTag](
    * using an associative reduce function.
    */
   def reduce(fun: (T, T) => T): DataSet[T] = {
-    Validate.notNull(fun, "Reduce function must not be null.")
+    require(fun != null, "Reduce function must not be null.")
     val reducer = new ReduceFunction[T] {
       val cleanFun = set.clean(fun)
       def reduce(v1: T, v2: T) = {
@@ -300,7 +298,7 @@ class GroupedDataSet[T: ClassTag](
    * using an associative reduce function.
    */
   def reduce(reducer: ReduceFunction[T]): DataSet[T] = {
-    Validate.notNull(reducer, "Reduce function must not be null.")
+    require(reducer != null, "Reduce function must not be null.")
     wrap(new ReduceOperator[T](createUnsortedGrouping(), reducer, getCallLocationName()))
   }
 
@@ -311,7 +309,7 @@ class GroupedDataSet[T: ClassTag](
    */
   def reduceGroup[R: TypeInformation: ClassTag](
       fun: (Iterator[T]) => R): DataSet[R] = {
-    Validate.notNull(fun, "Group reduce function must not be null.")
+    require(fun != null, "Group reduce function must not be null.")
     val reducer = new GroupReduceFunction[T, R] {
       val cleanFun = set.clean(fun)
       def reduce(in: java.lang.Iterable[T], out: Collector[R]) {
@@ -330,7 +328,7 @@ class GroupedDataSet[T: ClassTag](
    */
   def reduceGroup[R: TypeInformation: ClassTag](
       fun: (Iterator[T], Collector[R]) => Unit): DataSet[R] = {
-    Validate.notNull(fun, "Group reduce function must not be null.")
+    require(fun != null, "Group reduce function must not be null.")
     val reducer = new GroupReduceFunction[T, R] {
       val cleanFun = set.clean(fun)
       def reduce(in: java.lang.Iterable[T], out: Collector[R]) {
@@ -348,10 +346,60 @@ class GroupedDataSet[T: ClassTag](
    * concatenation of the emitted values will form the resulting [[DataSet]].
    */
   def reduceGroup[R: TypeInformation: ClassTag](reducer: GroupReduceFunction[T, R]): DataSet[R] = {
-    Validate.notNull(reducer, "GroupReduce function must not be null.")
+    require(reducer != null, "GroupReduce function must not be null.")
     wrap(
       new GroupReduceOperator[T, R](maybeCreateSortedGrouping(),
         implicitly[TypeInformation[R]], reducer, getCallLocationName()))
+  }
+
+  /**
+   *  Applies a CombineFunction on a grouped [[DataSet]].  A
+   *  CombineFunction is similar to a GroupReduceFunction but does not
+   *  perform a full data exchange. Instead, the CombineFunction calls
+   *  the combine method once per partition for combining a group of
+   *  results. This operator is suitable for combining values into an
+   *  intermediate format before doing a proper groupReduce where the
+   *  data is shuffled across the node for further reduction. The
+   *  GroupReduce operator can also be supplied with a combiner by
+   *  implementing the RichGroupReduce function. The combine method of
+   *  the RichGroupReduce function demands input and output type to be
+   *  the same. The CombineFunction, on the other side, can have an
+   *  arbitrary output type.
+   */
+  def combineGroup[R: TypeInformation: ClassTag](
+                                          fun: (Iterator[T], Collector[R]) => Unit): DataSet[R] = {
+    require(fun != null, "GroupCombine function must not be null.")
+    val combiner = new GroupCombineFunction[T, R] {
+      val cleanFun = set.clean(fun)
+      def combine(in: java.lang.Iterable[T], out: Collector[R]) {
+        cleanFun(in.iterator().asScala, out)
+      }
+    }
+    wrap(
+      new GroupCombineOperator[T, R](maybeCreateSortedGrouping(),
+        implicitly[TypeInformation[R]], combiner, getCallLocationName()))
+  }
+
+  /**
+   *  Applies a CombineFunction on a grouped [[DataSet]].  A
+   *  CombineFunction is similar to a GroupReduceFunction but does not
+   *  perform a full data exchange. Instead, the CombineFunction calls
+   *  the combine method once per partition for combining a group of
+   *  results. This operator is suitable for combining values into an
+   *  intermediate format before doing a proper groupReduce where the
+   *  data is shuffled across the node for further reduction. The
+   *  GroupReduce operator can also be supplied with a combiner by
+   *  implementing the RichGroupReduce function. The combine method of
+   *  the RichGroupReduce function demands input and output type to be
+   *  the same. The CombineFunction, on the other side, can have an
+   *  arbitrary output type.
+   */
+  def combineGroup[R: TypeInformation: ClassTag](
+      combiner: GroupCombineFunction[T, R]): DataSet[R] = {
+    require(combiner != null, "GroupCombine function must not be null.")
+    wrap(
+      new GroupCombineOperator[T, R](maybeCreateSortedGrouping(),
+        implicitly[TypeInformation[R]], combiner, getCallLocationName()))
   }
 
   /**

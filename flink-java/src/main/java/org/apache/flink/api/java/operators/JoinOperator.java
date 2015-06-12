@@ -202,6 +202,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 			
 			this.function = function;
 			this.joinLocationName = joinLocationName;
+
+			UdfOperatorUtils.analyzeDualInputUdf(this, FlatJoinFunction.class, joinLocationName, function, keys1, keys2);
 		}
 
 		public EquiJoin(DataSet<I1> input1, DataSet<I2> input2,
@@ -217,11 +219,36 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 			}
 
 			this.function = generatedFunction;
+
+			UdfOperatorUtils.analyzeDualInputUdf(this, JoinFunction.class, joinLocationName, function, keys1, keys2);
 		}
 		
 		@Override
 		protected FlatJoinFunction<I1, I2, OUT> getFunction() {
 			return function;
+		}
+
+		@Override
+		public DualInputSemanticProperties getSemanticProperties() {
+
+			DualInputSemanticProperties props = super.getSemanticProperties();
+
+			// offset semantic information by extracted key fields
+			if(props != null &&
+					(this.keys1 instanceof Keys.SelectorFunctionKeys ||
+							this.keys2 instanceof Keys.SelectorFunctionKeys)) {
+
+				int numFields1 = this.getInput1Type().getTotalFields();
+				int numFields2 = this.getInput2Type().getTotalFields();
+				int offset1 = (this.keys1 instanceof Keys.SelectorFunctionKeys) ?
+						((Keys.SelectorFunctionKeys<?,?>) this.keys1).getKeyType().getTotalFields() : 0;
+				int offset2 = (this.keys2 instanceof Keys.SelectorFunctionKeys) ?
+						((Keys.SelectorFunctionKeys<?,?>) this.keys2).getKeyType().getTotalFields() : 0;
+
+				props = SemanticPropUtil.addSourceFieldOffsets(props, numFields1, numFields2, offset1, offset2);
+			}
+
+			return props;
 		}
 
 		@Override
@@ -273,8 +300,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 						translateSelectorFunctionJoin(selectorKeys1, selectorKeys2, function, 
 						getInput1Type(), getInput2Type(), getResultType(), name, input1, input2);
 				
-				// set dop
-				po.setDegreeOfParallelism(this.getParallelism());
+				// set parallelism
+				po.setParallelism(this.getParallelism());
 				
 				translated = po;
 			}
@@ -292,8 +319,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 								function, getInput1Type(), getInput2Type(), getResultType(), name,
 								input1, input2);
 
-				// set dop
-				po.setDegreeOfParallelism(this.getParallelism());
+				// set parallelism
+				po.setParallelism(this.getParallelism());
 
 				translated = po;
 			}
@@ -311,8 +338,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 						translateSelectorFunctionJoinLeft(selectorKeys1, logicalKeyPositions2, function,
 								getInput1Type(), getInput2Type(), getResultType(), name, input1, input2);
 
-				// set dop
-				po.setDegreeOfParallelism(this.getParallelism());
+				// set parallelism
+				po.setParallelism(this.getParallelism());
 
 				translated = po;
 			}
@@ -332,8 +359,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 				// set inputs
 				po.setFirstInput(input1);
 				po.setSecondInput(input2);
-				// set dop
-				po.setDegreeOfParallelism(this.getParallelism());
+				// set parallelism
+				po.setParallelism(this.getParallelism());
 				
 				translated = po;
 			}
@@ -375,9 +402,9 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 			
 			keyMapper1.setInput(input1);
 			keyMapper2.setInput(input2);
-			// set dop
-			keyMapper1.setDegreeOfParallelism(input1.getDegreeOfParallelism());
-			keyMapper2.setDegreeOfParallelism(input2.getDegreeOfParallelism());
+			// set parallelism
+			keyMapper1.setParallelism(input1.getParallelism());
+			keyMapper2.setParallelism(input2.getParallelism());
 			
 			return join;
 		}
@@ -427,8 +454,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 			join.setSecondInput(keyMapper2);
 			
 			keyMapper2.setInput(input2);
-			// set dop
-			keyMapper2.setDegreeOfParallelism(input2.getDegreeOfParallelism());
+			// set parallelism
+			keyMapper2.setParallelism(input2.getParallelism());
 			
 			return join;
 		}
@@ -477,8 +504,8 @@ public abstract class JoinOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, 
 			join.setSecondInput(input2);
 			
 			keyMapper1.setInput(input1);
-			// set dop
-			keyMapper1.setDegreeOfParallelism(input1.getDegreeOfParallelism());
+			// set parallelism
+			keyMapper1.setParallelism(input1.getParallelism());
 
 			return join;
 		}

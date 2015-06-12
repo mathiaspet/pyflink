@@ -21,6 +21,8 @@ package org.apache.flink.test.util
 import akka.actor.{Props, ActorRef, ActorSystem}
 import akka.pattern.Patterns._
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
+import org.apache.flink.runtime.StreamingMode
+import org.apache.flink.runtime.jobmanager.web.WebInfoServer
 import org.apache.flink.runtime.jobmanager.{MemoryArchivist, JobManager}
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster
 import org.apache.flink.runtime.taskmanager.TaskManager
@@ -38,11 +40,19 @@ import scala.concurrent.Await
  * @param singleActorSystem true, if all actors (JobManager and TaskManager) shall be run in the
  *                          same [[ActorSystem]], otherwise false.
  */
-class ForkableFlinkMiniCluster(userConfiguration: Configuration, singleActorSystem: Boolean)
-  extends LocalFlinkMiniCluster(userConfiguration, singleActorSystem) {
+class ForkableFlinkMiniCluster(userConfiguration: Configuration,
+                               singleActorSystem: Boolean,
+                               streamingMode: StreamingMode)
+  extends LocalFlinkMiniCluster(userConfiguration, singleActorSystem, streamingMode) {
+  
+
+  def this(userConfiguration: Configuration, singleActorSystem: Boolean) 
+       = this(userConfiguration, singleActorSystem, StreamingMode.BATCH_ONLY)
 
   def this(userConfiguration: Configuration) = this(userConfiguration, true)
-
+  
+  // --------------------------------------------------------------------------
+  
   override def generateConfiguration(userConfiguration: Configuration): Configuration = {
     val forNumberString = System.getProperty("forkNumber")
 
@@ -70,18 +80,25 @@ class ForkableFlinkMiniCluster(userConfiguration: Configuration, singleActorSyst
 
   override def startJobManager(actorSystem: ActorSystem): ActorRef = {
 
-    val (instanceManager, scheduler, libraryCacheManager, _, accumulatorManager, _,
+    val (instanceManager, scheduler, libraryCacheManager, _, accumulatorManager,
     executionRetries, delayBetweenRetries,
     timeout, archiveCount) = JobManager.createJobManagerComponents(configuration)
 
     val testArchiveProps = Props(new MemoryArchivist(archiveCount) with TestingMemoryArchivist)
     val archive = actorSystem.actorOf(testArchiveProps, JobManager.ARCHIVE_NAME)
-
+    
     val jobManagerProps = Props(new JobManager(configuration, instanceManager, scheduler,
-      libraryCacheManager, archive, accumulatorManager, None, executionRetries,
-      delayBetweenRetries, timeout) with TestingJobManager)
+      libraryCacheManager, archive, accumulatorManager, executionRetries,
+      delayBetweenRetries, timeout, streamingMode) with TestingJobManager)
 
-    actorSystem.actorOf(jobManagerProps, JobManager.JOB_MANAGER_NAME)
+    val jobManager = actorSystem.actorOf(jobManagerProps, JobManager.JOB_MANAGER_NAME)
+
+    if (userConfiguration.getBoolean(ConfigConstants.LOCAL_INSTANCE_MANAGER_START_WEBSERVER,false)){
+      val webServer = new WebInfoServer(configuration, jobManager, archive)
+      webServer.start()
+    }
+
+    jobManager
   }
 
   override def startTaskManager(index: Int, system: ActorSystem): ActorRef = {
@@ -102,9 +119,15 @@ class ForkableFlinkMiniCluster(userConfiguration: Configuration, singleActorSyst
 
     val localExecution = numTaskManagers == 1
 
-    TaskManager.startTaskManagerActor(config, system, HOSTNAME,
-        TaskManager.TASK_MANAGER_NAME + index, singleActorSystem, localExecution,
-         classOf[TestingTaskManager])
+    val jobManagerAkkaUrl: Option[String] = if (singleActorSystem) {
+      Some(jobManagerActor.path.toString)
+    } else {
+      None
+    }
+
+    TaskManager.startTaskManagerComponentsAndActor(config, system, hostname,
+        Some(TaskManager.TASK_MANAGER_NAME + index), jobManagerAkkaUrl, localExecution,
+      streamingMode, classOf[TestingTaskManager])
   }
 
   def restartJobManager(): Unit = {
