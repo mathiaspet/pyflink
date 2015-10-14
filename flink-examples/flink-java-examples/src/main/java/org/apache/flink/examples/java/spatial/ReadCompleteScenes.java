@@ -25,7 +25,6 @@ import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
 import org.apache.flink.api.java.spatial.envi.SceneInputFormat;
-import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 

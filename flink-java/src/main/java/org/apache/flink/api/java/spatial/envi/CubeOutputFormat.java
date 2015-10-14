@@ -102,35 +102,6 @@ public class CubeOutputFormat extends FileOutputFormat<Tile> {
 		Path headerPath = new Path(this.outputFilePath.toUri() + ".hdr");
 		FSDataOutputStream headerStream = fs.create(headerPath, true);
 
-		// BufferedWriter writer = new BufferedWriter();
-		//
-		// writer.append("ENVI\n");
-		// writer.append("samples = " + this.width + "\n");
-		// writer.append("lines = " + this.height + "\n");
-		// writer.append("bands = " + this.bands.size() + "\n");
-		// // TODO: make this multi type capable
-		// writer.append("data type = 2\n");
-		// writer.append("interleave = bsq\n");
-		// writer.append("file type = ENVI Standard\n");
-		// writer.append("header offset = 0\n");
-		// writer.append("byte order = 0\n");
-		// writer.append("map info = " + this.mapInfoString + "\n");
-		// writer.append(this.projectionInfo + "\n");
-		// writer.append(this.coordinateSystemString + "\n");
-		// writer.append("band names = {\n");
-		// int index = 0;
-		// for (String b : bands) {
-		// writer.append(b);
-		// if (index++ < this.bands.size()) {
-		// writer.append(", ");
-		// }
-		// if (index % 4 == 0) {
-		// writer.append("\n");
-		// }
-		// }
-		//
-		// writer.append("}");
-
 		headerStream.write("ENVI\n".getBytes());
 		headerStream.write(("samples = " + this.width + "\n").getBytes());
 		headerStream.write(("lines = " + this.height + "\n").getBytes());
@@ -161,8 +132,6 @@ public class CubeOutputFormat extends FileOutputFormat<Tile> {
 		headerStream.flush();
 		headerStream.close();
 
-		// writer.flush();
-		// writer.close();
 	}
 
 }
