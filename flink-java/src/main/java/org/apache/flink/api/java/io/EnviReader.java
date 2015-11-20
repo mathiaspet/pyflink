@@ -18,7 +18,6 @@
 
 package org.apache.flink.api.java.io;
 
-import org.apache.commons.lang3.Validate;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.Utils;
 import org.apache.flink.api.java.operators.DataSource;
@@ -27,6 +26,8 @@ import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.spatial.TileTypeInformation;
 import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.core.fs.Path;
+
+import com.google.common.base.Preconditions;
 
 /**
  * A builder class to instantiate a data source that parses ENVI files.
@@ -46,10 +47,12 @@ public class EnviReader {
 	// --------------------------------------------------------------------------------------------
 	
 	public EnviReader(Path filePath, int xpixels, int ypixels, ExecutionEnvironment executionContext) {
-		Validate.notNull(filePath, "The file path may not be null.");
-		Validate.notNull(executionContext, "The execution context may not be null.");
-		Validate.inclusiveBetween(1, Integer.MAX_VALUE, xpixels, "Positive x pixel count required.");
-		Validate.inclusiveBetween(1, Integer.MAX_VALUE, ypixels, "Positive y pixel count required.");
+		Preconditions.checkNotNull(filePath, "The file path may not be null.");
+		Preconditions.checkNotNull(executionContext, "The execution context may not be null.");
+		Preconditions.checkArgument(xpixels > 0,  "Positive x pixel count required.");
+		Preconditions.checkArgument(xpixels <= Integer.MAX_VALUE, "Positive x pixel count required.");
+		Preconditions.checkArgument(ypixels > 0,  "Positive x pixel count required.");
+		Preconditions.checkArgument(ypixels <= Integer.MAX_VALUE, "Positive x pixel count required.");
 		
 		this.path = filePath;
 		this.executionContext = executionContext;
@@ -58,7 +61,7 @@ public class EnviReader {
 	}
 	
 	public EnviReader(String filePath, int xpixels, int ypixels, ExecutionEnvironment executionContext) {
-		this(new Path(Validate.notNull(filePath, "The file path may not be null.")), xpixels, ypixels, executionContext);
+		this(new Path(Preconditions.checkNotNull(filePath, "The file path may not be null.")), xpixels, ypixels, executionContext);
 	}
 	
 	public Path getFilePath() {
