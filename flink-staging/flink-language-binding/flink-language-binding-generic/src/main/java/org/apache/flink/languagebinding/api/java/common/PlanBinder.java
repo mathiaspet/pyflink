@@ -108,8 +108,8 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	 * This enum contains the identifiers for all supported non-UDF DataSet operations.
 	 */
 	protected enum Operation {
-		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SINK_CSV, SINK_TEXT, SINK_PRINT,
-		PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
+		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_ENVI, SINK_CSV, SINK_TEXT,
+		SINK_PRINT, SINK_ENVI, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST
 	}
@@ -150,6 +150,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 					case SOURCE_SEQ:
 						createSequenceSource(createOperationInfo(op));
 						break;
+					case SOURCE_ENVI:
+						createEnviSource();
+						break;
 					case SINK_CSV:
 						createCsvSink(createOperationInfo(op));
 						break;
@@ -158,6 +161,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 						break;
 					case SINK_PRINT:
 						createPrintSink(createOperationInfo(op));
+						break;
+					case SINK_ENVI:
+						createEnviSink();
 						break;
 					case BROADCAST:
 						createBroadcastVariable(createOperationInfo(op));
