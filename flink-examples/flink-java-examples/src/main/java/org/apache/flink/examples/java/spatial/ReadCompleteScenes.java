@@ -55,7 +55,7 @@ public class ReadCompleteScenes {
 
 		final ExecutionEnvironment env = ExecutionEnvironment
 				.getExecutionEnvironment();
-		env.setDegreeOfParallelism(dop);
+		env.setParallelism(dop);
 		
 		DataSet<Tile> tiles = readTiles(env);
 		DataSet<Tile> filtered = tiles.filter(new FilterFunction<Tile>() {

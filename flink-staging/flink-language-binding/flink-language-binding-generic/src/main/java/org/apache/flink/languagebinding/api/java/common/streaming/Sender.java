@@ -14,16 +14,19 @@ package org.apache.flink.languagebinding.api.java.common.streaming;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.UnsupportedEncodingException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.tuple.Tuple;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED_FILE_SIZE;
@@ -32,6 +35,7 @@ import static org.apache.flink.languagebinding.api.java.common.PlanBinder.MAPPED
  * General-purpose class to write data to memory-mapped files.
  */
 public class Sender implements Serializable {
+	public static final byte TYPE_TILE = (byte) 12;
 	public static final byte TYPE_TUPLE = (byte) 11;
 	public static final byte TYPE_BOOLEAN = (byte) 10;
 	public static final byte TYPE_BYTE = (byte) 9;
@@ -180,7 +184,7 @@ public class Sender implements Serializable {
 	}
 
 	private enum SupportedTypes {
-		TUPLE, BOOLEAN, BYTE, BYTES, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, OTHER, NULL
+		TUPLE, BOOLEAN, BYTE, BYTES, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, STRING, OTHER, NULL, TILE
 	}
 
 	//=====Serializer===================================================================================================
@@ -231,6 +235,9 @@ public class Sender implements Serializable {
 			case NULL:
 				fileBuffer.put(TYPE_NULL);
 				return new NullSerializer();
+			case TILE:
+				fileBuffer.put(TYPE_TILE);
+				return new TileSerializer();
 			default:
 				throw new IllegalArgumentException("Unknown Type encountered: " + type);
 		}
@@ -549,7 +556,7 @@ public class Sender implements Serializable {
 			this.buffers.add(this.intSerializer3.buffer);
 
 			this.doubleSerializer5.buffer.clear();
-			this.doubleSerializer5.serializeInternal(value.getxPixelWith());
+			this.doubleSerializer5.serializeInternal(value.getxPixelWidth());
 			length += this.doubleSerializer5.buffer.position();
 			this.buffers.add(this.doubleSerializer5.buffer);
 

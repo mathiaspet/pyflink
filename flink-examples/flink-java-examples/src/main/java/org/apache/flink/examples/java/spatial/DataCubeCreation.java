@@ -56,7 +56,7 @@ public class DataCubeCreation {
 
 		final ExecutionEnvironment env = ExecutionEnvironment
 				.getExecutionEnvironment();
-		env.setDegreeOfParallelism(dop);
+		env.setParallelism(dop);
 		
 		DataSet<Tile> tiles = readTiles(env);
 		DataSet<Tile> stitchedTimeSlices = tiles.groupBy(

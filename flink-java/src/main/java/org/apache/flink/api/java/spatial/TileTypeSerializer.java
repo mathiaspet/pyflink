@@ -47,11 +47,6 @@ public class TileTypeSerializer extends TypeSerializer<Tile> {
 	}
 
 	@Override
-	public boolean isStateful() {
-		return false;
-	}
-
-	@Override
 	public Tile createInstance() {
 		return new Tile();
 	}
@@ -97,4 +92,29 @@ public class TileTypeSerializer extends TypeSerializer<Tile> {
 		intermediate = null;
 	}
 
+	@Override
+	public TileTypeSerializer duplicate() {
+		return this;
+	}
+
+	@Override
+	public int hashCode() {
+		return 23;
+	}
+
+	@Override
+	public boolean canEqual(Object obj) {
+		return obj instanceof TileTypeSerializer;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof TileTypeSerializer) {
+			TileTypeSerializer other = (TileTypeSerializer) obj;
+
+			return other.canEqual(this);
+		} else {
+			return false;
+		}
+	}
 }

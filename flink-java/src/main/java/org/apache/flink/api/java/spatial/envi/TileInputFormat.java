@@ -38,8 +38,6 @@ import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.core.memory.DataInputView;
-import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -467,55 +465,11 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 		private static final long serialVersionUID = -9205048860784884871L;
 		public TileInfo info;
 		public EnviTilePosition pos;
-
-		public EnviInputSplit() {
-			super();
-			this.info = null;
-			this.pos = null;
-		}
 		
 		public EnviInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info, EnviTilePosition pos) {
 			super(num, file, start, length, hosts);
 			this.info = info;
 			this.pos = pos;
-		}
-		
-		@Override
-		public void read(DataInputView in) throws IOException {
-			this.info = new TileInfo();
-			this.info.deserialize(in);
-			
-			String aqcDate = in.readUTF();
-			int band = in.readInt();
-			Coordinate leftUpper = new Coordinate();
-			leftUpper.deserialize(in);
-			String pathRow = in.readUTF();
-			Coordinate rightLower = new Coordinate();
-			rightLower.deserialize(in);
-			int xnext = in.readInt();
-			int xstart = in.readInt();
-			int ynext = in.readInt();
-			int ystart = in.readInt();
-			this.pos = new EnviTilePosition(band, xstart, xnext, ystart, ynext, leftUpper, rightLower, pathRow, aqcDate);
-			
-			super.read(in);
-		}
-		
-		@Override
-		public void write(DataOutputView out) throws IOException {
-			this.info.serialize(out);
-			
-			out.writeUTF(this.pos.aqcDate);
-			out.writeInt(this.pos.band);
-			this.pos.leftUpperCorner.serialize(out);
-			out.writeUTF(this.pos.pathRow);
-			this.pos.rightLowerCorner.serialize(out);
-			out.writeInt(this.pos.xnext);
-			out.writeInt(this.pos.xstart);
-			out.writeInt(this.pos.ynext);
-			out.writeInt(this.pos.ystart);
-			
-			super.write(out);
 		}
 	}
 

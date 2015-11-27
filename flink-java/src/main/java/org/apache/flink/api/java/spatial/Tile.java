@@ -51,7 +51,7 @@ public class Tile implements Serializable {
 	private Coordinate luCord = null, rlCord = null;
 
 	// x- and y-width of a pixel
-	private double xPixelWith = -1.0, yPixelWidth = -1.0;
+	private double xPixelWidth = -1.0, yPixelWidth = -1.0;
 
 	private TileInfo tileInfo = null;
 
@@ -86,7 +86,7 @@ public class Tile implements Serializable {
 		this.tileHeight = tile.getTileHeight();
 		this.tileInfo = tile.getTileInfo().copy();
 		this.tileWidth = tile.getTileWidth();
-		this.xPixelWith = tile.xPixelWith;
+		this.xPixelWidth = tile.xPixelWidth;
 		this.yPixelWidth = tile.yPixelWidth;
 	}
 
@@ -162,7 +162,6 @@ public class Tile implements Serializable {
 	 * Update the tile information to the given object.
 	 * 
 	 * @param aqcDate
-	 * @param pathRow2
 	 */
 	public void update(TileInfo tileInfo, Coordinate leftUpper,
 			Coordinate rightLower, int width, int height, int band,
@@ -176,7 +175,7 @@ public class Tile implements Serializable {
 		this.band = band;
 		this.pathRow = pathRow;
 		this.aqcuisitionDate = aqcDate;
-		this.xPixelWith = xPixelWidth;
+		this.xPixelWidth = xPixelWidth;
 		this.yPixelWidth = yPixelWidth;
 	}
 
@@ -208,13 +207,13 @@ public class Tile implements Serializable {
 	 * Given the number of samples, the pixel dimensions and the upper left
 	 * reference point we calculate the geographical coordinate;
 	 * 
-	 * @param i
+	 * @param contentIndex
 	 * @return
 	 */
 	public Coordinate getCoordinate(int contentIndex) {
 		int x = contentIndex % tileWidth;
 		int y = (int) (contentIndex / tileWidth);
-		double newLon = this.luCord.lon + this.xPixelWith * x;
+		double newLon = this.luCord.lon + this.xPixelWidth * x;
 		double newLat = this.luCord.lat - this.yPixelWidth * y;
 
 		return new Coordinate(newLon, newLat);
@@ -236,7 +235,7 @@ public class Tile implements Serializable {
 			return -1;
 		}
 
-		int x = (int) (lonDiff / this.xPixelWith);
+		int x = (int) (lonDiff / this.xPixelWidth);
 		int y = (int) (latDiff / this.yPixelWidth);
 
 		return y * this.tileWidth + x;
@@ -261,7 +260,7 @@ public class Tile implements Serializable {
 		target.tileHeight = this.tileHeight;
 		target.tileInfo = this.getTileInfo().copy();
 		target.tileWidth = this.tileWidth;
-		target.xPixelWith = this.xPixelWith;
+		target.xPixelWidth = this.xPixelWidth;
 		target.yPixelWidth = this.yPixelWidth;
 
 	}
@@ -291,7 +290,7 @@ public class Tile implements Serializable {
 
 		target.writeInt(this.tileHeight);
 		target.writeInt(this.tileWidth);
-		target.writeDouble(this.xPixelWith);
+		target.writeDouble(this.xPixelWidth);
 		target.writeDouble(this.yPixelWidth);
 		
 		this.tileInfo.serialize(target);
@@ -313,7 +312,6 @@ public class Tile implements Serializable {
 
 	public void deserialize(DataInputView source) throws IOException {
 		if (source.readBoolean()) {
-//			this.aqcuisitionDate = readString(source);
 			this.aqcuisitionDate = source.readUTF();
 		}
 		
@@ -328,13 +326,12 @@ public class Tile implements Serializable {
 		
 		if (source.readBoolean()) {
 			this.pathRow = source.readUTF();
-//			this.pathRow = readString(source);
 		}
 		
 		
 		this.tileHeight = source.readInt();
 		this.tileWidth = source.readInt();
-		this.xPixelWith = source.readDouble();
+		this.xPixelWidth = source.readDouble();
 		this.yPixelWidth = source.readDouble();
 		
 		this.tileInfo = new TileInfo();
@@ -372,4 +369,28 @@ public class Tile implements Serializable {
 	public Coordinate getRlCord() {
 		return rlCord;
 	}
+
+	public void setBand(int band) {
+		this.band = band;
+	}
+
+	public void setTileHeight(int tileHeight) {
+		this.tileHeight = tileHeight;
+	}
+
+	public void setTileWidth(int tileWidth) {
+		this.tileWidth = tileWidth;
+	}
+
+	public void setxPixelWidth(Double xPixelWidth) {
+		this.xPixelWidth = xPixelWidth;
+	}
+
+	public void setyPixelWidth(Double yPixelWidth) {
+		this.yPixelWidth = yPixelWidth;
+	}
+
+	public double getxPixelWidth() {	return xPixelWidth;}
+
+	public double getyPixelWidth() {return yPixelWidth;	}
 }

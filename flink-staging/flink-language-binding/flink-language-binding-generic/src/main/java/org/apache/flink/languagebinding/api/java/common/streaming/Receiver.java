@@ -17,9 +17,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.Tile;
+import org.apache.flink.api.java.tuple.Tuple;
 //CHECKSTYLE.OFF: AvoidStarImport - tuple imports
 import org.apache.flink.api.java.tuple.*;
 import static org.apache.flink.languagebinding.api.java.common.streaming.Sender.*;
@@ -238,6 +243,8 @@ public class Receiver implements Serializable {
 				return new DoubleDeserializer();
 			case TYPE_NULL:
 				return new NullDeserializer();
+			case TYPE_TILE:
+				return new TileDeserializer();
 			default:
 				throw new IllegalArgumentException("Unknown TypeID encountered: " + type);
 
@@ -349,6 +356,57 @@ public class Receiver implements Serializable {
 			return reuse;
 		}
 	}
+
+	private class TileDeserializer implements Deserializer<Tile> {
+
+		private StringDeserializer stringDes;
+		private DoubleDeserializer doubleDes;
+		private LongDeserializer intDes;
+		private BytesDeserializer bytesDes;
+		//TODO: check if this is still in line with the serialization approach of Flink
+		Tile reuse;
+
+		public TileDeserializer() {
+			this.stringDes = new StringDeserializer();
+			this.intDes = new LongDeserializer();
+			this.doubleDes = new DoubleDeserializer();
+			this.bytesDes = new BytesDeserializer();
+			this.reuse = new Tile();
+		}
+
+
+		@Override
+		public Tile deserialize() {
+			this.reuse.setAqcuisitionDate(this.stringDes.deserialize());
+			this.reuse.setBand(this.intDes.deserialize().intValue());
+
+			double luLon = this.doubleDes.deserialize();
+			double luLat = this.doubleDes.deserialize();
+			Coordinate leftUpper = new Coordinate(luLon, luLat);
+			this.reuse.setLuCord(leftUpper);
+
+			double rlLon = this.doubleDes.deserialize();
+			double rlLat = this.doubleDes.deserialize();
+			Coordinate rightLower = new Coordinate(rlLon, rlLat);
+			this.reuse.setRlCord(rightLower);
+
+			this.reuse.setPathRow(this.stringDes.deserialize());
+			this.reuse.setTileHeight(this.intDes.deserialize().intValue());
+			this.reuse.setTileWidth(this.intDes.deserialize().intValue());
+			this.reuse.setxPixelWidth(this.doubleDes.deserialize());
+			this.reuse.setyPixelWidth(this.doubleDes.deserialize());
+
+			byte[] bytes = this.bytesDes.deserialize();
+			short[] data = new short[bytes.length / 2];
+			ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+					.get(data);
+
+			this.reuse.setS16Tile(data);
+			return this.reuse;
+		}
+
+	}
+
 
 	public static Tuple createTuple(int size) {
 		try {

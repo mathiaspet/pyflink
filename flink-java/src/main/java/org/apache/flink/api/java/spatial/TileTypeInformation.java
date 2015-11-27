@@ -18,6 +18,7 @@
 package org.apache.flink.api.java.spatial;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
 /**
@@ -53,7 +54,7 @@ public class TileTypeInformation extends TypeInformation<Tile> {
 	}
 
 	@Override
-	public TypeSerializer<Tile> createSerializer() {
+	public TypeSerializer<Tile> createSerializer(ExecutionConfig config) {
 		return TileTypeSerializer.get();
 	}
 
@@ -62,4 +63,29 @@ public class TileTypeInformation extends TypeInformation<Tile> {
 		return 11;
 	}
 
+	@Override
+	public int hashCode() {
+		return 11;
+	}
+
+	@Override
+	public boolean canEqual(Object obj) {
+		return obj instanceof TileTypeInformation;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof TileTypeInformation) {
+			TileTypeInformation other = (TileTypeInformation) obj;
+
+			return other.canEqual(this);
+		} else {
+			return false;
+		}
+	}
+
+	@Override
+	public String toString() {
+		return "TileType";
+	}	
 }
