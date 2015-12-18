@@ -17,6 +17,7 @@
 ################################################################################
 from struct import unpack
 from collections import deque
+from flink.plan.Constants import Tile
 
 try:
     import _abcoll as defIter
@@ -231,7 +232,8 @@ def _get_deserializer(group, read, type=None):
         return StringDeserializer(read, group)
     elif type == Types.TYPE_NULL:
         return NullDeserializer(read, group)
-
+    elif type == Types.TYPE_TILE:
+        return TileDeserializer(read, group)
 
 class TupleDeserializer(object):
     def __init__(self, read, group):
@@ -325,3 +327,42 @@ class NullDeserializer(object):
 
     def deserialize(self):
         return None
+
+class TileDeserializer(object):
+    def __init__(self, read, group):
+        self.read = read
+        self._group = group
+        self._stringSerializer = StringDeserializer(read, group)
+        self._boolSerializer = BooleanDeserializer(read, group)
+        self._intSerializer = IntegerDeserializer(read, group)
+        self._doubleSerializer = DoubleDeserializer(read, group)
+        self._bytesSerializer = ByteArrayDeserializer(read, group)
+
+    def deserialize(self):
+        tile = Tile()
+        isAckDate = self._boolSerializer.deserialize()
+        if isAckDate > 0:
+            tile._aquisitionDate = self._stringSerializer.deserialize()
+
+        tile._band = self._intSerializer.deserialize()
+
+        tile._leftUpperLon = self._doubleSerializer.deserialize()
+        tile._leftUpperLat = self._doubleSerializer.deserialize()
+        tile._rightLowerLon = self._doubleSerializer.deserialize()
+        tile._rightLowerLat = self._doubleSerializer.deserialize()
+
+        isPathRow = self._boolSerializer.deserialize()
+        if isPathRow > 0:
+            tile._pathRow = self._stringSerializer.deserialize()
+
+        tile._height = self._intSerializer.deserialize()
+        tile._width = self._intSerializer.deserialize()
+
+        tile._xPixelWidth = self._doubleSerializer.deserialize()
+        tile._yPixelWidth = self._doubleSerializer.deserialize()
+
+        hasContent = self._boolSerializer.deserialize()
+        if hasContent > 0:
+            tile._content = self._bytesSerializer.deserialize()
+
+        return tile

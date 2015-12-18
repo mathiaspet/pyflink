@@ -140,7 +140,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 8:
         print("Usage: ./bin/pyflink.sh EnviCube - <dop> <input directory> <left-upper-longitude> <left-upper-latitude> <block size> <pixel size> <output path>")
         sys.exit()
-    
+
     dop = int(sys.argv[1])
     path = sys.argv[2]
     leftLong = sys.argv[3]

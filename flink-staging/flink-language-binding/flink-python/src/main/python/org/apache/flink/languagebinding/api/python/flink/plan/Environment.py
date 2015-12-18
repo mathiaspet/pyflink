@@ -83,6 +83,22 @@ class Environment(object):
         self._sources.append(child)
         return child_set
 
+    def read_envi(self, path, leftLong, leftLat, blockSize, pixelSize):
+        """
+        Creates an envi data source to read envi tiles from a directory
+        :param path: the path to the directory containing the bsq and hdr files
+        :return A DataSet containing envi tiles
+        """
+        child = dict()
+        child_set = DataSet(self, child)
+        child[_Fields.IDENTIFIER] = _Identifier.SOURCE_ENVI
+        child[_Fields.PATH] = path
+        child["leftLong"] = leftLong
+        child["leftLat"] = leftLat
+        child["blockSize"] = blockSize
+        child["pixelSize"] = pixelSize
+        self._sources.append(child)
+        return child_set
     def from_elements(self, *elements):
         """
         Creates a new data set that contains the given elements.
@@ -254,6 +270,13 @@ class Environment(object):
                     for value in source[_Fields.VALUES]:
                         collect(value)
                     break
+                if case(_Identifier.SOURCE_ENVI):
+                    self._collector.collect(source[_Fields.PATH])
+                    self._collector.collect(source["leftLong"])
+                    self._collector.collect(source["leftLat"])
+                    self._collector.collect(source["blockSize"])
+                    self._collector.collect(source["pixelSize"])
+                    break
 
     def _send_operations(self):
         collect = self._collector.collect
@@ -334,6 +357,10 @@ class Environment(object):
                     break
                 if case(_Identifier.SINK_PRINT):
                     collect(sink[_Fields.TO_ERR])
+                    break
+                if case(_Identifier.SINK_ENVI):
+                    collect(sink[_Fields.PATH])
+                    collect(sink[_Fields.WRITE_MODE])
                     break
 
     def _send_broadcast(self):

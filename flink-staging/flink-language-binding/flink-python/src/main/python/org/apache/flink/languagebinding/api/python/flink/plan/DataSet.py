@@ -20,7 +20,6 @@ import copy
 import types as TYPES
 
 from flink.plan.Constants import _Fields, _Identifier, WriteMode, STRING, TILE
-from flink.plan.OperationInfo import OperationInfo
 from flink.functions.CoGroupFunction import CoGroupFunction
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
@@ -129,6 +128,15 @@ class Set(object):
         child[_Fields.PARENT] = self._info
         child[_Fields.DELIMITER_FIELD] = field_delimiter
         child[_Fields.DELIMITER_LINE] = line_delimiter
+        child[_Fields.WRITE_MODE] = write_mode
+        self._info[_Fields.SINKS].append(child)
+        self._env._sinks.append(child)
+
+    def write_envi(self, path, write_mode=WriteMode.OVERWRITE):
+        child = dict()
+        child[_Fields.IDENTIFIER] = _Identifier.SINK_ENVI
+        child[_Fields.PARENT] = self._info
+        child[_Fields.PATH] = path
         child[_Fields.WRITE_MODE] = write_mode
         self._info[_Fields.SINKS].append(child)
         self._env._sinks.append(child)

@@ -70,6 +70,9 @@ def _get_serializer(write, value):
     elif isinstance(value, float):
         write(Types.TYPE_DOUBLE)
         return FloatSerializer()
+    elif isinstance(value, Tile):
+        write(Types.TYPE_TILE)
+        return TileSerializer(write, value)
     else:
         raise Exception("Unsupported Type encountered.")
 
@@ -89,6 +92,30 @@ class BooleanSerializer(object):
     def serialize(self, value):
         return pack(">?", value)
 
+class TileSerializer(object):
+    def __init__(self, write, value):
+        self._boolSerializer = BooleanSerializer()
+        self._longSerializer = LongSerializer()
+        self._stringSerializer = StringSerializer()
+        self._bytesSerializer = ByteArraySerializer()
+        self._doubleSerializer = FloatSerializer()
+
+    def serialize(self, value):
+        bits = []
+        """TODO: remove check isNull checks from Tile Serialization for pathRow, ackDate and Content """
+        bits.append(self._stringSerializer.serialize(value._aquisitionDate))
+        bits.append(self._longSerializer.serialize(value._band))
+        bits.append(self._doubleSerializer.serialize(value._leftUpperLon))
+        bits.append(self._doubleSerializer.serialize(value._leftUpperLat))
+        bits.append(self._doubleSerializer.serialize(value._rightLowerLon))
+        bits.append(self._doubleSerializer.serialize(value._rightLowerLat))
+        bits.append(self._stringSerializer.serialize(value._pathRow))
+        bits.append(self._longSerializer.serialize(value._height))
+        bits.append(self._longSerializer.serialize(value._width))
+        bits.append(self._doubleSerializer.serialize(value._xPixelWidth))
+        bits.append(self._doubleSerializer.serialize(value._yPixelWidth))
+        bits.append(self._bytesSerializer.serialize(value._content))
+        return b"".join(bits)
 
 class FloatSerializer(object):
     def serialize(self, value):
