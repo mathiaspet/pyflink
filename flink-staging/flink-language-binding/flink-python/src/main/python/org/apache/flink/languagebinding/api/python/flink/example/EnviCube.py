@@ -20,25 +20,22 @@ from collections import defaultdict
 from struct import pack
 
 from flink.plan.Environment import get_environment
-from flink.plan.Constants import TILE, STRING
+from flink.plan.Constants import TILE, STRING, BYTES
 from flink.plan.Constants import Tile
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
-from flink.functions.KeySelectorFunction import KeySelectorFunction
+
+from flink.example.ImageWrapper import tile_to_tuple
 
 
 NOVAL = pack("<h", -9999)
 
 
-#deprecated
-class Tokenizer(FlatMapFunction):
+class TupleConverter(FlatMapFunction):
     def flat_map(self, value, collector):
-        print("acquisition date: " + value.aquisitionDate + " " + value.pathRow)
-        print("band " + str(value.band) + " lu (" + str(value.leftUpperLon) + ", " + str(value.leftUpperLat) + ")")
-        print(" rl (" + str(value.rightLowerLon) + ", " + str(value.rightLowerLat) + ")")
-        print("pixelsize: " + str(value.xPixelWidth) + " x " + str(value.yPixelWidth))
-        print("tile size: " + str(value.width) + " x " + str(value.height))
-        collector.collect(value)
+        as_tuple = tile_to_tuple(value)
+        print(type(as_tuple[0]), type(as_tuple[1]), type(as_tuple[2]))
+        collector.collect(as_tuple)
 
 
 class CubeCreator(GroupReduceFunction):
@@ -115,9 +112,9 @@ class CubeCreator(GroupReduceFunction):
         print("orig not null", orig_not_null_counter)
 
 
-class AcqDateSelector(KeySelectorFunction):
-    def get_key(self, value):
-        return value._aquisitionDate
+# class AcqDateSelector(KeySelectorFunction):
+#     def get_key(self, value):
+#         return value._aquisitionDate
 
 
 def coord_iter(tile):
@@ -154,10 +151,12 @@ if __name__ == "__main__":
                   float(leftLong) + int(blockSize) * int(pixelSize))
 
     data = env.read_envi(path, leftLong, leftLat, blockSize, pixelSize)
-    cube = data.group_by(AcqDateSelector(), STRING)\
-        .reduce_group(CubeCreator(leftUpper, rightLower, int(blockSize), int(blockSize)), TILE)
+    tuples = data.flat_map(TupleConverter(), (STRING, BYTES, BYTES))
+    tuples.write_csv(outputPath)
+    # cube = data.group_by(AcqDateSelector(), STRING)\
+        # .reduce_group(CubeCreator(leftUpper, rightLower, int(blockSize), int(blockSize)), TILE)
 
-    cube.write_envi(outputPath)
+    # cube.write_envi(outputPath)
 
     env.set_degree_of_parallelism(dop)
 
