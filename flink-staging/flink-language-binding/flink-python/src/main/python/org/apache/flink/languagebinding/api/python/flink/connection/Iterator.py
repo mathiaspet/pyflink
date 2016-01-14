@@ -341,7 +341,7 @@ class TileDeserializer(object):
     def deserialize(self):
         tile = Tile()
         isAckDate = self._boolSerializer.deserialize()
-        if isAckDate > 0:
+        if isAckDate:
             tile._aquisitionDate = self._stringSerializer.deserialize()
 
         tile._band = self._intSerializer.deserialize()

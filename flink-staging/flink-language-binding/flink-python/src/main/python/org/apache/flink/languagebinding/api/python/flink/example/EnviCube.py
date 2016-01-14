@@ -21,25 +21,12 @@ from struct import pack
 
 from flink.plan.Environment import get_environment
 from flink.plan.Constants import TILE
-from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 
-from flink.example.ImageWrapper import tile_to_tuple, tuple_to_tile, ImageWrapper, IMAGE_TUPLE
+from flink.example.ImageWrapper import TileToTuple, TupleToTile, ImageWrapper, IMAGE_TUPLE
 
 
 NOVAL = pack("<h", -9999)
-
-
-class ToTuple(FlatMapFunction):
-    def flat_map(self, value, collector):
-        as_tuple = tile_to_tuple(value)
-        collector.collect(as_tuple)
-
-
-class ToTile(FlatMapFunction):
-    def flat_map(self, value, collector):
-        as_tile = tuple_to_tile(value)
-        collector.collect(as_tile)
 
 
 class CubeCreator(GroupReduceFunction):
@@ -144,10 +131,10 @@ if __name__ == "__main__":
 
     data = env.read_envi(path, str(leftLon), str(leftLat), str(blockSize), str(pixelSize))
 
-    tuples = data.flat_map(ToTuple(), IMAGE_TUPLE)
+    tuples = data.flat_map(TileToTuple(), IMAGE_TUPLE)
     cube = tuples.group_by(0)\
                  .reduce_group(CubeCreator(leftUpper, rightLower, blockSize, blockSize), IMAGE_TUPLE)
-    tiles = cube.flat_map(ToTile(), TILE)
+    tiles = cube.flat_map(TupleToTile(), TILE)
     tiles.write_envi(outputPath)
 
     env.set_degree_of_parallelism(dop)

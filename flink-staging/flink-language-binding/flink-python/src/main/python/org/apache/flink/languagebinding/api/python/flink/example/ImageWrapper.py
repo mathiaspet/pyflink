@@ -16,49 +16,52 @@
 # limitations under the License.
 ################################################################################
 import marshal
+from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.plan.Constants import Tile, STRING, BYTES
 
 
 IMAGE_TUPLE = STRING, BYTES, BYTES
 
 
-def tile_to_tuple(as_tile):
-    tile_meta = {
-        "acquisitionDate": as_tile._aquisitionDate,
-        "coordinates": (as_tile._leftUpperLat, as_tile._rightLowerLat, as_tile._leftUpperLon, as_tile._rightLowerLon),
-        "width": as_tile._width,
-        "height": as_tile._height,
-        "band": as_tile._band,
-        "pathRow": as_tile._pathRow,
-        "xPixelWidth": as_tile._xPixelWidth,
-        "yPixelWidth": as_tile._yPixelWidth
-    }
+class TileToTuple(FlatMapFunction):
+    def flat_map(self, value, collector):
+        tile_meta = {
+            "acquisitionDate": value._aquisitionDate,
+            "coordinates": (value._leftUpperLat, value._rightLowerLat, value._leftUpperLon, value._rightLowerLon),
+            "width": value._width,
+            "height": value._height,
+            "band": value._band,
+            "pathRow": value._pathRow,
+            "xPixelWidth": value._xPixelWidth,
+            "yPixelWidth": value._yPixelWidth
+        }
 
-    return (
-        as_tile._aquisitionDate,
-        bytearray(marshal.dumps(tile_meta)),
-        as_tile._content
-    )
+        collector.collect((
+            value._aquisitionDate,
+            bytearray(marshal.dumps(tile_meta)),
+            value._content
+        ))
 
 
-def tuple_to_tile(as_tuple):
-    image = ImageWrapper(as_tuple)
+class TupleToTile(FlatMapFunction):
+    def flat_map(self, value, collector):
+        image = ImageWrapper(value)
 
-    as_tile = Tile()
-    as_tile._aquisitionDate = image.acquisitionDate
-    as_tile._pathRow = image.get_meta('pathRow')
-    as_tile._leftUpperLat = image.coordinates[0]
-    as_tile._leftUpperLon = image.coordinates[2]
-    as_tile._rightLowerLat = image.coordinates[1]
-    as_tile._rightLowerLon = image.coordinates[3]
-    as_tile._width = image.get_meta('width')
-    as_tile._height = image.get_meta('height')
-    as_tile._band = image.get_meta('band')
-    as_tile._xPixelWidth = image.get_meta('xPixelWidth')
-    as_tile._yPixelWidth = image.get_meta('yPixelWidth')
-    as_tile._content = image.content
+        as_tile = Tile()
+        as_tile._aquisitionDate = image.acquisitionDate
+        as_tile._pathRow = image.get_meta('pathRow')
+        as_tile._leftUpperLat = image.coordinates[0]
+        as_tile._leftUpperLon = image.coordinates[2]
+        as_tile._rightLowerLat = image.coordinates[1]
+        as_tile._rightLowerLon = image.coordinates[3]
+        as_tile._width = image.get_meta('width')
+        as_tile._height = image.get_meta('height')
+        as_tile._band = image.get_meta('band')
+        as_tile._xPixelWidth = image.get_meta('xPixelWidth')
+        as_tile._yPixelWidth = image.get_meta('yPixelWidth')
+        as_tile._content = image.content
 
-    return as_tile
+        collector.collect(as_tile)
 
 
 class ImageWrapper(object):
