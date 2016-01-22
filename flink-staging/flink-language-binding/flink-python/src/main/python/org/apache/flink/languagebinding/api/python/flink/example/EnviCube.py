@@ -59,14 +59,14 @@ class CubeCreator(GroupReduceFunction):
                                             sample.get_meta("pathRow"), sample.acquisitionDate,
                                             sample.get_meta("xPixelWidth"), sample.get_meta("yPixelWidth"))
             band_to_tiles[b].add(sample)
-            # Initialize content with -NOVAL
+            # Initialize content with NOVAL
             for i in range(0, len(result.s16_tile)):
-                result.s16_tile[i] = -NOVAL
+                result.s16_tile[i] = NOVAL
 
             # iterate over tiles for current band
             for t in band_to_tiles[b]:
                 for i, (px_coord_lat, px_coord_lon) in coord_iter(t):
-                    if result.s16_tile[i] != -NOVAL:
+                    if result.s16_tile[i] != NOVAL:
                         orig_not_null_counter += 1
                     if (self.leftUpperLat >= px_coord_lat and
                             px_coord_lat >= self.rightLowerLat and
@@ -77,7 +77,7 @@ class CubeCreator(GroupReduceFunction):
                         if index >= 0 and index < len(result.s16_tile):
                             inside_counter += 1
                             px_value = t.s16_tile[i]
-                            if px_value != -NOVAL:
+                            if px_value != NOVAL:
                                 known_counter += 1
                             result.s16_tile[index] = px_value
 
