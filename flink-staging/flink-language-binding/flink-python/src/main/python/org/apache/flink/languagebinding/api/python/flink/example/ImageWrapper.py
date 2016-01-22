@@ -70,8 +70,8 @@ class ImageWrapper(object):
         self._meta = marshal.loads(tup[1])
 
     @staticmethod
-    def fromData(coordinates, width, height, band, pathRow,
-                 acquisitionDate, xPixelWidth, yPixelWidth):
+    def from_data(coordinates, width, height, band, pathRow,
+                  acquisitionDate, xPixelWidth, yPixelWidth):
         tile_meta = {
             "acquisitionDate": acquisitionDate,
             "coordinates": coordinates,
@@ -116,6 +116,11 @@ class ImageWrapper(object):
     def content(self):
         return self._tup[2]
 
+    @property
+    def s16_tile(self):
+        # This only works on little endian systems
+        return memoryview(self._tup[2]).cast("h")
+
     def get_coordinate(self, index):
         index = index // 2
         x = index % self.get_meta("width")
@@ -124,10 +129,10 @@ class ImageWrapper(object):
         newLat = self.coordinates[0] - self.get_meta("yPixelWidth") * y
         return (newLat, newLon)
 
-    def get_content_index_from_coordinate(self, coord):
+    def get_index_from_coordinate(self, coord):
         lat, lon = coord
-        latDiff = int(self.coordinates[2] - lat)
-        lonDiff = int(lon - self.coordinates[0])
+        latDiff = int(self.coordinates[0] - lat)
+        lonDiff = int(lon - self.coordinates[2])
 
         if latDiff < 0 or lonDiff < 0:
             return -1
@@ -135,4 +140,4 @@ class ImageWrapper(object):
         x = lonDiff // self.get_meta("xPixelWidth")
         y = latDiff // self.get_meta("yPixelWidth")
 
-        return int(2 * (y * self.get_meta("width") + x))
+        return int(y * self.get_meta("width") + x)

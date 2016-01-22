@@ -17,7 +17,6 @@
 ################################################################################
 import sys
 from collections import defaultdict
-from struct import pack
 
 from flink.plan.Environment import get_environment
 from flink.plan.Constants import TILE
@@ -26,7 +25,7 @@ from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.example.ImageWrapper import TileToTuple, TupleToTile, ImageWrapper, IMAGE_TUPLE
 
 
-NOVAL = pack("<h", -9999)
+NOVAL = -9999
 
 
 class CubeCreator(GroupReduceFunction):
@@ -56,34 +55,31 @@ class CubeCreator(GroupReduceFunction):
         known_counter = 0
         for b in bands:
             sample = band_to_tiles[b].pop()
-            result = ImageWrapper.fromData(sample.coordinates, self.xSize, self.ySize, b,
-                                           sample.get_meta("pathRow"), sample.acquisitionDate,
-                                           sample.get_meta("xPixelWidth"), sample.get_meta("yPixelWidth"))
+            result = ImageWrapper.from_data(sample.coordinates, self.xSize, self.ySize, b,
+                                            sample.get_meta("pathRow"), sample.acquisitionDate,
+                                            sample.get_meta("xPixelWidth"), sample.get_meta("yPixelWidth"))
             band_to_tiles[b].add(sample)
-            # Initialize content with -9999
-            for i in range(0, len(result.content), 2):
-                result.content[i] = NOVAL[0]
-                result.content[i+1] = NOVAL[1]
+            # Initialize content with -NOVAL
+            for i in range(0, len(result.s16_tile)):
+                result.s16_tile[i] = -NOVAL
 
             # iterate over tiles for current band
             for t in band_to_tiles[b]:
                 for i, (px_coord_lat, px_coord_lon) in coord_iter(t):
-                    if t.content[i:i+2] != NOVAL:
+                    if result.s16_tile[i] != -NOVAL:
                         orig_not_null_counter += 1
-
                     if (self.leftUpperLat >= px_coord_lat and
                             px_coord_lat >= self.rightLowerLat and
                             self.leftUpperLon <= px_coord_lon and
                             px_coord_lon <= self.rightLowerLon):
                         # get index in result image for current pixel
-                        index = int(result.get_content_index_from_coordinate((px_coord_lat, px_coord_lon)))
-                        if index >= 0 and index < len(result._content):
+                        index = result.get_index_from_coordinate((px_coord_lat, px_coord_lon))
+                        if index >= 0 and index < len(result.s16_tile):
                             inside_counter += 1
-                            px_value = t._content[i:i+2]
-                            if px_value != NOVAL:
+                            px_value = t.s16_tile[i]
+                            if px_value != -NOVAL:
                                 known_counter += 1
-                            result._content[index] = px_value[0]
-                            result._content[index+1] = px_value[1]
+                            result.s16_tile[index] = px_value
 
             collector.collect(result._tup)
 
@@ -93,18 +89,19 @@ class CubeCreator(GroupReduceFunction):
 
 
 def coord_iter(image):
-    lon = image.coordinates[0]
-    lat = image.coordinates[2]
+    lat = image.coordinates[0]
+    lon = image.coordinates[2]
 
     width = image.get_meta("width")
     xPixelWidth = image.get_meta("xPixelWidth")
     yPixelWidth = image.get_meta("yPixelWidth")
 
     yield (0, (lat, lon))
-    if len(image.content) > 2:
-        for i in range(2, len(image.content), 2):
+
+    if len(image.s16_tile) > 1:
+        for i in range(1, len(image.s16_tile)):
             if i % width == 0:
-                lon = image.coordinates[0]
+                lon = image.coordinates[2]
                 lat -= yPixelWidth
             else:
                 lon += xPixelWidth
