@@ -20,10 +20,15 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Iterator;
+
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.api.common.io.RichInputFormat;
 import org.apache.flink.configuration.Configuration;
+
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.PLANBINDER_CONFIG_BCVAR_NAME_PREFIX;
+
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +59,25 @@ public abstract class Streamer implements Serializable {
 
 	protected StringBuilder msg = new StringBuilder();
 
-	protected final AbstractRichFunction function;
+	//TODO: refactor this since both variables are just here to provide access to a runtime context
+	//however, at the time of construction this context is unavailable
+	protected /*final*/ AbstractRichFunction function;
+	protected RichInputFormat format;
+	
+	protected RuntimeContext context;
 
 	public Streamer(AbstractRichFunction function) {
 		this.function = function;
 		sender = new Sender(function);
 		receiver = new Receiver(function);
 	}
-
+	
+	public Streamer(RichInputFormat format) {
+		this.format = format;
+		this.sender = new Sender();
+		this.receiver = new Receiver();
+	}
+	
 	public void open() throws IOException {
 		server = new ServerSocket(0);
 		setupProcess();
@@ -99,13 +115,15 @@ public abstract class Streamer implements Serializable {
 	}
 
 	private void checkForError() {
+		this.setContext();
 		if (getInt(buffer, 0) == -2) {
 			try { //wait before terminating to ensure that the complete error message is printed
 				Thread.sleep(2000);
 			} catch (InterruptedException ex) {
 			}
 			throw new RuntimeException(
-					"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely." + msg);
+					//"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely." + msg);
+					"External process for task " + this.context.getTaskName() + " terminated prematurely." + msg);
 		}
 	}
 
@@ -116,6 +134,7 @@ public abstract class Streamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void sendBroadCastVariables(Configuration config) throws IOException {
+		this.setContext();
 		try {
 			int broadcastCount = config.getInteger(PLANBINDER_CONFIG_BCVAR_COUNT, 0);
 
@@ -131,7 +150,7 @@ public abstract class Streamer implements Serializable {
 			sendWriteNotification(size, false);
 
 			for (String name : names) {
-				Iterator bcv = function.getRuntimeContext().getBroadcastVariable(name).iterator();
+				Iterator bcv = this.context.getBroadcastVariable(name).iterator();
 
 				in.read(buffer, 0, 4);
 				checkForError();
@@ -147,7 +166,7 @@ public abstract class Streamer implements Serializable {
 				sender.reset();
 			}
 		} catch (SocketTimeoutException ste) {
-			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
+			throw new RuntimeException("External process for task " + this.context.getTaskName() + " stopped responding." + msg);
 		}
 	}
 
@@ -159,6 +178,7 @@ public abstract class Streamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithoutGroups(Iterator i, Collector c) throws IOException {
+		this.setContext();
 		try {
 			int size;
 			if (i.hasNext()) {
@@ -182,7 +202,7 @@ public abstract class Streamer implements Serializable {
 							} catch (InterruptedException ex) {
 							}
 							throw new RuntimeException(
-									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+									"External process for task " + this.context.getTaskName() + " terminated prematurely due to an error." + msg);
 						default:
 							receiver.collectBuffer(c, sig);
 							sendReadConfirmation();
@@ -191,7 +211,7 @@ public abstract class Streamer implements Serializable {
 				}
 			}
 		} catch (SocketTimeoutException ste) {
-			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
+			throw new RuntimeException("External process for task " + this.context.getTaskName() + " stopped responding." + msg);
 		}
 	}
 
@@ -204,6 +224,7 @@ public abstract class Streamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithGroups(Iterator i1, Iterator i2, Collector c) throws IOException {
+		this.setContext();
 		try {
 			int size;
 			if (i1.hasNext() || i2.hasNext()) {
@@ -231,7 +252,7 @@ public abstract class Streamer implements Serializable {
 							} catch (InterruptedException ex) {
 							}
 							throw new RuntimeException(
-									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+									"External process for task " + this.context.getTaskName() + " terminated prematurely due to an error." + msg);
 						default:
 							receiver.collectBuffer(c, sig);
 							sendReadConfirmation();
@@ -240,7 +261,7 @@ public abstract class Streamer implements Serializable {
 				}
 			}
 		} catch (SocketTimeoutException ste) {
-			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
+			throw new RuntimeException("External process for task " + this.context.getTaskName() + " stopped responding." + msg);
 		}
 	}
 
@@ -253,6 +274,28 @@ public abstract class Streamer implements Serializable {
 		array[offset + 1] = (byte) (value >> 16);
 		array[offset + 2] = (byte) (value >> 8);
 		array[offset + 3] = (byte) (value);
+	}
+	
+	/**
+	 * Checks whether this streamer belongs to a data source or a function, extracts the runtime context and 
+	 * stores it into this.context.
+	 */
+	protected void setContext(){
+		if(this.context != null)
+		{
+			return;
+		}
+		
+		if(this.function != null)
+		{
+			this.context = this.function.getRuntimeContext();
+			return;
+		}
+		
+		if(this.format != null)
+		{
+			this.context = this.format.getRuntimeContext();
+		}
 	}
 
 }

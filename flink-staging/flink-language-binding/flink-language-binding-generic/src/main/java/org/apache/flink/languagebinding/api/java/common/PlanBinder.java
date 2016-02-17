@@ -15,6 +15,7 @@ package org.apache.flink.languagebinding.api.java.common;
 import java.io.IOException;
 import java.util.HashMap;
 
+import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -33,9 +34,11 @@ import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint;
+
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.HUGE;
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.NONE;
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.TINY;
+
 import org.apache.flink.languagebinding.api.java.common.OperationInfo.ProjectionEntry;
 import org.apache.flink.languagebinding.api.java.common.streaming.Receiver;
 
@@ -108,7 +111,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	 * This enum contains the identifiers for all supported non-UDF DataSet operations.
 	 */
 	protected enum Operation {
-		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SINK_CSV, SINK_TEXT, SINK_PRINT,
+		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_CUSTOM, SINK_CSV, SINK_TEXT, SINK_PRINT,
 		PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST
@@ -149,6 +152,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 						break;
 					case SOURCE_SEQ:
 						createSequenceSource(createOperationInfo(op));
+						break;
+					case SOURCE_CUSTOM:
+						createCustomSource(createOperationInfo(op));
 						break;
 					case SINK_CSV:
 						createCsvSink(createOperationInfo(op));
@@ -278,6 +284,11 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 
 	private void createSequenceSource(OperationInfo info) throws IOException {
 		sets.put(info.setID, env.generateSequence(info.from, info.to).name("SequenceSource"));
+	}
+	
+	private void createCustomSource(OperationInfo info) {
+		InputFormat format = createCustomInputFormat(info);
+		sets.put(info.setID, env.createInput(format));
 	}
 
 	private void createCsvSink(OperationInfo info) throws IOException {
@@ -503,6 +514,8 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		}
 	}
 
+	protected abstract InputFormat createCustomInputFormat(OperationInfo info);
+	
 	protected abstract DataSet applyCoGroupOperation(DataSet op1, DataSet op2, String[] firstKeys, String[] secondKeys, INFO info);
 
 	protected abstract DataSet applyCrossOperation(DataSet op1, DataSet op2, DatasizeHint mode, INFO info);

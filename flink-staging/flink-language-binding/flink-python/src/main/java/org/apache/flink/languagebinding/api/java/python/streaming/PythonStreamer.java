@@ -12,19 +12,22 @@
  */
 package org.apache.flink.languagebinding.api.java.python.streaming;
 
+import static org.apache.flink.languagebinding.api.java.common.PlanBinder.DEBUG;
+import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
+import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
+import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
+import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_DC_ID;
+import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+
 import org.apache.flink.api.common.functions.AbstractRichFunction;
-import static org.apache.flink.languagebinding.api.java.common.PlanBinder.DEBUG;
-import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_DC_ID;
-import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
-import static org.apache.flink.languagebinding.api.java.common.PlanBinder.FLINK_TMP_DATA_DIR;
+import org.apache.flink.api.common.io.RichInputFormat;
 import org.apache.flink.languagebinding.api.java.common.streaming.StreamPrinter;
 import org.apache.flink.languagebinding.api.java.common.streaming.Streamer;
 import org.apache.flink.languagebinding.api.java.python.PythonPlanBinder;
-import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
-import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
 
 /**
  * This streamer is used by functions to send/receive data to/from an external python process.
@@ -40,6 +43,19 @@ public class PythonStreamer extends Streamer {
 	private String inputFilePath;
 	private String outputFilePath;
 
+	/*
+	 * This code duplication of constructors is ugly and only necessary because the 
+	 * RuntimeContext is not available during construction. 
+	 */
+	
+	public PythonStreamer(RichInputFormat format, int id) {
+		super(format);
+		this.id = id;
+		this.usePython3 = PythonPlanBinder.usePython3;
+		this.debug = DEBUG;
+		planArguments = PythonPlanBinder.arguments.toString();
+	}
+	
 	public PythonStreamer(AbstractRichFunction function, int id) {
 		super(function);
 		this.id = id;
@@ -47,7 +63,7 @@ public class PythonStreamer extends Streamer {
 		this.debug = DEBUG;
 		planArguments = PythonPlanBinder.arguments.toString();
 	}
-
+	
 	/**
 	 * Starts the python script.
 	 *
@@ -59,13 +75,14 @@ public class PythonStreamer extends Streamer {
 	}
 
 	private void startPython() throws IOException {
-		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.function.getRuntimeContext().getIndexOfThisSubtask() + "output";
-		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.function.getRuntimeContext().getIndexOfThisSubtask() + "input";
+		this.setContext();
+		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.context.getIndexOfThisSubtask() + "output";
+		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.context.getIndexOfThisSubtask() + "input";
 
 		sender.open(inputFilePath);
 		receiver.open(outputFilePath);
 
-		String path = function.getRuntimeContext().getDistributedCache().getFile(FLINK_PYTHON_DC_ID).getAbsolutePath();
+		String path = this.context.getDistributedCache().getFile(FLINK_PYTHON_DC_ID).getAbsolutePath();
 		String planPath = path + FLINK_PYTHON_PLAN_NAME;
 
 		String pythonBinaryPath = usePython3 ? FLINK_PYTHON3_BINARY_PATH : FLINK_PYTHON2_BINARY_PATH;
@@ -78,7 +95,7 @@ public class PythonStreamer extends Streamer {
 
 		if (debug) {
 			socket.setSoTimeout(0);
-			LOG.info("Waiting for Python Process : " + function.getRuntimeContext().getTaskName()
+			LOG.info("Waiting for Python Process : " + this.context.getTaskName()
 					+ " Run python " + planPath + planArguments);
 		} else {
 			process = Runtime.getRuntime().exec(pythonBinaryPath + " -O -B " + planPath + planArguments);
@@ -113,7 +130,7 @@ public class PythonStreamer extends Streamer {
 		if (!debug) {
 			try {
 				process.exitValue();
-				throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely." + msg);
+				throw new RuntimeException("External process for task " + this.context.getTaskName() + " terminated prematurely." + msg);
 			} catch (IllegalThreadStateException ise) { //process still active -> start receiving data
 			}
 		}

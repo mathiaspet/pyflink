@@ -45,7 +45,7 @@ public class Sender implements Serializable {
 	public static final byte TYPE_BYTES = (byte) 1;
 	public static final byte TYPE_NULL = (byte) 0;
 
-	private final AbstractRichFunction function;
+	//private final AbstractRichFunction function;
 
 	private File outputFile;
 	private RandomAccessFile outputRAF;
@@ -57,8 +57,10 @@ public class Sender implements Serializable {
 	private final Serializer[] serializer = new Serializer[2];
 
 	public Sender(AbstractRichFunction function) {
-		this.function = function;
+		//this.function = function;
 	}
+	
+	public Sender(){}
 
 	//=====Setup========================================================================================================
 	public void open(String path) throws IOException {

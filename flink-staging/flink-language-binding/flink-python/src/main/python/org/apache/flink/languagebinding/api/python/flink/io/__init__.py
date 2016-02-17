@@ -15,20 +15,3 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-from distutils.core import setup
-
-setup(
-    name='flink',
-    version='1.0',
-    packages=['flink',
-              'flink.connection',
-              'flink.functions',
-              'flink.plan',
-              'flink.utilities',
-              'flink.io'],
-    url='http://flink.apache.org',
-    license='Licensed under the Apache License, Version 2.0',
-    author='',
-    author_email='',
-    description='Flink Python API'
-)
