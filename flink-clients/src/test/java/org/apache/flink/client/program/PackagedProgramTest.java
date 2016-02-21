@@ -18,12 +18,12 @@
 
 package org.apache.flink.client.program;
 
-import java.io.File;
-import java.io.PrintStream;
-
 import org.apache.flink.client.CliFrontendTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.PrintStream;
 
 
 public class PackagedProgramTest {

@@ -23,10 +23,9 @@ import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
 import org.apache.flink.api.java.io.DiscardingOutputFormat;
-
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 @SuppressWarnings("serial")
 public class ExecutionPlanAfterExecutionTest implements java.io.Serializable {

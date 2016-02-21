@@ -19,37 +19,31 @@
 
 package org.apache.flink.client.web;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+ import org.apache.commons.lang3.StringEscapeUtils;
+ import org.apache.flink.api.java.tuple.Tuple2;
+ import org.apache.flink.client.CliFrontend;
+ import org.apache.flink.client.cli.CliFrontendParser;
+ import org.apache.flink.client.program.Client;
+ import org.apache.flink.client.program.PackagedProgram;
+ import org.apache.flink.client.program.ProgramInvocationException;
+ import org.apache.flink.configuration.GlobalConfiguration;
+ import org.apache.flink.optimizer.CompilerException;
+ import org.apache.flink.optimizer.plan.FlinkPlan;
+ import org.apache.flink.optimizer.plan.OptimizedPlan;
+ import org.apache.flink.optimizer.plan.StreamingPlan;
+ import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.client.CliFrontend;
-import org.apache.flink.client.cli.CliFrontendParser;
-import org.apache.flink.client.program.Client;
-import org.apache.flink.client.program.PackagedProgram;
-import org.apache.flink.client.program.ProgramInvocationException;
-import org.apache.flink.optimizer.CompilerException;
-import org.apache.flink.optimizer.plan.FlinkPlan;
-import org.apache.flink.optimizer.plan.OptimizedPlan;
-import org.apache.flink.optimizer.plan.StreamingPlan;
-import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
-import org.apache.flink.configuration.GlobalConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+ import javax.servlet.ServletException;
+ import javax.servlet.http.HttpServlet;
+ import javax.servlet.http.HttpServletRequest;
+ import javax.servlet.http.HttpServletResponse;
+ import java.io.File;
+ import java.io.IOException;
+ import java.io.PrintWriter;
+ import java.io.StringWriter;
+ import java.util.*;
 
 
 public class JobSubmissionServlet extends HttpServlet {

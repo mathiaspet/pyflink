@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+
+import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.LocalEnvironment;
@@ -24,16 +26,22 @@ import org.apache.flink.api.java.operators.CoGroupRawOperator;
 import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.tuple.Tuple;
+
 import static org.apache.flink.api.java.typeutils.TypeExtractor.getForObject;
+
 import org.apache.flink.configuration.GlobalConfiguration;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.languagebinding.api.java.common.PlanBinder;
 import org.apache.flink.languagebinding.api.java.common.OperationInfo;
 import org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.PythonOperationInfo;
+
+
 //CHECKSTYLE.OFF: AvoidStarImport - enum/function import
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.PythonOperationInfo.*;
+
 import org.apache.flink.languagebinding.api.java.python.functions.*;
+import org.apache.flink.languagebinding.api.java.python.io.PythonInputFormat;
 //CHECKSTYLE.ON: AvoidStarImport
 import org.apache.flink.languagebinding.api.java.common.streaming.Receiver;
 import org.apache.flink.languagebinding.api.java.common.streaming.StreamPrinter;
@@ -438,5 +446,11 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 					.mapPartition(new PythonMapPartition(info.setID, info.types))
 					.name(info.name);
 		}
+	}
+
+	@Override
+	protected InputFormat createCustomInputFormat(OperationInfo info) {
+		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types);
+		return format;
 	}
 }

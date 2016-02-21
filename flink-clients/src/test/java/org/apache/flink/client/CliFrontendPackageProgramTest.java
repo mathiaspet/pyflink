@@ -18,25 +18,14 @@
 
 package org.apache.flink.client;
 
-import static org.apache.flink.client.CliFrontendTestUtils.TEST_JAR_CLASSLOADERTEST_CLASS;
-import static org.apache.flink.client.CliFrontendTestUtils.TEST_JAR_MAIN_CLASS;
-import static org.apache.flink.client.CliFrontendTestUtils.getNonJarFilePath;
-import static org.apache.flink.client.CliFrontendTestUtils.getTestJarPath;
-import static org.apache.flink.client.CliFrontendTestUtils.pipeSystemOutToNull;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 import org.apache.flink.client.cli.CliFrontendParser;
 import org.apache.flink.client.cli.ProgramOptions;
 import org.apache.flink.client.cli.RunOptions;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.PackagedProgram;
 import org.apache.flink.client.program.ProgramInvocationException;
-import org.apache.flink.optimizer.CompilerException;
-import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
-
+import org.apache.flink.optimizer.CompilerException;
 import org.apache.flink.optimizer.DataStatistics;
 import org.apache.flink.optimizer.Optimizer;
 import org.apache.flink.optimizer.costs.DefaultCostEstimator;
@@ -46,6 +35,10 @@ import org.junit.Test;
 
 import java.io.FileNotFoundException;
 import java.net.URL;
+
+import static org.apache.flink.client.CliFrontendTestUtils.*;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 
 public class CliFrontendPackageProgramTest {

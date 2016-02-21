@@ -19,15 +19,15 @@
 
 package org.apache.flink.client;
 
-import static org.apache.flink.client.CliFrontendTestUtils.*;
-import static org.junit.Assert.*;
-
 import org.apache.flink.client.cli.CommandLineOptions;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.PackagedProgram;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import static org.apache.flink.client.CliFrontendTestUtils.getTestJarPath;
+import static org.junit.Assert.*;
 
 
 public class CliFrontendRunTest {

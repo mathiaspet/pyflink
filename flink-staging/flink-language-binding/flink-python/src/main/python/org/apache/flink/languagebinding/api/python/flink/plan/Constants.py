@@ -42,6 +42,7 @@ class _Identifier(object):
     SOURCE_TEXT = "source_text"
     SOURCE_VALUE = "source_value"
     SOURCE_ENVI = "source_envi"
+    SOURCE_CUSTOM = "source_custom"
     SINK_CSV = "sink_csv"
     SINK_TEXT = "sink_text"
     SINK_PRINT = "sink_print"

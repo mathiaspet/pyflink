@@ -18,9 +18,6 @@
 
 package org.apache.flink.client.program;
 
-import java.net.URL;
-import java.util.List;
-
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
@@ -31,6 +28,9 @@ import org.apache.flink.optimizer.plan.OptimizedPlan;
 import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URL;
+import java.util.List;
 
 /**
  * Execution Environment for remote execution with the Client.

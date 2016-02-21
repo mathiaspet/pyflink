@@ -18,40 +18,14 @@
 
 package org.apache.flink.client;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.FileNotFoundException;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-
 import akka.actor.ActorSystem;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.accumulators.AccumulatorHelper;
-import org.apache.flink.client.cli.CancelOptions;
-import org.apache.flink.client.cli.CliArgsException;
-import org.apache.flink.client.cli.CliFrontendParser;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.client.cli.CommandLineOptions;
-import org.apache.flink.client.cli.InfoOptions;
-import org.apache.flink.client.cli.ListOptions;
-import org.apache.flink.client.cli.ProgramOptions;
-import org.apache.flink.client.cli.RunOptions;
+import org.apache.flink.client.cli.*;
 import org.apache.flink.client.program.Client;
 import org.apache.flink.client.program.PackagedProgram;
 import org.apache.flink.client.program.ProgramInvocationException;
@@ -68,27 +42,32 @@ import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.runtime.instance.ActorGateway;
+import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.leaderretrieval.LeaderRetrievalService;
 import org.apache.flink.runtime.messages.JobManagerMessages;
+import org.apache.flink.runtime.messages.JobManagerMessages.CancelJob;
+import org.apache.flink.runtime.messages.JobManagerMessages.RunningJobsStatus;
 import org.apache.flink.runtime.security.SecurityUtils;
 import org.apache.flink.runtime.util.EnvironmentInformation;
 import org.apache.flink.runtime.util.LeaderRetrievalUtils;
 import org.apache.flink.runtime.yarn.AbstractFlinkYarnClient;
-import org.apache.flink.api.common.JobID;
-import org.apache.flink.runtime.jobgraph.JobStatus;
-import org.apache.flink.runtime.messages.JobManagerMessages.CancelJob;
-import org.apache.flink.runtime.messages.JobManagerMessages.RunningJobsStatus;
 import org.apache.flink.runtime.yarn.AbstractFlinkYarnCluster;
 import org.apache.flink.runtime.yarn.FlinkYarnClusterStatus;
 import org.apache.flink.util.StringUtils;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import scala.Some;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.FiniteDuration;
+
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * Implementation of a simple command line frontend for executing programs.
@@ -519,7 +498,8 @@ public class CliFrontend {
 				}
 
 				for (JobStatusMessage rj : jobs) {
-					if (running && rj.getJobState().equals(JobStatus.RUNNING)) {
+					if (running && (rj.getJobState().equals(JobStatus.RUNNING)
+							|| rj.getJobState().equals(JobStatus.RESTARTING))) {
 						runningJobs.add(rj);
 					}
 					if (scheduled && rj.getJobState().equals(JobStatus.CREATED)) {
@@ -542,10 +522,10 @@ public class CliFrontend {
 					else {
 						Collections.sort(runningJobs, njec);
 
-						System.out.println("------------------------ Running Jobs ------------------------");
+						System.out.println("------------------ Running/Restarting Jobs -------------------");
 						for (JobStatusMessage rj : runningJobs) {
 							System.out.println(df.format(new Date(rj.getStartTime()))
-									+ " : " + rj.getJobId() + " : " + rj.getJobName());
+									+ " : " + rj.getJobId() + " : " + rj.getJobName() + " (" + rj.getJobState() + ")");
 						}
 						System.out.println("--------------------------------------------------------------");
 					}

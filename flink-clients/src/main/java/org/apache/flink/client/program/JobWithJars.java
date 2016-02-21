@@ -18,6 +18,8 @@
 
 package org.apache.flink.client.program;
 
+import org.apache.flink.api.common.Plan;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -26,8 +28,6 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import org.apache.flink.api.common.Plan;
 
 /**
  * A JobWithJars is a Flink dataflow plan, together with a bunch of JAR files that contain

@@ -19,18 +19,13 @@ package org.apache.flink.client.cli;
 
 import org.apache.commons.cli.CommandLine;
 
-import java.net.URL;
 import java.net.MalformedURLException;
-import java.util.List;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
-import static org.apache.flink.client.cli.CliFrontendParser.ARGS_OPTION;
-import static org.apache.flink.client.cli.CliFrontendParser.JAR_OPTION;
-import static org.apache.flink.client.cli.CliFrontendParser.CLASS_OPTION;
-import static org.apache.flink.client.cli.CliFrontendParser.CLASSPATH_OPTION;
-import static org.apache.flink.client.cli.CliFrontendParser.PARALLELISM_OPTION;
-import static org.apache.flink.client.cli.CliFrontendParser.LOGGING_OPTION;
+import static org.apache.flink.client.cli.CliFrontendParser.*;
 
 /**
  * Base class for command line options that refer to a JAR file program.

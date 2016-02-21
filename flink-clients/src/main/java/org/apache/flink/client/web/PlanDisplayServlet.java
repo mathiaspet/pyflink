@@ -18,13 +18,12 @@
 
 package org.apache.flink.client.web;
 
+import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
 
 /**
  * Simple servlet that displays the visualization of a data flow plan.

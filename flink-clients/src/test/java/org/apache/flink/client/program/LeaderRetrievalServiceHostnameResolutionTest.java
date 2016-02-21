@@ -27,8 +27,8 @@ import org.junit.Test;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-import static org.junit.Assert.*;
-import static org.junit.Assume.*;
+import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Tests that verify that the LeaderRetrievalSevice correctly handles non-resolvable host names

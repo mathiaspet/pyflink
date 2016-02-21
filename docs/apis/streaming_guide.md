@@ -50,6 +50,13 @@ words coming from a web socket in 5 second windows. You can copy &amp; paste the
 <div data-lang="java" markdown="1">
 
 {% highlight java %}
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.util.Collector;
+
 public class WindowWordCount {
 
     public static void main(String[] args) throws Exception {
@@ -84,6 +91,10 @@ public class WindowWordCount {
 
 <div data-lang="scala" markdown="1">
 {% highlight scala %}
+import java.util.concurrent.TimeUnit
+
+import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.windowing.time.Time
 
 object WindowWordCount {
   def main(args: Array[String]) {
@@ -326,14 +337,14 @@ Typically, you only need to use `getExecutionEnvironment`, since this
 will do the right thing depending on the context: if you are executing
 your program inside an IDE or as a regular Java program it will create
 a local environment that will execute your program on your local machine. If
-you created a JAR file from you program, and invoke it through the [command line](cli.html)
+you created a JAR file from your program, and invoke it through the [command line](cli.html)
 or the [web interface](web_client.html),
 the Flink cluster manager will execute your main method and `getExecutionEnvironment()` will return
 an execution environment for executing your program on a cluster.
 
 For specifying data sources the execution environment has several methods
 to read from files, sockets, and external systems using various methods. To just read
-data from a socket (useful also for debugginf), you can use:
+data from a socket (useful also for debugging), you can use:
 
 {% highlight scala %}
 StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -519,22 +530,23 @@ keyedStream.reduce(new ReduceFunction<Integer>() {
           </td>
         </tr>
         <tr>
-          <td><strong>Fold</strong><br>DataStream &rarr; DataStream</td>
+          <td><strong>Fold</strong><br>KeyedStream &rarr; DataStream</td>
           <td>
           <p>A "rolling" fold on a keyed data stream with an initial value. 
           Combines the current element with the last folded value and
           emits the new value.
           <br/>
           <br/>
-          A fold function that creates a stream of partial sums:</p>
+          <p>A fold function that, when applied on the sequence (1,2,3,4,5), 
+          emits the sequence "start-1", "start-1-2", "start-1-2-3", ...</p>
           {% highlight java %}
-keyedStream.fold(0, new ReduceFunction<Integer>() {
-  @Override
-  public Integer fold(Integer accumulator, Integer value)
-  throws Exception {
-      return accumulator + value;
-  }
-});
+DataStream<String> result = 
+  keyedStream.fold("start", new FoldFunction<Integer, String>() {
+    @Override
+    public String fold(String current, Integer value) {
+        return current + "-" + value;
+    }
+  });
           {% endhighlight %}
           </p>
           </td>
@@ -566,7 +578,7 @@ keyedStream.maxBy("key");
             key according to some characteristic (e.g., the data that arrived within the last 5 seconds).
             See <a href="#windows">windows</a> for a complete description of windows.
     {% highlight java %}
-dataStream.keyBy(0).window(TumblingTimeWindows.of(5, TimeUnit.SECONDS)); // Last 5 seconds of data
+dataStream.keyBy(0).window(TumblingTimeWindows.of(Time.of(5, TimeUnit.SECONDS))); // Last 5 seconds of data
     {% endhighlight %}
         </p>
           </td>
@@ -621,11 +633,13 @@ windowedStream.reduce (new ReduceFunction<Tuple2<String,Integer>() {
         <tr>
           <td><strong>Window Fold</strong><br>WindowedStream &rarr; DataStream</td>
           <td>
-            <p>Applies a functional fold function to the window and returns the folded value.</p>
+            <p>Applies a functional fold function to the window and returns the folded value.
+               The example function, when applied on the sequence (1,2,3,4,5),
+               folds the sequence into the string "start-1-2-3-4-5":</p>
     {% highlight java %}
-windowedStream.fold (new Tuple2<String,Integer>("Sum of all", 0),  new FoldFunction<Tuple2<String,Integer>() {
-    public Tuple2<String, Integer> fold(Tuple2<String, Integer> acc, Tuple2<String, Integer> value) throws Exception {
-        return new Tuple2<String,Integer>(acc.f0, acc.f1 + value.f1);
+windowedStream.fold("start-", new FoldFunction<Integer, String>() {
+    public String fold(String current, Integer value) {
+        return current + "-" + value;
     }
 };
     {% endhighlight %}
@@ -655,7 +669,7 @@ windowedStream.maxBy("key");
           <td><strong>Union</strong><br>DataStream* &rarr; DataStream</td>
           <td>
             <p>Union of two or more data streams creating a new stream containing all the elements from all the streams. Node: If you union a data stream
-            with itself you will still only get each element once.</p>
+            with itself you will get each element twice in the resulting stream.</p>
     {% highlight java %}
 dataStream.union(otherStream1, otherStream2, ...);
     {% endhighlight %}
@@ -884,16 +898,18 @@ keyedStream.reduce { _ + _ }
           </td>
         </tr>
         <tr>
-          <td><strong>Fold</strong><br>DataStream &rarr; DataStream</td>
+          <td><strong>Fold</strong><br>KeyedStream &rarr; DataStream</td>
           <td>
           <p>A "rolling" fold on a keyed data stream with an initial value.
           Combines the current element with the last folded value and
           emits the new value.
           <br/>
           <br/>
-          A fold function that creates a stream of partial sums:</p>
+          <p>A fold function that, when applied on the sequence (1,2,3,4,5),
+          emits the sequence "start-1", "start-1-2", "start-1-2-3", ...</p>
           {% highlight scala %}
-keyedStream.fold { 0, _ + _ }
+val result: DataStream[String] = 
+    keyedStream.fold("start", (str, i) => { str + "-" + i })
           {% endhighlight %}
           </p>
           </td>
@@ -925,7 +941,7 @@ keyedStream.maxBy("key")
             key according to some characteristic (e.g., the data that arrived within the last 5 seconds).
             See <a href="#windows">windows</a> for a description of windows.
     {% highlight scala %}
-dataStream.keyBy(0).window(TumblingTimeWindows.of(5, TimeUnit.SECONDS)) // Last 5 seconds of data // Last 5 seconds of data
+dataStream.keyBy(0).window(TumblingTimeWindows.of(Time.of(5, TimeUnit.SECONDS))) // Last 5 seconds of data
     {% endhighlight %}
         </p>
           </td>
@@ -965,10 +981,13 @@ windowedStream.reduce { _ + _ }
         <tr>
           <td><strong>Window Fold</strong><br>WindowedStream &rarr; DataStream</td>
           <td>
-            <p>Applies a functional fold function to the window and returns the folded value.</p>
-    {% highlight java %}
-windowedStream.fold { 0, _ + _ }
-    {% endhighlight %}
+            <p>Applies a functional fold function to the window and returns the folded value.
+               The example function, when applied on the sequence (1,2,3,4,5),
+               folds the sequence into the string "start-1-2-3-4-5":</p>
+          {% highlight scala %}
+val result: DataStream[String] = 
+    windowedStream.fold("start", (str, i) => { str + "-" + i })
+          {% endhighlight %}
           </td>
 	</tr>
         <tr>
@@ -995,7 +1014,7 @@ windowedStream.maxBy("key")
           <td><strong>Union</strong><br>DataStream* &rarr; DataStream</td>
           <td>
             <p>Union of two or more data streams creating a new stream containing all the elements from all the streams. Node: If you union a data stream
-            with itself you will still only get each element once.</p>
+            with itself you will get each element twice in the resulting stream.</p>
     {% highlight scala %}
 dataStream.union(otherStream1, otherStream2, ...)
     {% endhighlight %}
@@ -1350,7 +1369,7 @@ dataStream.broadcast()
 
 ### Task chaining and resource groups
 
-Chaining two subsequent transformations means col-locating them within the same thread for better
+Chaining two subsequent transformations means co-locating them within the same thread for better
 performance. Flink by default chains operators if this is possible (e.g., two subsequent map
 transformations). The API gives fine-grained control over chaining if desired:
 
@@ -1361,7 +1380,7 @@ previous transformation. For example, you can use `someStream.map(...).startNewC
 you cannot use `someStream.startNewChain()`.
 
 A resource group is a slot in Flink, see
-[slots](config#configuring-taskmanager-processing-slots). You can
+[slots]({{site.baseurl}}/setup/config.html#configuring-taskmanager-processing-slots). You can
 manually isolate operators in separate slots if desired.
 
 <div class="codetabs" markdown="1">
@@ -2123,8 +2142,8 @@ window, and every time execution is triggered, 10 elements are retained in the w
 {% highlight java %}
 keyedStream
     .window(SlidingTimeWindows.of(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS))
-    .trigger(Count.of(100))
-    .evictor(Count.of(10));
+    .trigger(CountTrigger.of(100))
+    .evictor(CountEvictor.of(10));
 {% endhighlight %}
 </div>
 
@@ -2132,8 +2151,8 @@ keyedStream
 {% highlight scala %}
 keyedStream
     .window(SlidingTimeWindows.of(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS))
-    .trigger(Count.of(100))
-    .evictor(Count.of(10))
+    .trigger(CountTrigger.of(100))
+    .evictor(CountEvictor.of(10))
 {% endhighlight %}
 </div>
 </div>
@@ -2511,7 +2530,7 @@ implementing the `Evictor` interface.
          until end-value are retained (the resulting window size is 1 second).
         </p>
   {% highlight java %}
-triggeredStream.evict(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
+triggeredStream.evictor(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
   {% endhighlight %}
       </td>
     </tr>
@@ -2522,7 +2541,7 @@ triggeredStream.evict(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
           Retain 1000 elements from the end of the window backwards, evicting all others.
          </p>
    {% highlight java %}
-triggeredStream.evict(CountEvictor.of(1000));
+triggeredStream.evictor(CountEvictor.of(1000));
    {% endhighlight %}
        </td>
      </tr>
@@ -2535,9 +2554,9 @@ triggeredStream.evict(CountEvictor.of(1000));
             DeltaFunction).
           </p>
     {% highlight java %}
-triggeredStream.evict(DeltaEvictor.of(5000, new DeltaFunction<Double>() {
-  public double (Double old, Double new) {
-      return (new - old > 0.01);
+triggeredStream.evictor(DeltaEvictor.of(5000, new DeltaFunction<Double>() {
+  public double (Double oldValue, Double newValue) {
+      return newValue - oldValue;
   }
 }));
     {% endhighlight %}
@@ -2564,7 +2583,7 @@ triggeredStream.evict(DeltaEvictor.of(5000, new DeltaFunction<Double>() {
          until end-value are retained (the resulting window size is 1 second).
         </p>
   {% highlight scala %}
-triggeredStream.evict(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
+triggeredStream.evictor(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
   {% endhighlight %}
       </td>
     </tr>
@@ -2575,7 +2594,7 @@ triggeredStream.evict(TimeEvictor.of(Time.of(1, TimeUnit.SECONDS)));
           Retain 1000 elements from the end of the window backwards, evicting all others.
          </p>
    {% highlight scala %}
-triggeredStream.evict(CountEvictor.of(1000));
+triggeredStream.evictor(CountEvictor.of(1000));
    {% endhighlight %}
        </td>
      </tr>
@@ -2588,7 +2607,7 @@ triggeredStream.evict(CountEvictor.of(1000));
             DeltaFunction).
           </p>
     {% highlight scala %}
-windowedStream.evict(DeltaEvictor.of(5000.0, { (old,new) => new - old > 0.01 }))
+windowedStream.evictor(DeltaEvictor.of(5000.0, { (old,new) => new - old > 0.01 }))
     {% endhighlight %}
         </td>
       </tr>
@@ -2624,7 +2643,7 @@ stream.countWindow(1000)
     {% highlight java %}
 stream.window(GlobalWindows.create())
   .trigger(CountTrigger.of(1000)
-  .evict(CountEvictor.of(1000)))
+  .evictor(CountEvictor.of(1000)))
     {% endhighlight %}
         </td>
       </tr>
@@ -2638,8 +2657,8 @@ stream.countWindow(1000, 100)
         <td>
     {% highlight java %}
 stream.window(GlobalWindows.create())
-  .trigger(CountTrigger.of(1000)
-  .evict(CountEvictor.of(100)))
+  .evictor(CountEvictor.of(1000))
+  .trigger(CountTrigger.of(100))
     {% endhighlight %}
         </td>
       </tr>
@@ -2715,8 +2734,8 @@ same:
 {% highlight java %}
 nonKeyedStream
     .windowAll(SlidingTimeWindows.of(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS))
-    .trigger(Count.of(100))
-    .evictor(Count.of(10));
+    .trigger(CountTrigger.of(100))
+    .evictor(CountEvictor.of(10));
 {% endhighlight %}
 </div>
 
@@ -2724,8 +2743,8 @@ nonKeyedStream
 {% highlight scala %}
 nonKeyedStream
     .windowAll(SlidingTimeWindows.of(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS))
-    .trigger(Count.of(100))
-    .evictor(Count.of(10))
+    .trigger(CountTrigger.of(100))
+    .evictor(CountEvictor.of(10))
 {% endhighlight %}
 </div>
 </div>
@@ -2884,7 +2903,7 @@ Execution Parameters
 Flink has a checkpointing mechanism that recovers streaming jobs after failues. The checkpointing mechanism requires a *persistent* or *durable* source that
 can be asked for prior records again (Apache Kafka is a good example of a durable source).
 
-The checkpointing mechanism stores the progress in the source as well as the user-defined state (see [Working with State](#Stateful_computation))
+The checkpointing mechanism stores the progress in the source as well as the user-defined state (see [Working with State](#working_with_state))
 consistently to provide *exactly once* processing guarantees.
 
 To enable checkpointing, call `enableCheckpointing(n)` on the `StreamExecutionEnvironment`, where *n* is the checkpoint interval in milliseconds.
@@ -3261,7 +3280,7 @@ the "termination" logic, where an element is allowed to propagate downstream rat
 than being fed back.
 
 {% highlight java %}
-iteration.closeWith(tail.filter(iterationBody.filter(/* one part of the stream */)));
+iteration.closeWith(iterationBody.filter(/* one part of the stream */));
 DataStream<Integer> output = iterationBody.filter(/* some other part of the stream */);
 {% endhighlight %}
 
@@ -3367,73 +3386,42 @@ with connectors.
 
 This connector provides access to event streams served by [Apache Kafka](https://kafka.apache.org/).
 
-Flink provides special Kafka Connectors for reading and writing data to Kafka topics.
-The Flink Kafka Consumer integrates with Flink's checkpointing mechanisms to provide different
-processing guarantees (most importantly exactly-once guarantees).
-
-For exactly-once processing Flink can not rely on the auto-commit capabilities of the Kafka consumers.
-The Kafka consumer might commit offsets to Kafka which have not been processed successfully.
+Flink provides special Kafka Connectors for reading and writing data from/to Kafka topics.
+The Flink Kafka Consumer integrates with Flink's checkpointing mechanism to provide
+exactly-once processing semantics. To achieve that, Flink does not purely rely on Kafka's consumer group
+offset tracking, but tracks and checkpoints these offsets internally as well.
 
 Please pick a package (maven artifact id) and class name for your use-case and environment.
-For most users, the `flink-connector-kafka-083` package and the `FlinkKafkaConsumer082` class are appropriate.
+For most users, the `FlinkKafkaConsumer082` (part of `flink-connector-kafka`) is appropriate.
 
 
 <table class="table table-bordered">
   <thead>
     <tr>
-      <th class="text-left">Package</th>
+      <th class="text-left">Maven Dependency</th>
       <th class="text-left">Supported since</th>
       <th class="text-left">Class name</th>
-      <th class="text-left">Kafka version</th>      
-      <th class="text-left">Checkpointing behavior</th>
-      <th class="text-left">Notes</th>            
+      <th class="text-left">Kafka version</th>
+      <th class="text-left">Notes</th>
     </tr>
   </thead>
   <tbody>
     <tr>
         <td>flink-connector-kafka</td>
-        <td>0.9, 0.10</td>
-        <td>KafkaSource</td>
-	<td>0.8.1, 0.8.2</td>	
-	<td>Does not participate in checkpointing (no consistency guarantees)</td>
-	<td>Uses the old, high level KafkaConsumer API, autocommits to ZK via Kafka</td>	
+        <td>0.9.1, 0.10</td>
+        <td>FlinkKafkaConsumer081</td>
+        <td>0.8.1</td>	
+        <td>Uses the <a href="https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example">SimpleConsumer</a> API of Kafka internally. Offsets are committed to ZK by Flink.</td>	
     </tr>
     <tr>
         <td>flink-connector-kafka</td>
-        <td>0.9, 0.10</td>
-        <td>PersistentKafkaSource</td>
-	<td>0.8.1, 0.8.2</td>	
-	<td>Does not guarantee exactly-once processing, element order, or strict partition assignment</td>
-	<td>Uses the old, high level KafkaConsumer API, offsets are committed into ZK manually</td>	
-    </tr>
-    <tr>
-        <td>flink-connector-kafka-083</td>
-        <td>0.9.1, 0.10</td>
-        <td>FlinkKafkaConsumer081</td>
-	<td>0.8.1</td>	
-	<td>Guarantees exactly-once processing</td>
-	<td>Uses the <a href = "https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example">SimpleConsumer</a> API of Kafka internally. Offsets are committed to ZK manually</td>	
-    </tr>
-    <tr>
-        <td>flink-connector-kafka-083</td>
         <td>0.9.1, 0.10</td>
         <td>FlinkKafkaConsumer082</td>
-	<td>0.8.2</td>	
-	<td>Guarantee exactly-once processing</td>
-	<td>Uses the <a href = "https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example">SimpleConsumer</a> API of Kafka internally. Offsets are committed to ZK manually</td>	
-    </tr>    
+        <td>0.8.2</td>	
+        <td>Uses the <a href="https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example">SimpleConsumer</a> API of Kafka internally. Offsets are committed to ZK by Flink.</td>	
+    </tr>
   </tbody>
 </table>
-
-
-<!--
-| Package                     | Supported Since | Class | Kafka Version | Allows exactly once processing | Notes |
-| -------------               |-------------| -----| ------ | ------ |
-| flink-connector-kafka       | 0.9, 0.10 | `KafkaSource` | 0.8.1, 0.8.2 | **No**, does not participate in checkpointing at all. | Uses the old, high level KafkaConsumer API, autocommits to ZK by Kafka |
-| flink-connector-kafka       | 0.9, 0.10 | `PersistentKafkaSource` | 0.8.1, 0.8.2 | **No**, does not guarantee exactly-once processing, element order or strict partition assignment | Uses the old, high level KafkaConsumer API, offsets are committed into ZK manually |
-| flink-connector-kafka-083   | 0.9.1 0.10 | `FlinkKafkaConsumer081` | 0.8.1  | **yes** | Uses the [SimpleConsumer](https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example) API of Kafka internally. Offsets are committed to ZK manually |
-| flink-connector-kafka-083   | 0.9.1 0.10 | `FlinkKafkaConsumer082` | 0.8.2  | **yes** | Uses the [SimpleConsumer](https://cwiki.apache.org/confluence/display/KAFKA/0.8.0+SimpleConsumer+Example) API of Kafka internally. Offsets are committed to ZK manually |
--->
 
 Then, import the connector in your maven project:
 
@@ -3448,15 +3436,14 @@ Then, import the connector in your maven project:
 Note that the streaming connectors are currently not part of the binary distribution. See how to link with them for cluster execution [here](cluster_execution.html#linking-with-modules-not-contained-in-the-binary-distribution).
 
 #### Installing Apache Kafka
+
 * Follow the instructions from [Kafka's quickstart](https://kafka.apache.org/documentation.html#quickstart) to download the code and launch a server (launching a Zookeeper and a Kafka server is required every time before starting the application).
 * On 32 bit computers [this](http://stackoverflow.com/questions/22325364/unrecognized-vm-option-usecompressedoops-when-running-kafka-from-my-ubuntu-in) problem may occur.
-* If the Kafka and Zookeeper servers are running on a remote machine, then the `advertised.host.name` setting in the `config/server.properties` file the  must be set to the machine's IP address.
+* If the Kafka and Zookeeper servers are running on a remote machine, then the `advertised.host.name` setting in the `config/server.properties` file must be set to the machine's IP address.
 
 #### Kafka Consumer
 
-The standard `FlinkKafkaConsumer082` is a Kafka consumer providing access to one topic.
-
-The following parameters have to be provided for the `FlinkKafkaConsumer082(...)` constructor:
+The standard `FlinkKafkaConsumer082` is a Kafka consumer providing access to one topic. It takes the following parameters to the constructor:
 
 1. The topic name
 2. A DeserializationSchema
@@ -3495,12 +3482,12 @@ stream = env
 
 #### Kafka Consumers and Fault Tolerance
 
-As Kafka persists all the data, a fault tolerant Kafka consumer can be provided.
+With Flink's checkpointing enabled, the Flink Kafka Consumer will consume records from a topic and periodically checkpoint all
+its Kafka offsets, together with the state of other operations, in a consistent manner. In case of a job failure, Flink will restore
+the streaming program to the state of the latest checkpoint and re-consume the records from Kafka, starting from the offsets that where
+stored in the checkpoint.
 
-The FlinkKafkaConsumer082 can read a topic, and if the job fails for some reason, the source will
-continue on reading from where it left off after a restart.
-For example if there are 3 partitions in the topic with offsets 31, 122, 110 read at the time of job
-failure, then at the time of restart it will continue on reading from those offsets, no matter whether these partitions have new messages.
+The interval of drawing checkpoints therefore defines how much the program may have to go back at most, in case of a failure.
 
 To use fault tolerant Kafka Consumers, checkpointing of the topology needs to be enabled at the execution environment:
 
@@ -3508,7 +3495,13 @@ To use fault tolerant Kafka Consumers, checkpointing of the topology needs to be
 <div data-lang="java" markdown="1">
 {% highlight java %}
 final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-env.enableCheckpointing(5000);
+env.enableCheckpointing(5000); // checkpoint every 5000 msecs
+{% endhighlight %}
+</div>
+<div data-lang="scala" markdown="1">
+{% highlight scala %}
+val env = StreamExecutionEnvironment.getExecutionEnvironment()
+env.enableCheckpointing(5000) // checkpoint every 5000 msecs
 {% endhighlight %}
 </div>
 </div>
@@ -3517,53 +3510,31 @@ Also note that Flink can only restart the topology if enough processing slots ar
 So if the topology fails due to loss of a TaskManager, there must still be enough slots available afterwards.
 Flink on YARN supports automatic restart of lost YARN containers.
 
+If checkpointing is not enabled, the Kafka consumer will periodically commit the offsets to Zookeeper.
 
-#### Kafka Sink
+#### Kafka Producer
 
-A class providing an interface for sending data to Kafka.
-
-The following arguments have to be provided for the `KafkaSink(…)` constructor in order:
-
-1. Broker address (in hostname:port format, can be a comma separated list)
-2. The topic name
-3. Serialization schema
+The `FlinkKafkaProducer` writes data to a Kafka topic. The producer can specify a custom partitioner that assigns
+recors to partitions.
 
 Example:
 
 <div class="codetabs" markdown="1">
 <div data-lang="java" markdown="1">
 {% highlight java %}
-stream.addSink(new KafkaSink<String>("localhost:9092", "test", new SimpleStringSchema()));
+stream.addSink(new FlinkKafkaProducer<String>("localhost:9092", "my-topic", new SimpleStringSchema()));
 {% endhighlight %}
 </div>
 <div data-lang="scala" markdown="1">
 {% highlight scala %}
-stream.addSink(new KafkaSink[String]("localhost:9092", "test", new SimpleStringSchema))
+stream.addSink(new FlinkKafkaProducer[String]("localhost:9092", "my-topic", new SimpleStringSchema()))
 {% endhighlight %}
 </div>
 </div>
 
-The user can also define custom Kafka producer configuration for the KafkaSink with the constructor:
-
-<div class="codetabs" markdown="1">
-<div data-lang="java" markdown="1">
-{% highlight java %}
-public KafkaSink(String zookeeperAddress, String topicId, Properties producerConfig,
-      SerializationSchema<IN, byte[]> serializationSchema)
-{% endhighlight %}
-</div>
-<div data-lang="scala" markdown="1">
-{% highlight scala %}
-public KafkaSink(String zookeeperAddress, String topicId, Properties producerConfig,
-      SerializationSchema serializationSchema)
-{% endhighlight %}
-</div>
-</div>
-
-If this constructor is used, the user needs to make sure to set the broker(s) with the "metadata.broker.list" property.
-Also the serializer configuration should be left default, and the serialization should be set via SerializationSchema.
-
-The Apache Kafka official documentation can be found [here](https://kafka.apache.org/documentation.html).
+You can also define a custom Kafka producer configuration for the KafkaSink with the constructor. Please refer to
+the [Apache Kafka documentation](https://kafka.apache.org/documentation.html) for details on how to configure
+Kafka Producers.
 
 [Back to top](#top)
 
@@ -3667,6 +3638,7 @@ This will buffer elements before sending a request to the cluster. The behaviour
   settings in milliseconds
 
 This example code does the same, but with a `TransportClient`:
+
 <div class="codetabs" markdown="1">
 <div data-lang="java" markdown="1">
 {% highlight java %}
@@ -3929,7 +3901,7 @@ In order to connect to Twitter stream the user has to register their program and
 
 #### Acquiring the authentication information
 First of all, a Twitter account is needed. Sign up for free at [twitter.com/signup](https://twitter.com/signup) or sign in at Twitter's [Application Management](https://apps.twitter.com/) and register the application by clicking on the "Create New App" button. Fill out a form about your program and accept the Terms and Conditions.
-After selecting the application, the API key and API secret (called `consumerKey` and `sonsumerSecret` in `TwitterSource` respectively) is located on the "API Keys" tab. The necessary access token data (`token` and `secret`) can be acquired here.
+After selecting the application, the API key and API secret (called `consumerKey` and `consumerSecret` in `TwitterSource` respectively) is located on the "API Keys" tab. The necessary OAuth Access Token data (`token` and `secret` in `TwitterSource`) can be generated and acquired on the "Keys and Access Tokens" tab.
 Remember to keep these pieces of information secret and do not push them to public repositories.
 
 #### Accessing the authentication information
@@ -3947,7 +3919,7 @@ consumerKey=***
 The `TwitterSource` class has two constructors.
 
 1. `public TwitterSource(String authPath, int numberOfTweets);`
-to emit finite number of tweets
+to emit a finite number of tweets
 2. `public TwitterSource(String authPath);`
 for streaming
 
@@ -3990,7 +3962,7 @@ function which can be use to acquire the value of a given field.
 There are two basic types of tweets. The usual tweets contain information such as date and time of creation, id, user, language and many more details. The other type is the delete information.
 
 #### Example
-`TwitterLocal` is an example how to use `TwitterSource`. It implements a language frequency counter program.
+`TwitterStream` is an example of how to use `TwitterSource`. It implements a language frequency counter program.
 
 [Back to top](#top)
 

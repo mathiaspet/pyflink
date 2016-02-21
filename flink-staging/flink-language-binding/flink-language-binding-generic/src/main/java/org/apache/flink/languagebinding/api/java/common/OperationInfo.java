@@ -85,6 +85,12 @@ public class OperationInfo {
 				from = (Long) receiver.getRecord();
 				to = (Long) receiver.getRecord();
 				return;
+			case SOURCE_CUSTOM:
+				setID = (Integer) receiver.getRecord(true);
+				path = (String) receiver.getRecord();
+				tmpType = (Tuple) receiver.getRecord();
+				types = tmpType == null ? null : getForObject(tmpType);
+				return;
 			case SINK_CSV:
 				parentID = (Integer) receiver.getRecord(true);
 				path = (String) receiver.getRecord();

@@ -18,16 +18,7 @@
 
 package org.apache.flink.client;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import static org.mockito.Mockito.*;
-
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import org.apache.flink.client.cli.CommandLineOptions;
-
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.junit.Before;
@@ -36,7 +27,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests that verify that the CLI client picks up the correct address for the JobManager

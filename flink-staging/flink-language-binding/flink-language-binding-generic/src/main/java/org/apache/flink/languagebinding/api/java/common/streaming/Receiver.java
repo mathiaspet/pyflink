@@ -39,7 +39,7 @@ import org.apache.flink.util.Collector;
 public class Receiver implements Serializable {
 	private static final long serialVersionUID = -2474088929850009968L;
 
-	private final AbstractRichFunction function;
+//	private final AbstractRichFunction function;
 
 	private File inputFile;
 	private RandomAccessFile inputRAF;
@@ -49,8 +49,10 @@ public class Receiver implements Serializable {
 	private Deserializer<?> deserializer = null;
 
 	public Receiver(AbstractRichFunction function) {
-		this.function = function;
+//		this.function = function;
 	}
+	
+	public Receiver(){}
 
 	//=====Setup========================================================================================================
 	public void open(String path) throws IOException {

@@ -18,13 +18,13 @@
 
 package org.apache.flink.client;
 
-import org.apache.flink.runtime.util.EnvironmentInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.flink.client.web.WebInterfaceServer;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.GlobalConfiguration;
+import org.apache.flink.runtime.util.EnvironmentInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Main entry point for the web frontend. Creates a web server according to the configuration

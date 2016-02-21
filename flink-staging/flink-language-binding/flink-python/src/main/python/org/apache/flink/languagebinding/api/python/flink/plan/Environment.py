@@ -82,6 +82,20 @@ class Environment(object):
         child[_Fields.PATH] = path
         self._sources.append(child)
         return child_set
+    
+    def read_custom(self, path, format, types):
+        """
+        Creates a DataSet using a custom input format that is executed directly in the Python process.
+        """
+        child = dict()
+        child_set = DataSet(self, child)
+        
+        child[_Fields.IDENTIFIER] = _Identifier.SOURCE_CUSTOM
+        child[_Fields.PATH] = path
+        child[_Fields.TYPES] = types
+        child[_Fields.OPERATOR] = copy.deepcopy(format) 
+        self._sources.append(child)
+        return child_set
 
     def read_envi(self, path, leftLong, leftLat, blockSize, pixelSize):
         """
@@ -157,11 +171,23 @@ class Environment(object):
                 output_path = sys.stdin.readline().rstrip('\n')
 
                 operator = None
+                found = False
                 for set in self._sets:
                     if set[_Fields.ID] == id:
+                        found = True
                         operator = set[_Fields.OPERATOR]
                     if set[_Fields.ID] == -id:
+                        found = True
                         operator = set[_Fields.COMBINEOP]
+                if found == False:
+                    for set in self._sources:
+                        if set[_Fields.ID] == id:
+                            print()
+                            found = True
+                            operator = set[_Fields.OPERATOR]
+                
+                
+                        
                 operator._configure(input_path, output_path, port)
                 operator._go()
                 sys.stdout.flush()
@@ -264,6 +290,10 @@ class Environment(object):
                     break
                 if case(_Identifier.SOURCE_TEXT):
                     collect(source[_Fields.PATH])
+                    break
+                if case(_Identifier.SOURCE_CUSTOM):
+                    collect(source[_Fields.PATH])
+                    collect(source[_Fields.TYPES])
                     break
                 if case(_Identifier.SOURCE_VALUE):
                     collect(len(source[_Fields.VALUES]))
