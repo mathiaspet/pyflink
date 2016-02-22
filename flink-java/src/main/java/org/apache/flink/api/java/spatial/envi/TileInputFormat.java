@@ -31,7 +31,7 @@ import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
-import org.apache.flink.api.java.spatial.TileInfo;
+import org.apache.flink.api.java.spatial.TileInfoWrapper;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -59,7 +59,7 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 	private double pixelWidth = -1.0, pixelHeight = -1.0;
 	
-	private TileInfo info;
+	private TileInfoWrapper info;
 	private EnviTilePosition pos;
 	private int readRecords = 0;
 
@@ -79,16 +79,16 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 		for (FileStatus file : files) {
 			// Read header file:
 			FSDataInputStream fdis = fs.open(file.getPath());
-			try{
-				TileInfo info = new TileInfo(fdis);
+			try {
+				TileInfoWrapper info = new TileInfoWrapper(fdis);
 				fdis.close();
 
 				// Determine data file associated with this header:
-				int interleaveType = info.getInterleave();
-				if(interleaveType != 0) {
+				String interleaveType = info.getInterleave();
+				if (!interleaveType.equals("bsq")) {
 					throw new RuntimeException("Interleave type " + interleaveType + " unsupported, use bsq.");
 				}
-				Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + TileInfo.InterleaveTypes.values()[interleaveType]));
+				Path dataFile = new Path(this.filePath.getFileSystem().getUri() + file.getPath().toUri().getPath().replaceAll("\\.hdr$", "." + interleaveType));
 				FileStatus dataFileStatus;
 				try {
 					dataFileStatus = fs.getFileStatus(dataFile);
@@ -96,9 +96,8 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 					throw new RuntimeException("Data file " + dataFile + " for header " + file + " not found.", e);
 				}
 
-				if(info.getDataType() != TileInfo.DataTypes.INT) {
-					throw new RuntimeException("Data type " + info.getDataType().name() + " is unsupported, use INT."
-							+ " File: " + file.getPath());
+				if(info.getDataType() != 2) {
+					throw new RuntimeException("Data type " + info.getDataType() + " is unsupported, use INT." + " File: " + file.getPath());
 				}
 				int data_size = info.getPixelSize();
 				int numBands = info.getBands();
@@ -132,7 +131,7 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 		return inputSplits.toArray(new EnviInputSplit[0]);
 	}
 
-	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfo info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String aqcDate) throws IOException {
+	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfoWrapper info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String aqcDate) throws IOException {
 	/*
 	 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 	 *  pixels.
@@ -141,7 +140,7 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 		int ysplits = (numRows + ysize - 1) / ysize;
 
 		// Real coordinates of this image + coordinate differences:
-		Coordinate upperLeftCorner = info.getUpperLeftCoordinate();
+		Coordinate upperLeftCorner = info.getLeftUpper();
 
 		LOG.info("Splitting " + numColumns + "x" + numRows + " image into " +
 				xsplits + "x" + ysplits + " tiles of size " + xsize + "x" + ysize + " for " + numBands + " bands: " + file.getPath());
@@ -319,7 +318,7 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 			}
 			// Read header file:
 			FSDataInputStream fdis = fs.open(file.getPath());
-			TileInfo info = new TileInfo(fdis);
+			TileInfoWrapper info = new TileInfoWrapper(fdis);
 			fdis.close();
 
 			// Calculate the number of splits, as done above:
@@ -463,10 +462,10 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 	
 	public static final class EnviInputSplit extends FileInputSplit implements Serializable{
 		private static final long serialVersionUID = -9205048860784884871L;
-		public TileInfo info;
+		public TileInfoWrapper info;
 		public EnviTilePosition pos;
 		
-		public EnviInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfo info, EnviTilePosition pos) {
+		public EnviInputSplit(int num, Path file, long start, long length, String[] hosts, TileInfoWrapper info, EnviTilePosition pos) {
 			super(num, file, start, length, hosts);
 			this.info = info;
 			this.pos = pos;

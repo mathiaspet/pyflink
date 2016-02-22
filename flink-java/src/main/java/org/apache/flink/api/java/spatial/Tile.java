@@ -53,7 +53,7 @@ public class Tile implements Serializable {
 	// x- and y-width of a pixel
 	private double xPixelWidth = -1.0, yPixelWidth = -1.0;
 
-	private TileInfo tileInfo = null;
+	private TileInfoWrapper tileInfo = null;
 
 	// Tile width and height in pixels
 	private int tileWidth = -1, tileHeight = -1;
@@ -154,7 +154,7 @@ public class Tile implements Serializable {
 	 * Return the header associated with this stream, if present. Otherwise,
 	 * null is returned.
 	 */
-	public TileInfo getTileInfo() {
+	public TileInfoWrapper getTileInfo() {
 		return this.tileInfo;
 	}
 
@@ -163,7 +163,7 @@ public class Tile implements Serializable {
 	 * 
 	 * @param aqcDate
 	 */
-	public void update(TileInfo tileInfo, Coordinate leftUpper,
+	public void update(TileInfoWrapper tileInfo, Coordinate leftUpper,
 			Coordinate rightLower, int width, int height, int band,
 			String pathRow, String aqcDate, double xPixelWidth, 
 			double yPixelWidth) {
@@ -183,7 +183,7 @@ public class Tile implements Serializable {
 		if (this.tileInfo == null) {
 			return new Long(-1);
 		} else {
-			return this.tileInfo.getAcqDate();
+			return this.tileInfo.getAcquisitionDate();
 		}
 	}
 
@@ -334,7 +334,7 @@ public class Tile implements Serializable {
 		this.xPixelWidth = source.readDouble();
 		this.yPixelWidth = source.readDouble();
 		
-		this.tileInfo = new TileInfo();
+		this.tileInfo = new TileInfoWrapper();
 		this.tileInfo.deserialize(source);
 		
 		if(source.readBoolean()) {
@@ -350,7 +350,7 @@ public class Tile implements Serializable {
 	}
 
 	
-	public void setTileInfo(TileInfo tileInfo) {
+	public void setTileInfo(TileInfoWrapper tileInfo) {
 		this.tileInfo = tileInfo;
 	}
 
