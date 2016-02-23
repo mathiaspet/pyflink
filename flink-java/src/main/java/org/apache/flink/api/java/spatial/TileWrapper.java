@@ -33,7 +33,7 @@ import org.apache.flink.core.memory.DataOutputView;
  * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
  *
  */
-public class Tile implements Serializable {
+public class TileWrapper implements Serializable {
 	private static final long serialVersionUID = 3999969290376342375L;
 
 	private String pathRow;
@@ -59,10 +59,10 @@ public class Tile implements Serializable {
 	private int tileWidth = -1, tileHeight = -1;
 
 	// TODO: decide whether to keep this public or not
-	public Tile() {
+	public TileWrapper() {
 	}
 
-	public Tile(Coordinate leftUpper, Coordinate rightLower, short[] content,
+	public TileWrapper(Coordinate leftUpper, Coordinate rightLower, short[] content,
 			int width, int height) {
 		this.luCord = leftUpper;
 		this.rlCord = rightLower;
@@ -71,7 +71,7 @@ public class Tile implements Serializable {
 		this.tileHeight = height;
 	}
 
-	public Tile(Tile tile) {
+	public TileWrapper(TileWrapper tile) {
 		this.aqcuisitionDate = tile.getAqcuisitionDate();
 		this.band = tile.getBand();
 		this.luCord = tile.getNWCoord().copy();
@@ -241,11 +241,11 @@ public class Tile implements Serializable {
 		return y * this.tileWidth + x;
 	}
 
-	public Tile createCopy() {
-		return new Tile(this);
+	public TileWrapper createCopy() {
+		return new TileWrapper(this);
 	}
 
-	public void copyTo(Tile target) {
+	public void copyTo(TileWrapper target) {
 		target.aqcuisitionDate = this.aqcuisitionDate;
 		target.band = this.band;
 		target.luCord = this.luCord.copy();

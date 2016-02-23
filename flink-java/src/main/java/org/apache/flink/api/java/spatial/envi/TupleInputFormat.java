@@ -50,9 +50,9 @@ import org.slf4j.LoggerFactory;
  * @author Dennis Schneider <dschneid@informatik.hu-berlin.de>
  * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
  */
-public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
+public class TupleInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private static final long serialVersionUID = -6483882465613479436L;
-	private static final Logger LOG = LoggerFactory.getLogger(TileInputFormat.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TupleInputFormat.class);
 
 	private int xsize = -1, ysize = -1;
 	private Coordinate leftUpperLimit = null, rightLowerLimit = null;
@@ -64,7 +64,7 @@ public class TileInputFormat<T extends Tile> extends FileInputFormat<T> {
 	private int readRecords = 0;
 
 
-	public TileInputFormat(Path path) {
+	public TupleInputFormat(Path path) {
 		super(path);
 	} 
 	
