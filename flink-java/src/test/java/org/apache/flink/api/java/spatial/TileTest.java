@@ -9,13 +9,13 @@ import org.junit.Test;
 
 public class TileTest {
 
-	private TileInfo info;
+	private TileInfoWrapper info;
 	private Tile out;
 	private Tile out2;
 	
 	@Before
 	public void setUp() {
-		this.info = new TileInfo();
+		this.info = new TileInfoWrapper();
 		
 		out = new Tile();
 		Coordinate leftUpper = new Coordinate(430404.0572, 3120036.4653);

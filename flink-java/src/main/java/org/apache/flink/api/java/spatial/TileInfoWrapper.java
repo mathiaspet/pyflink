@@ -58,9 +58,11 @@ public class TileInfoWrapper {
 	}
 
 	public void update(Coordinate leftUpper, Coordinate rightLower, int width, int height,
-			int band, String pathRow, String aqcDate, double xPixelWidth, double yPixelWidth) {
+			int band, String pathRow, String acqDate, double xPixelWidth, double yPixelWidth) {
 		// TODO
 		this.setLeftUpper(leftUpper);
+		this.setSamples(width);
+		this.setLines(height);
 	}
 
 	private String readHeader(InputStream is) throws IOException {
@@ -178,12 +180,24 @@ public class TileInfoWrapper {
 		return Integer.parseInt(this.metaData.get("bands"));
 	}
 
+	public void setBands(int bands) {
+		this.metaData.put("bands", Integer.toString(bands));
+	}
+
 	public int getLines() {
 		return Integer.parseInt(this.metaData.get("lines"));
 	}
 
+	public void setLines(int lines) {
+		this.metaData.put("lines", Integer.toString(lines));
+	}
+
 	public int getSamples() {
 		return Integer.parseInt(this.metaData.get("samples"));
+	}
+
+	public void setSamples(int samples) {
+		this.metaData.put("samples", Integer.toString(samples));
 	}
 
 	private String[] getMapInfo() {
@@ -324,7 +338,15 @@ public class TileInfoWrapper {
 		this.metaData.put("wrs_path", pathRow.substring(3, 6));
 	}
 
-	public long getAcquisitionDate() {
+	public String getAcquisitionDate() {
+		return this.metaData.get("acquisitiondate");
+	}
+
+	public void setAcquisitionDate(String acqDate) {
+		this.metaData.put("acquisitiondate", acqDate);
+	}
+
+	public long getAcquisitionDateAsLong() {
 		DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ss.SSS"); 
 		try {
 			Date date = df.parse(this.metaData.get("acquisitiondate"));
@@ -333,5 +355,9 @@ public class TileInfoWrapper {
 		catch (ParseException e) {
 			return -1;
 		}
+	}
+
+	public int getHeaderOffset() {
+		return Integer.parseInt(this.metaData.get("header offset"));
 	}
 }

@@ -36,7 +36,7 @@ public class TileTimeKeySelector<Key> implements KeySelector<Tile, Long>{
 
 	@Override
 	public Long getKey(Tile value) throws Exception {
-		return value.getAqcuisitionDateAsLong();
+		return value.getAcquisitionDateAsLong();
 	}
 
 }

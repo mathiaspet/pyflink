@@ -36,9 +36,6 @@ import org.apache.flink.core.memory.DataOutputView;
 public class Tile implements Serializable {
 	private static final long serialVersionUID = 3999969290376342375L;
 
-	private String pathRow;
-	private String aqcuisitionDate;
-
 	private int band = -1;
 
 	/**
@@ -46,17 +43,10 @@ public class Tile implements Serializable {
 	 */
 	private short[] s16Tile = null;
 
-	// Coordinates of left upper and right lower edge (according to the map
-	// info)
-	private Coordinate luCord = null, rlCord = null;
-
 	// x- and y-width of a pixel
 	private double xPixelWidth = -1.0, yPixelWidth = -1.0;
 
 	private TileInfoWrapper tileInfo = null;
-
-	// Tile width and height in pixels
-	private int tileWidth = -1, tileHeight = -1;
 
 	// TODO: decide whether to keep this public or not
 	public Tile() {
@@ -64,28 +54,19 @@ public class Tile implements Serializable {
 
 	public Tile(Coordinate leftUpper, Coordinate rightLower, short[] content,
 			int width, int height) {
-		this.luCord = leftUpper;
-		this.rlCord = rightLower;
 		this.s16Tile = content;
-		this.tileWidth = width;
-		this.tileHeight = height;
 	}
 
 	public Tile(Tile tile) {
-		this.aqcuisitionDate = tile.getAqcuisitionDate();
 		this.band = tile.getBand();
-		this.luCord = tile.getNWCoord().copy();
-		this.pathRow = tile.getPathRow();
-		this.rlCord = tile.getSECoord().copy();
 
 		short[] content = tile.getS16Tile();
 		short[] newContent = new short[content.length];
 		System.arraycopy(content, 0, newContent, 0, content.length);
 		this.s16Tile = newContent;
 
-		this.tileHeight = tile.getTileHeight();
 		this.tileInfo = tile.getTileInfo().copy();
-		this.tileWidth = tile.getTileWidth();
+
 		this.xPixelWidth = tile.xPixelWidth;
 		this.yPixelWidth = tile.yPixelWidth;
 	}
@@ -117,7 +98,7 @@ public class Tile implements Serializable {
 	 * Coordinates start at (0, 0).
 	 */
 	public short getPixel(int width, int height) {
-		return this.s16Tile[width + (height * this.tileWidth)];
+		return this.s16Tile[width + (height * getTileWidth())];
 	}
 
 	/**
@@ -125,7 +106,7 @@ public class Tile implements Serializable {
 	 * representing one row in the tile array.
 	 */
 	public int getTileWidth() {
-		return this.tileWidth;
+		return this.tileInfo.getSamples();
 	}
 
 	/**
@@ -133,21 +114,21 @@ public class Tile implements Serializable {
 	 * tile array.
 	 */
 	public int getTileHeight() {
-		return this.tileHeight;
+		return this.tileInfo.getLines();
 	}
 
 	/**
 	 * Return the coordinate of the north-west boundary point of this tile.
 	 */
 	public Coordinate getNWCoord() {
-		return this.luCord;
+		return this.tileInfo.getLeftUpper();
 	}
 
 	/**
 	 * Return the coordinate of the south-east boundary point of this tile.
 	 */
 	public Coordinate getSECoord() {
-		return this.rlCord;
+		return this.tileInfo.getLowerRightCoordinate();
 	}
 
 	/**
@@ -160,47 +141,42 @@ public class Tile implements Serializable {
 
 	/**
 	 * Update the tile information to the given object.
-	 * 
-	 * @param aqcDate
 	 */
 	public void update(TileInfoWrapper tileInfo, Coordinate leftUpper,
 			Coordinate rightLower, int width, int height, int band,
-			String pathRow, String aqcDate, double xPixelWidth, 
+			String pathRow, String acqDate, double xPixelWidth, 
 			double yPixelWidth) {
 		this.tileInfo = tileInfo;
-		this.luCord = leftUpper;
-		this.rlCord = rightLower;
-		this.tileWidth = width;
-		this.tileHeight = height;
+		this.tileInfo.setLeftUpper(leftUpper);
+
+		this.tileInfo.setSamples(width);
+		this.tileInfo.setLines(height);
+		this.tileInfo.setPathRow(pathRow);
+		this.tileInfo.setAcquisitionDate(acqDate);
+
 		this.band = band;
-		this.pathRow = pathRow;
-		this.aqcuisitionDate = aqcDate;
 		this.xPixelWidth = xPixelWidth;
 		this.yPixelWidth = yPixelWidth;
 	}
 
-	public Long getAqcuisitionDateAsLong() {
-		if (this.tileInfo == null) {
-			return new Long(-1);
-		} else {
-			return this.tileInfo.getAcquisitionDate();
-		}
+	public Long getAcquisitionDateAsLong() {
+		return this.tileInfo.getAcquisitionDateAsLong();
 	}
 
 	public String getPathRow() {
-		return pathRow;
+		return this.tileInfo.getPathRow();
 	}
 
 	public void setPathRow(String pathRow) {
-		this.pathRow = pathRow;
+		this.tileInfo.setPathRow(pathRow);
 	}
 
-	public void setAqcuisitionDate(String aqcuisitionDate) {
-		this.aqcuisitionDate = aqcuisitionDate;
+	public void setAcquisitionDate(String acquisitionDate) {
+		this.tileInfo.setAcquisitionDate(acquisitionDate);
 	}
 
-	public String getAqcuisitionDate() {
-		return aqcuisitionDate;
+	public String getAcquisitionDate() {
+		return this.tileInfo.getAcquisitionDate();
 	}
 
 	/**
@@ -211,10 +187,10 @@ public class Tile implements Serializable {
 	 * @return
 	 */
 	public Coordinate getCoordinate(int contentIndex) {
-		int x = contentIndex % tileWidth;
-		int y = (int) (contentIndex / tileWidth);
-		double newLon = this.luCord.lon + this.xPixelWidth * x;
-		double newLat = this.luCord.lat - this.yPixelWidth * y;
+		int x = contentIndex % getTileWidth();
+		int y = contentIndex / getTileWidth();
+		double newLon = getLuCord().lon + this.xPixelWidth * x;
+		double newLat = getLuCord().lat - this.yPixelWidth * y;
 
 		return new Coordinate(newLon, newLat);
 	}
@@ -227,8 +203,8 @@ public class Tile implements Serializable {
 	 * @return
 	 */
 	public int getContentIndexFromCoordinate(Coordinate coord) {
-		int latDiff = (int) (this.luCord.lat - coord.lat);
-		int lonDiff = (int) (coord.lon - this.luCord.lon);
+		int latDiff = (int) (getLuCord().lat - coord.lat);
+		int lonDiff = (int) (coord.lon - getLuCord().lon);
 
 		// check if coord is fully contained in this tile
 		if (latDiff < 0 || lonDiff < 0) {
@@ -238,7 +214,7 @@ public class Tile implements Serializable {
 		int x = (int) (lonDiff / this.xPixelWidth);
 		int y = (int) (latDiff / this.yPixelWidth);
 
-		return y * this.tileWidth + x;
+		return y * getTileWidth() + x;
 	}
 
 	public Tile createCopy() {
@@ -246,50 +222,23 @@ public class Tile implements Serializable {
 	}
 
 	public void copyTo(Tile target) {
-		target.aqcuisitionDate = this.aqcuisitionDate;
 		target.band = this.band;
-		target.luCord = this.luCord.copy();
-		target.pathRow = this.pathRow;
-		target.rlCord = this.rlCord.copy();
 
 		short[] content = this.s16Tile;
 		short[] newContent = new short[content.length];
 		System.arraycopy(content, 0, newContent, 0, content.length);
 		target.s16Tile = newContent;
 
-		target.tileHeight = this.tileHeight;
 		target.tileInfo = this.getTileInfo().copy();
-		target.tileWidth = this.tileWidth;
 		target.xPixelWidth = this.xPixelWidth;
 		target.yPixelWidth = this.yPixelWidth;
 
 	}
 
 	public void serialize(DataOutputView target) throws IOException {
-		if (this.aqcuisitionDate != null) {
-			target.writeBoolean(true);
-//			writeString(target, aqcuisitionDate);
-			target.writeUTF(this.aqcuisitionDate);
-		} else {
-			target.writeBoolean(false);
-		}
-		
 		target.writeInt(this.band);
 		
-		this.luCord.serialize(target);
-		this.rlCord.serialize(target);
-		
-		if (this.pathRow != null) {
-			target.writeBoolean(true);
-//			writeString(target, pathRow);
-			target.writeUTF(this.pathRow);
-		} else {
-			target.writeBoolean(false);
-		}
-		
 
-		target.writeInt(this.tileHeight);
-		target.writeInt(this.tileWidth);
 		target.writeDouble(this.xPixelWidth);
 		target.writeDouble(this.yPixelWidth);
 		
@@ -311,26 +260,9 @@ public class Tile implements Serializable {
 	}
 
 	public void deserialize(DataInputView source) throws IOException {
-		if (source.readBoolean()) {
-			this.aqcuisitionDate = source.readUTF();
-		}
-		
 		this.band = source.readInt();
-
-		this.luCord = new Coordinate();
-		this.luCord.deserialize(source);
-		
-		this.rlCord = new Coordinate();
-		this.rlCord.deserialize(source);
-
-		
-		if (source.readBoolean()) {
-			this.pathRow = source.readUTF();
-		}
 		
 		
-		this.tileHeight = source.readInt();
-		this.tileWidth = source.readInt();
 		this.xPixelWidth = source.readDouble();
 		this.yPixelWidth = source.readDouble();
 		
@@ -355,19 +287,15 @@ public class Tile implements Serializable {
 	}
 
 	public void setLuCord(Coordinate luCord) {
-		this.luCord = luCord;
-	}
-
-	public void setRlCord(Coordinate rlCord) {
-		this.rlCord = rlCord;
+		this.tileInfo.setLeftUpper(luCord);
 	}
 
 	public Coordinate getLuCord() {
-		return luCord;
+		return this.tileInfo.getLeftUpper();
 	}
 
 	public Coordinate getRlCord() {
-		return rlCord;
+		return this.tileInfo.getLowerRightCoordinate();
 	}
 
 	public void setBand(int band) {
@@ -375,11 +303,11 @@ public class Tile implements Serializable {
 	}
 
 	public void setTileHeight(int tileHeight) {
-		this.tileHeight = tileHeight;
+		this.tileInfo.setLines(tileHeight);
 	}
 
 	public void setTileWidth(int tileWidth) {
-		this.tileWidth = tileWidth;
+		this.tileInfo.setSamples(tileWidth);
 	}
 
 	public void setxPixelWidth(Double xPixelWidth) {
@@ -390,7 +318,11 @@ public class Tile implements Serializable {
 		this.yPixelWidth = yPixelWidth;
 	}
 
-	public double getxPixelWidth() {	return xPixelWidth;}
+	public double getxPixelWidth() {
+		return this.xPixelWidth;
+	}
 
-	public double getyPixelWidth() {return yPixelWidth;	}
+	public double getyPixelWidth() {
+		return this.yPixelWidth;
+	}
 }

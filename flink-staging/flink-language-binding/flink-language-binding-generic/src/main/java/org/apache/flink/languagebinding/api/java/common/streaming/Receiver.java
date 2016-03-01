@@ -22,7 +22,6 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
-import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.Tile;
 import org.apache.flink.api.java.tuple.Tuple;
 //CHECKSTYLE.OFF: AvoidStarImport - tuple imports
@@ -377,18 +376,8 @@ public class Receiver implements Serializable {
 
 		@Override
 		public Tile deserialize() {
-			this.reuse.setAqcuisitionDate(this.stringDes.deserialize());
+			this.reuse.setAcquisitionDate(this.stringDes.deserialize());
 			this.reuse.setBand(this.intDes.deserialize().intValue());
-
-			double luLon = this.doubleDes.deserialize();
-			double luLat = this.doubleDes.deserialize();
-			Coordinate leftUpper = new Coordinate(luLon, luLat);
-			this.reuse.setLuCord(leftUpper);
-
-			double rlLon = this.doubleDes.deserialize();
-			double rlLat = this.doubleDes.deserialize();
-			Coordinate rightLower = new Coordinate(rlLon, rlLat);
-			this.reuse.setRlCord(rightLower);
 
 			this.reuse.setPathRow(this.stringDes.deserialize());
 			this.reuse.setTileHeight(this.intDes.deserialize().intValue());

@@ -81,7 +81,7 @@ public class TileStitchReduce implements GroupReduceFunction<Tile, Tile> {
 				if (!updated) {
 					result.update(t.getTileInfo(), leftUpper, rightLower,
 							xSize, ySize, band, t.getPathRow(),
-							t.getAqcuisitionDate(), t.getTileInfo().getPixelWidth(),
+							t.getAcquisitionDate(), t.getTileInfo().getPixelWidth(),
 							t.getTileInfo().getPixelHeight());
 					updated = true;
 				}

@@ -125,7 +125,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 				filePath = filePath.substring(lastIndexOf + 1);
 				String[] split = filePath.split("_");
 				String pathRow = split[0];
-				String aqcDate = split[1];
+				String acqDate = split[1];
 
 				if(completeScene) {
 					// Determine list of FS blocks that contain the given block
@@ -133,13 +133,13 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 					Arrays.sort(blocks);
 
 					//create absolute position that comprises the whole scene
-					EnviTilePosition absolutePosition = new EnviTilePosition(-1, 0, numColumns, 0, numRows, this.leftUpperLimit, this.rightLowerLimit, pathRow, aqcDate);
+					EnviTilePosition absolutePosition = new EnviTilePosition(-1, 0, numColumns, 0, numRows, this.leftUpperLimit, this.rightLowerLimit, pathRow, acqDate);
 					EnviInputSplit sceneSplit = new EnviInputSplit(1, dataFile, 0, data_size,
 							blocks[0].getHosts(), info,
 							absolutePosition);
 					inputSplits.add(sceneSplit);
 				} else {
-					createTiledSplits(fs, inputSplits, file, info, dataFile, dataFileStatus, data_size, numBands, numRows, numColumns, pathRow, aqcDate);
+					createTiledSplits(fs, inputSplits, file, info, dataFile, dataFileStatus, data_size, numBands, numRows, numColumns, pathRow, acqDate);
 				}
 
 			}catch (RuntimeException ex) {
@@ -159,7 +159,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		return inputSplits.toArray(new EnviInputSplit[0]);
 	}
 
-	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfoWrapper info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String aqcDate) throws IOException {
+	private void createTiledSplits(FileSystem fs, List<FileInputSplit> inputSplits, FileStatus file, TileInfoWrapper info, Path dataFile, FileStatus dataFileStatus, int data_size, int numBands, int numRows, int numColumns, String pathRow, String acqDate) throws IOException {
 	/*
 	 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 	 *  pixels.
@@ -221,7 +221,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 
 					inputSplits.add(new EnviInputSplit(inputSplits.size(), dataFile, offset, length,
 							blocks[0].getHosts(), info,
-							new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, aqcDate)));
+							new EnviTilePosition(band, pxstart, pxnextNoWrapped, pystart, pynext, tileUpperLeft, tileLowerRight, pathRow, acqDate)));
 				}
 			}
 		}
@@ -438,7 +438,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		//in case complete scene should be read, use the number of lines of all bands
 		if(this.completeScene) {yread = yread * this.info.getBands();}
 
-		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.aqcDate, pixelWidth, pixelHeight);
+		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.acqDate, pixelWidth, pixelHeight);
 		short[] values = record.getS16Tile();
 		if(values == null) {
 			int multiplicator = 1; 
@@ -489,9 +489,9 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 		public final int ystart, ynext;
 		public final Coordinate leftUpperCorner, rightLowerCorner;
 		public final String pathRow;
-		public final String aqcDate;
+		public final String acqDate;
 
-		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String aqcDate) {
+		public EnviTilePosition(int band, int xstart, int xnext, int ystart, int ynext, Coordinate leftUpperCorner, Coordinate rightLowerCorner, String pathRow, String acqDate) {
 			this.band = band;
 			this.xstart = xstart;
 			this.xnext = xnext;
@@ -500,7 +500,7 @@ public class SceneInputFormat<T extends Tile> extends FileInputFormat<T> {
 			this.leftUpperCorner = leftUpperCorner;
 			this.rightLowerCorner = rightLowerCorner;
 			this.pathRow = pathRow;
-			this.aqcDate = aqcDate;
+			this.acqDate = acqDate;
 		}
 		
 		@Override
