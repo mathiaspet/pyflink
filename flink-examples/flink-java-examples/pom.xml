@@ -315,19 +315,19 @@ under the License.
 						</configuration>
 					</execution>
 
-					<!-- ReadCompleteScenes -->
+					<!-- ImageTest -->
 					<execution>
-						<id>ReadCompleteScenes</id>
+						<id>ImageTest</id>
 						<phase>package</phase>
 						<goals>
 							<goal>jar</goal>
 						</goals>
 						<configuration>
-							<classifier>ReadCompleteScenes</classifier>
+							<classifier>ImageTest</classifier>
 
 							<archive>
 								<manifestEntries>
-									<program-class>org.apache.flink.examples.java.spatial.ReadCompleteScenes</program-class>
+									<program-class>org.apache.flink.examples.java.spatial.ImageTest</program-class>
 								</manifestEntries>
 							</archive>
 
@@ -365,7 +365,7 @@ under the License.
 								<copy file="${project.basedir}/target/flink-java-examples-${project.version}-WordCountPOJO.jar" tofile="${project.basedir}/target/WordCountPOJO.jar" />
 								<copy file="${project.basedir}/target/flink-java-examples-${project.version}-DistCp.jar" tofile="${project.basedir}/target/DistCp.jar" />
 								<copy file="${project.basedir}/target/flink-java-examples-${project.version}-DataCubeCreation.jar" tofile="${project.basedir}/target/DataCubeCreation.jar" />
-								<copy file="${project.basedir}/target/flink-java-examples-${project.version}-ReadCompleteScenes.jar" tofile="${project.basedir}/target/ReadCompleteScenes.jar" />
+								<copy file="${project.basedir}/target/flink-java-examples-${project.version}-ImageTest.jar" tofile="${project.basedir}/target/ImageTest.jar" />
 							</target>
 						</configuration>
 					</execution>

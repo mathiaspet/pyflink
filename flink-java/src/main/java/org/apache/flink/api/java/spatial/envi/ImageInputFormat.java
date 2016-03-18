@@ -28,46 +28,47 @@ import java.util.List;
 
 // import org.apache.flink.api.common.io.statistics.BaseStatistics;
 // import org.apache.flink.api.java.spatial.Coordinate;
+// import org.apache.flink.api.java.spatial.ImageWrapper;
 // import org.apache.flink.api.java.spatial.TileInfoWrapper;
-import org.apache.flink.core.fs.BlockLocation;
 // import org.apache.flink.util.StringUtils;
 import org.apache.flink.api.common.io.FileInputFormat;
-import org.apache.flink.api.java.spatial.ImageWrapper;
 import org.apache.flink.api.java.spatial.ImageInfoWrapper;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.core.fs.BlockLocation;
+import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
-import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ImageInputFormat extends FileInputFormat<ImageWrapper> {
+public class ImageInputFormat<T extends Tuple3<String, byte[], byte[]>> extends FileInputFormat<T> {
 	private static final long serialVersionUID = 1L;
 	private static final Logger LOG = LoggerFactory.getLogger(ImageInputFormat.class);
 
 	private String currentKey;
-	private ImageInfoWrapper currentInfo;
+	private byte[] currentInfo;
+	private int currentDataSize;
 
 	public ImageInputFormat(Path path) {
 		super(path);
 	} 
 
 	@Override
-	public ImageWrapper nextRecord(ImageWrapper reuse) throws IOException {
+	public T nextRecord(T reuse) throws IOException {
 		if (this.reachedEnd()) {
 			return null;
 		}
 
 		// Read image data from stream
-		int dataSize = this.currentInfo.getLines() * this.currentInfo.getSamples() * this.currentInfo.getPixelSize();
-		byte[] data = new byte[dataSize];
-		if (stream.read(data) != dataSize) {
-			throw new RuntimeException("Unexpected file size (" + dataSize + ") while reading data file.");
+		byte[] data = new byte[this.currentDataSize];
+		if (stream.read(data) != this.currentDataSize) {
+			throw new RuntimeException("Unexpected file size (" + this.currentDataSize + ") while reading data file.");
 		}
 
-		reuse.setFields(this.currentKey, this.currentInfo.toBytes(), data); 
+		reuse.setFields(this.currentKey, this.currentInfo, data);
 
 		this.currentKey = null;
 		this.currentInfo = null;
@@ -82,6 +83,7 @@ public class ImageInputFormat extends FileInputFormat<ImageWrapper> {
 		
 		this.currentKey = imageSplit.key;
 		this.currentInfo = imageSplit.info;
+		this.currentDataSize = imageSplit.dataSize;
 	}
 
 	@Override
@@ -96,11 +98,14 @@ public class ImageInputFormat extends FileInputFormat<ImageWrapper> {
 		}
 
 		List<FileStatus> headerFiles = getHeaderFiles();
+		LOG.info("Found {} header files", headerFiles.size());
+
 		List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(headerFiles.size());
 
 		final FileSystem fs = this.filePath.getFileSystem();
 		for (FileStatus header: headerFiles) {
 			FSDataInputStream headerIn = fs.open(header.getPath());
+			LOG.info("Processing header file \"{}\"", header.getPath().toString());
 			try {
 				// Read header
 				ImageInfoWrapper info = new ImageInfoWrapper(headerIn);
@@ -118,6 +123,7 @@ public class ImageInputFormat extends FileInputFormat<ImageWrapper> {
 				} catch(FileNotFoundException e) {
 					throw new RuntimeException("Data file " + data + " for header " + header + " not found.", e);
 				}
+				LOG.info("Found data file {} ({} bytes)",  dataStatus.getPath().toString(), dataStatus.getLen());
 
 				// Determine blocks
 				final BlockLocation[] blocks = fs.getFileBlockLocations(dataStatus, 0, dataStatus.getLen());
@@ -160,12 +166,14 @@ public class ImageInputFormat extends FileInputFormat<ImageWrapper> {
 	public static final class ImageInputSplit extends FileInputSplit {
 		private static final long serialVersionUID = 1L;
 		public String key;
-		public ImageInfoWrapper info;
+		public byte[] info;
+		public int dataSize;
 
 		public ImageInputSplit(int num, Path file, long start, long length, String[] hosts, String key, ImageInfoWrapper info) {
 			super(num, file, start, length, hosts);
 			this.key = key;
-			this.info = info;
+			this.info = info.toBytes();
+			this.dataSize = info.getLines() * info.getSamples() * info.getPixelSize();
 		}
 	}
 }
