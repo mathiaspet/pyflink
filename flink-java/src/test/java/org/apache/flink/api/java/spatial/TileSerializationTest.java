@@ -110,7 +110,7 @@ public class TileSerializationTest {
 		out.setAqcuisitionDate("000202");
 		out.setPathRow("227064");
 		
-		TileInfo info = new TileInfo(testHeader);
+		TileInfoWrapper info = new TileInfoWrapper(testHeader.getBytes());
 		out.setTileInfo(info);
 		
 		short[] content = {1, 2, 3, 4, 5 ,6 ,7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
@@ -131,15 +131,12 @@ public class TileSerializationTest {
 		assertThat(this.out.getAqcuisitionDate(), is(equalTo(tile.getAqcuisitionDate())));
 		assertThat(this.out.getPathRow(), is(equalTo(tile.getPathRow())));
 		
-		TileInfo outInfo = this.out.getTileInfo();
-		TileInfo tileInfo = tile.getTileInfo();
+		TileInfoWrapper outInfo = this.out.getTileInfo();
+		TileInfoWrapper tileInfo = tile.getTileInfo();
 		
-		assertThat(outInfo.getAcqDate(), is(equalTo(tileInfo.getAcqDate())));
+		assertThat(outInfo.getAcquisitionDate(), is(equalTo(tileInfo.getAcquisitionDate())));
 		assertThat(outInfo.getBands(), is(equalTo(tileInfo.getBands())));
-		assertThat(outInfo.getByteOrder(), is(equalTo(tileInfo.getByteOrder())));
 		assertThat(outInfo.getDataIgnoreValue(), is(equalTo(tileInfo.getDataIgnoreValue())));
-		assertThat(outInfo.getDataTypeindex(), is(equalTo(tileInfo.getDataTypeindex())));
-		assertThat(outInfo.getHeaderOffset(), is(equalTo(tileInfo.getHeaderOffset())));
 		assertThat(outInfo.getInterleave(), is(equalTo(tileInfo.getInterleave())));
 		assertThat(outInfo.getLines(), is(equalTo(tileInfo.getLines())));
 		assertThat(outInfo.getPixelSize(), is(equalTo(tileInfo.getPixelSize())));

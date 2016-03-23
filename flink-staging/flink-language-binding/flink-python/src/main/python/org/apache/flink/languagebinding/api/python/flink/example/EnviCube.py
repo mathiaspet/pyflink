@@ -66,7 +66,7 @@ class CubeCreator(GroupReduceFunction):
             # iterate over tiles for current band
             for t in band_to_tiles[b]:
                 for i, (px_coord_lat, px_coord_lon) in coord_iter(t):
-                    if result.s16_tile[i] != NOVAL:
+                    if result.s16_tile[i] != NOVAL:m
                         orig_not_null_counter += 1
                     if (self.leftUpperLat >= px_coord_lat and
                             px_coord_lat >= self.rightLowerLat and

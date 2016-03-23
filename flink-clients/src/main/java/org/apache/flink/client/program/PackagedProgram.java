@@ -27,14 +27,25 @@ import org.apache.flink.optimizer.dag.DataSinkNode;
 import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.apache.flink.util.InstantiationUtil;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Random;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -406,7 +417,7 @@ public class PackagedProgram {
 	}
 
 	public List<URL> getAllLibraries() {
-		List<URL> libs = new ArrayList<URL>(this.extractedTempLibraries.size() + 1);
+		List<URL> libs = new ArrayList(this.extractedTempLibraries.size() + 1);
 
 		if (jarFile != null) {
 			libs.add(jarFile);
@@ -662,7 +673,7 @@ public class PackagedProgram {
 						
 						// copy the temp file contents to a temporary File
 						OutputStream out = null;
-						InputStream in = null; 
+						InputStream in = null;
 						try {
 							
 							

@@ -1,49 +1,54 @@
- /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+/*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 
 package org.apache.flink.client.web;
 
- import org.apache.commons.lang3.StringEscapeUtils;
- import org.apache.flink.api.java.tuple.Tuple2;
- import org.apache.flink.client.CliFrontend;
- import org.apache.flink.client.cli.CliFrontendParser;
- import org.apache.flink.client.program.Client;
- import org.apache.flink.client.program.PackagedProgram;
- import org.apache.flink.client.program.ProgramInvocationException;
- import org.apache.flink.configuration.GlobalConfiguration;
- import org.apache.flink.optimizer.CompilerException;
- import org.apache.flink.optimizer.plan.FlinkPlan;
- import org.apache.flink.optimizer.plan.OptimizedPlan;
- import org.apache.flink.optimizer.plan.StreamingPlan;
- import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
- import org.slf4j.Logger;
- import org.slf4j.LoggerFactory;
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.client.CliFrontend;
+import org.apache.flink.client.cli.CliFrontendParser;
+import org.apache.flink.client.program.Client;
+import org.apache.flink.client.program.PackagedProgram;
+import org.apache.flink.client.program.ProgramInvocationException;
+import org.apache.flink.configuration.GlobalConfiguration;
+import org.apache.flink.optimizer.CompilerException;
+import org.apache.flink.optimizer.plan.FlinkPlan;
+import org.apache.flink.optimizer.plan.OptimizedPlan;
+import org.apache.flink.optimizer.plan.StreamingPlan;
+import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
- import javax.servlet.ServletException;
- import javax.servlet.http.HttpServlet;
- import javax.servlet.http.HttpServletRequest;
- import javax.servlet.http.HttpServletResponse;
- import java.io.File;
- import java.io.IOException;
- import java.io.PrintWriter;
- import java.io.StringWriter;
- import java.util.*;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 
 public class JobSubmissionServlet extends HttpServlet {
@@ -78,16 +83,15 @@ public class JobSubmissionServlet extends HttpServlet {
 
 	// ------------------------------------------------------------------------
 
-	private final File jobStoreDirectory;										// the directory containing the uploaded jobs
+	private final File jobStoreDirectory;                                        // the directory containing the uploaded jobs
 
-	private final File planDumpDirectory;										// the directory to dump the optimizer plans to
+	private final File planDumpDirectory;                                        // the directory to dump the optimizer plans to
 
-	private final Map<Long, Tuple2<PackagedProgram, FlinkPlan>> submittedJobs;	// map from UIDs to the submitted jobs
+	private final Map<Long, Tuple2<PackagedProgram, FlinkPlan>> submittedJobs;    // map from UIDs to the submitted jobs
 
-	private final Random rand;													// random number generator for UID
+	private final Random rand;                                                    // random number generator for UID
 
 	private final CliFrontend cli;
-	
 
 
 	public JobSubmissionServlet(CliFrontend cli, File jobDir, File planDir) {
@@ -122,10 +126,9 @@ public class JobSubmissionServlet extends HttpServlet {
 			// check that parameters are set
 			// do NOT check 'options' or 'assemblerClass' -> it is OK if not set
 			if (checkParameterSet(resp, jobName, JOB_PARAM_NAME)
-				|| checkParameterSet(resp, arguments, ARGUMENTS_PARAM_NAME)
-				|| checkParameterSet(resp, showPlan, SHOW_PLAN_PARAM_NAME)
-				|| checkParameterSet(resp, suspendPlan, SUSPEND_PARAM_NAME))
-			{
+					|| checkParameterSet(resp, arguments, ARGUMENTS_PARAM_NAME)
+					|| checkParameterSet(resp, showPlan, SHOW_PLAN_PARAM_NAME)
+					|| checkParameterSet(resp, suspendPlan, SUSPEND_PARAM_NAME)) {
 				return;
 			}
 
@@ -169,11 +172,10 @@ public class JobSubmissionServlet extends HttpServlet {
 					// wrapping hack to get this exception handled correctly by following catch block
 					throw new RuntimeException(new Exception("The optimized plan could not be produced."));
 				}
-			}
-			catch (RuntimeException e) {
+			} catch (RuntimeException e) {
 				Throwable t = e.getCause();
 
-				if(t instanceof ProgramInvocationException) {
+				if (t instanceof ProgramInvocationException) {
 					// collect the stack trace
 					StringWriter sw = new StringWriter();
 					PrintWriter w = new PrintWriter(sw);
@@ -202,7 +204,7 @@ public class JobSubmissionServlet extends HttpServlet {
 
 					showErrorPage(resp, "An error occurred in the compiler:<br/><br/>"
 							+ t.getMessage() + "<br/>"
-							+ (t.getCause() != null ? "Caused by: " + t.getCause().getMessage():"")
+							+ (t.getCause() != null ? "Caused by: " + t.getCause().getMessage() : "")
 							+ "<br/><br/><pre>" + message + "</pre>");
 					return;
 				} else {
@@ -236,8 +238,7 @@ public class JobSubmissionServlet extends HttpServlet {
 
 				if (optPlan instanceof StreamingPlan) {
 					((StreamingPlan) optPlan).dumpStreamingPlanAsJSON(jsonFile);
-				}
-				else {
+				} else {
 					PlanJSONDumpGenerator jsonGen = new PlanJSONDumpGenerator();
 					jsonGen.setEncodeForHTML(true);
 					jsonGen.dumpOptimizerPlanAsJSON((OptimizedPlan) optPlan, jsonFile);
@@ -248,27 +249,24 @@ public class JobSubmissionServlet extends HttpServlet {
 					parameters.set(0, CliFrontend.ACTION_RUN);
 					try {
 						this.cli.parseParameters(parameters.toArray(args));
-					} catch(RuntimeException e) {
+					} catch (RuntimeException e) {
 						LOG.error("Error submitting job to the job-manager.", e.getCause());
 						showErrorPage(resp, e.getCause().getMessage());
 						return;
 					}
-				}
-				else {
+				} else {
 					this.submittedJobs.put(uid, new Tuple2<PackagedProgram, FlinkPlan>(this.cli.getPackagedProgram(), optPlan));
 				}
 
 				// redirect to the plan display page
 				resp.sendRedirect("showPlan?id=" + uid + "&suspended=" + (suspend ? "true" : "false"));
-			}
-			else {
+			} else {
 				// don't show any plan. directly submit the job and redirect to the
 				// runtime monitor
 				parameters.set(0, CliFrontend.ACTION_RUN);
 				try {
 					this.cli.parseParameters(parameters.toArray(args));
-				}
-				catch (RuntimeException e) {
+				} catch (RuntimeException e) {
 					LOG.error("Error submitting job to the job-manager.", e.getCause());
 					// HACK: Is necessary because Message contains whole stack trace
 					String errorMessage = e.getCause().getMessage().split("\n")[0];
@@ -277,8 +275,7 @@ public class JobSubmissionServlet extends HttpServlet {
 				}
 				resp.sendRedirect(START_PAGE_URL);
 			}
-		}
-		else if (action.equals(ACTION_RUN_SUBMITTED_VALUE)) {
+		} else if (action.equals(ACTION_RUN_SUBMITTED_VALUE)) {
 			// --------------- run a job that has been submitted earlier, but was -------------------
 			// --------------- not executed because of a plan display -------------------
 
@@ -290,8 +287,7 @@ public class JobSubmissionServlet extends HttpServlet {
 			Long uid;
 			try {
 				uid = Long.parseLong(id);
-			}
-			catch (NumberFormatException nfex) {
+			} catch (NumberFormatException nfex) {
 				showErrorPage(resp, "An invalid id for the job was provided.");
 				return;
 			}
@@ -300,7 +296,7 @@ public class JobSubmissionServlet extends HttpServlet {
 			Tuple2<PackagedProgram, FlinkPlan> job = submittedJobs.remove(uid);
 			if (job == null) {
 				resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
-					"No job with the given uid was retained for later submission.");
+						"No job with the given uid was retained for later submission.");
 				return;
 			}
 
@@ -308,8 +304,7 @@ public class JobSubmissionServlet extends HttpServlet {
 			try {
 				Client client = new Client(GlobalConfiguration.getConfiguration());
 				client.runDetached(client.getJobGraph(job.f0, job.f1), job.f0.getUserCodeClassLoader());
-			}
-			catch (Exception ex) {
+			} catch (Exception ex) {
 				LOG.error("Error submitting job to the job-manager.", ex);
 				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				// HACK: Is necessary because Message contains whole stack trace
@@ -321,8 +316,7 @@ public class JobSubmissionServlet extends HttpServlet {
 
 			// redirect to the start page
 			resp.sendRedirect(START_PAGE_URL);
-		}
-		else if (action.equals(ACTION_BACK_VALUE)) {
+		} else if (action.equals(ACTION_BACK_VALUE)) {
 			// remove the job from the map
 
 			String id = req.getParameter("id");
@@ -333,8 +327,7 @@ public class JobSubmissionServlet extends HttpServlet {
 			Long uid;
 			try {
 				uid = Long.parseLong(id);
-			}
-			catch (NumberFormatException nfex) {
+			} catch (NumberFormatException nfex) {
 				showErrorPage(resp, "An invalid id for the job was provided.");
 				return;
 			}
@@ -344,21 +337,17 @@ public class JobSubmissionServlet extends HttpServlet {
 
 			// redirect to the start page
 			resp.sendRedirect(START_PAGE_URL);
-		}
-		else {
+		} else {
 			showErrorPage(resp, "Invalid action specified.");
 		}
 	}
 
 	/**
 	 * Prints the error page, containing the given message.
-	 * 
-	 * @param resp
-	 *        The response handler.
-	 * @param message
-	 *        The message to display.
-	 * @throws IOException
-	 *         Thrown, if the error page could not be printed due to an I/O problem.
+	 *
+	 * @param resp    The response handler.
+	 * @param message The message to display.
+	 * @throws IOException Thrown, if the error page could not be printed due to an I/O problem.
 	 */
 	private void showErrorPage(HttpServletResponse resp, String message) throws IOException {
 		resp.setStatus(HttpServletResponse.SC_OK);
@@ -392,16 +381,12 @@ public class JobSubmissionServlet extends HttpServlet {
 
 	/**
 	 * Checks the given parameter. If it is null, it prints the error page.
-	 * 
-	 * @param resp
-	 *        The response handler.
-	 * @param parameter
-	 *        The parameter to check.
-	 * @param parameterName
-	 *        The name of the parameter, to describe it in the error message.
+	 *
+	 * @param resp          The response handler.
+	 * @param parameter     The parameter to check.
+	 * @param parameterName The name of the parameter, to describe it in the error message.
 	 * @return True, if the parameter is null, false otherwise.
-	 * @throws IOException
-	 *         Thrown, if the error page could not be printed.
+	 * @throws IOException Thrown, if the error page could not be printed.
 	 */
 	private boolean checkParameterSet(HttpServletResponse resp, String parameter, String parameterName)
 			throws IOException {
@@ -417,13 +402,12 @@ public class JobSubmissionServlet extends HttpServlet {
 	 * Utility method that takes the given arguments, splits them at the whitespaces (space and tab) and
 	 * turns them into an array of Strings. Other than the <tt>StringTokenizer</tt>, this method
 	 * takes care of quotes, such that quoted passages end up being one string.
-	 * 
-	 * @param args
-	 *        The string to be split.
+	 *
+	 * @param args The string to be split.
 	 * @return The array of split strings.
 	 */
 	private static List<String> tokenizeArguments(String args) {
-		List<String> list = new ArrayList<String>();
+		List<String> list = new ArrayList<>();
 		StringBuilder curr = new StringBuilder();
 
 		int pos = 0;
