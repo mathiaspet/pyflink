@@ -57,14 +57,6 @@ public class TileInfoWrapper {
 		return new TileInfoWrapper(this);
 	}
 
-	public void update(Coordinate leftUpper, Coordinate rightLower, int width, int height,
-			int band, String pathRow, String acqDate, double xPixelWidth, double yPixelWidth) {
-		// TODO
-		this.setLeftUpper(leftUpper);
-		this.setSamples(width);
-		this.setLines(height);
-	}
-
 	private String readHeader(InputStream is) throws IOException {
 		// Read header
 		byte[] buf = new byte[4096];
@@ -184,6 +176,14 @@ public class TileInfoWrapper {
 		this.metaData.put("bands", Integer.toString(bands));
 	}
 
+	public String [] getBandNames() {
+		return getList("band names");
+	}
+
+	public void setBandNames(String [] bandNames) {
+		putList("band names", bandNames);
+	}
+
 	public int getLines() {
 		return Integer.parseInt(this.metaData.get("lines"));
 	}
@@ -233,6 +233,7 @@ public class TileInfoWrapper {
 			list.append(", ");
 			list.append(entries[i]);
 		}
+		list.append("}");
 		this.metaData.put(key, list.toString());
 	}
 
@@ -241,9 +242,21 @@ public class TileInfoWrapper {
 		return Double.parseDouble(mapInfo[5]);
 	}
 
+	public void setPixelWidth(double pixelWidth) {
+		String[] mapInfo = getMapInfo();
+		mapInfo[5] = Double.toString(pixelWidth);
+		putList("map info", mapInfo);
+	}
+
 	public double getPixelHeight() {
 		String[] mapInfo = getMapInfo();
 		return Double.parseDouble(mapInfo[6]);
+	}
+
+	public void setPixelHeight(double pixelHeight) {
+		String[] mapInfo = getMapInfo();
+		mapInfo[6] = Double.toString(pixelHeight);
+		putList("map info", mapInfo);
 	}
 
 	public Coordinate getLeftUpper() {
