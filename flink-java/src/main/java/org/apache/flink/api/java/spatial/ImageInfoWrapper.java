@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.text.DateFormat;
+import java.io.Serializable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -34,7 +35,9 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataInputView;
 
 
-public class ImageInfoWrapper {
+public class ImageInfoWrapper implements Serializable {
+	private static final long serialVersionUID = 1L;
+
 	private Map<String, String> metaData;
 
 	public ImageInfoWrapper() {
@@ -289,7 +292,6 @@ public class ImageInfoWrapper {
 		for (Entry<String, String> e: this.metaData.entrySet()) {
 			strBuf.append(e.getKey() + '\0' + e.getValue() + '\0');
 		}
-		strBuf.append('\0');
 		return strBuf.toString().getBytes(Charset.forName("UTF-8"));
 	}
 
@@ -372,5 +374,16 @@ public class ImageInfoWrapper {
 
 	public int getHeaderOffset() {
 		return Integer.parseInt(this.metaData.get("header offset"));
+	}
+
+	public String toString() {
+		StringBuilder out = new StringBuilder();
+		for (Entry<String, String> e: this.metaData.entrySet()) {
+			out.append(e.getKey());
+			out.append(" = ");
+			out.append(e.getValue());
+			out.append("\n");
+		}
+		return out.toString();
 	}
 }
