@@ -48,11 +48,13 @@ public class ImageTest {
 
 		DataSet<Tuple3<String, byte[], byte[]>> images = readImages(env);
 		DataSet<Tuple3<String, byte[], byte[]>> filtered = images.filter(new FilterFunction<Tuple3<String, byte[], byte[]>>() {
+			static final long serialVersionUID = 1L;
 			int count = 0;
+
 			@Override
 			public boolean filter(Tuple3<String, byte[], byte[]> value) throws Exception {
 				count++;
-				System.out.println("counted: " + count);
+				System.out.println("image " + count);
 				return true;
 			}
 		});
@@ -80,7 +82,7 @@ public class ImageTest {
 
 	private static DataSet<Tuple3<String, byte[], byte[]>> readImages(ExecutionEnvironment env) {
 		ImageInputFormat imageFormat = new ImageInputFormat(new Path(filePath));
-		// TupleTypeInfo<Tuple3<String, Byte[], Byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, Byte[], Byte[]>>(BasicTypeInfo.STRING_TYPE_INFO, BasicArrayTypeInfo.BYTE_ARRAY_TYPE_INFO, BasicArrayTypeInfo.BYTE_ARRAY_TYPE_INFO);
+		imageFormat.configure(true);
 		TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, byte[], byte[]>>(BasicTypeInfo.STRING_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO);
 		return new DataSource<Tuple3<String, byte[], byte[]>>(env, imageFormat, typeInfo, "imageSource");
 	}

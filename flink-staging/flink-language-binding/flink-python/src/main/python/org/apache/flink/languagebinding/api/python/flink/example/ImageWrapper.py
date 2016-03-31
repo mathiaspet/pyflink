@@ -15,7 +15,6 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-import marshal
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.plan.Constants import Tile, STRING, BYTES
 
@@ -38,7 +37,7 @@ class TileToTuple(FlatMapFunction):
 
         collector.collect((
             value._aquisitionDate,
-            bytearray(marshal.dumps(tile_meta)),
+            self._meta_to_bytes(tile_meta),
             value._content
         ))
 
@@ -67,7 +66,28 @@ class TupleToTile(FlatMapFunction):
 class ImageWrapper(object):
     def __init__(self, tup):
         self._tup = tup
-        self._meta = marshal.loads(tup[1])
+        self._meta = self._meta_from_bytes(tup[1])
+
+    @staticmethod
+    def _meta_from_bytes(meta_bytes):
+        all_strings = iter(meta_bytes.split(b"\0"))
+        meta = dict()
+        while True:
+            try:
+                key = next(all_strings)
+            except StopIteration:
+                break
+            value = next(all_strings)
+            meta[key.decode()] = value.decode()
+        return meta
+
+    @staticmethod
+    def _meta_to_bytes(meta):
+        all_strings = []
+        for k, v in meta.items():
+            all_strings.extend([k, v])
+        all_strings.append("\0")
+        return bytearray("\0".join(all_strings).encode())
 
     @staticmethod
     def from_data(coordinates, width, height, band, pathRow,
@@ -85,7 +105,7 @@ class ImageWrapper(object):
 
         return ImageWrapper((
             acquisitionDate,
-            bytearray(marshal.dumps(tile_meta)),
+            ImageWrapper._meta_to_bytes(tile_meta),
             bytearray(width * height * 2)
         ))
 
@@ -94,7 +114,7 @@ class ImageWrapper(object):
 
     def set_meta(self, name, value):
         self._meta[name] = value
-        self._tup = (self._tup[0], bytearray(marshal.dumps(self._meta)), self._tup[2])
+        self._tup = (self._tup[0], self._meta_to_bytes(self._meta), self._tup[2])
 
     @property
     def acquisitionDate(self):

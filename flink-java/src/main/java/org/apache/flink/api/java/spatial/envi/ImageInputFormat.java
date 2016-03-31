@@ -48,12 +48,15 @@ public class ImageInputFormat<T extends Tuple3<String, byte[], byte[]>> extends 
 	private static final long serialVersionUID = 1L;
 	private static final Logger LOG = LoggerFactory.getLogger(ImageInputFormat.class);
 
-	private String currentKey;
-	private byte[] currentInfo;
-	private int currentDataSize;
+	private boolean splitBands = false;
+	private ImageInputSplit openSplit;
 
 	public ImageInputFormat(Path path) {
 		super(path);
+	} 
+
+	public void configure(boolean splitBands) {
+		this.splitBands = splitBands;
 	} 
 
 	@Override
@@ -63,32 +66,26 @@ public class ImageInputFormat<T extends Tuple3<String, byte[], byte[]>> extends 
 		}
 
 		// Read image data from stream
-		byte[] data = new byte[this.currentDataSize];
-		if (stream.read(data) != this.currentDataSize) {
-			throw new RuntimeException("Unexpected file size (" + this.currentDataSize + ") while reading data file.");
+		byte[] data = new byte[this.openSplit.dataSize];
+		if (stream.read(data) != this.openSplit.dataSize) {
+			throw new RuntimeException("Unexpected file size (" + this.openSplit.dataSize + ") while reading data file.");
 		}
 
-		reuse.setFields(this.currentKey, this.currentInfo, data);
+		reuse.setFields(this.openSplit.key, this.openSplit.info, data);
 
-		this.currentKey = null;
-		this.currentInfo = null;
+		this.openSplit = null;
 		return reuse;
 	}
 
 	@Override
 	public void open(FileInputSplit split) throws IOException {
 		super.open(split);
-
-		ImageInputSplit imageSplit = (ImageInputSplit) split;
-		
-		this.currentKey = imageSplit.key;
-		this.currentInfo = imageSplit.info;
-		this.currentDataSize = imageSplit.dataSize;
+		this.openSplit = (ImageInputSplit) split;
 	}
 
 	@Override
 	public boolean reachedEnd() throws IOException {
-		return this.currentInfo == null;
+		return this.openSplit == null;
 	}
 
 	@Override
@@ -128,8 +125,28 @@ public class ImageInputFormat<T extends Tuple3<String, byte[], byte[]>> extends 
 				// Determine blocks
 				final BlockLocation[] blocks = fs.getFileBlockLocations(dataStatus, 0, dataStatus.getLen());
 
-				// Create split
-				inputSplits.add(new ImageInputSplit(inputSplits.size(), data, 0, dataStatus.getLen(), blocks[0].getHosts(), info.getAcquisitionDate(), info));
+				// Create split(s)
+				if (this.splitBands) {
+					// Create separate splits for each band
+					String[] bands = info.getBandNames();
+					info.setBands(1);
+
+					String[] singleBand = new String[1];
+					long start = 0;
+					long length = dataStatus.getLen() / bands.length;
+					for (String band : bands) {
+						// Set bandname to current band
+						singleBand[0] = band;
+						info.setBandNames(singleBand);
+
+						inputSplits.add(new ImageInputSplit(inputSplits.size(), data, start, length, blocks[0].getHosts(), info.getAcquisitionDate(), info.copy()));
+						start += length;
+					}
+				}
+				else {
+					// Split per file
+					inputSplits.add(new ImageInputSplit(inputSplits.size(), data, 0, dataStatus.getLen(), blocks[0].getHosts(), info.getAcquisitionDate(), info));
+				}
 			} catch (RuntimeException e){
 				LOG.warn(e.getMessage(), e);
 				continue;
@@ -173,7 +190,7 @@ public class ImageInputFormat<T extends Tuple3<String, byte[], byte[]>> extends 
 			super(num, file, start, length, hosts);
 			this.key = key;
 			this.info = info.toBytes();
-			this.dataSize = info.getLines() * info.getSamples() * info.getPixelSize();
+			this.dataSize = info.getLines() * info.getSamples() * info.getPixelSize() * info.getBands();
 		}
 	}
 }
