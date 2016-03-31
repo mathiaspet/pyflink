@@ -37,7 +37,7 @@ public class TileWrapper implements Serializable {
 	private static final long serialVersionUID = 3999969290376342375L;
 
 	private String pathRow;
-	private String aqcuisitionDate;
+	private String acquisitionDate;
 
 	private int band = -1;
 
@@ -72,7 +72,7 @@ public class TileWrapper implements Serializable {
 	}
 
 	public TileWrapper(TileWrapper tile) {
-		this.aqcuisitionDate = tile.getAqcuisitionDate();
+		this.acquisitionDate = tile.getAcquisitionDate();
 		this.band = tile.getBand();
 		this.luCord = tile.getNWCoord().copy();
 		this.pathRow = tile.getPathRow();
@@ -160,12 +160,10 @@ public class TileWrapper implements Serializable {
 
 	/**
 	 * Update the tile information to the given object.
-	 * 
-	 * @param aqcDate
 	 */
 	public void update(TileInfoWrapper tileInfo, Coordinate leftUpper,
 			Coordinate rightLower, int width, int height, int band,
-			String pathRow, String aqcDate, double xPixelWidth, 
+			String pathRow, String acqDate, double xPixelWidth, 
 			double yPixelWidth) {
 		this.tileInfo = tileInfo;
 		this.luCord = leftUpper;
@@ -174,16 +172,16 @@ public class TileWrapper implements Serializable {
 		this.tileHeight = height;
 		this.band = band;
 		this.pathRow = pathRow;
-		this.aqcuisitionDate = aqcDate;
+		this.acquisitionDate = acqDate;
 		this.xPixelWidth = xPixelWidth;
 		this.yPixelWidth = yPixelWidth;
 	}
 
-	public Long getAqcuisitionDateAsLong() {
+	public Long getAcquisitionDateAsLong() {
 		if (this.tileInfo == null) {
 			return new Long(-1);
 		} else {
-			return this.tileInfo.getAcquisitionDate();
+			return this.tileInfo.getAcquisitionDateAsLong();
 		}
 	}
 
@@ -195,12 +193,12 @@ public class TileWrapper implements Serializable {
 		this.pathRow = pathRow;
 	}
 
-	public void setAqcuisitionDate(String aqcuisitionDate) {
-		this.aqcuisitionDate = aqcuisitionDate;
+	public void setAcquisitionDate(String acquisitionDate) {
+		this.acquisitionDate = acquisitionDate;
 	}
 
-	public String getAqcuisitionDate() {
-		return aqcuisitionDate;
+	public String getAcquisitionDate() {
+		return acquisitionDate;
 	}
 
 	/**
@@ -246,7 +244,7 @@ public class TileWrapper implements Serializable {
 	}
 
 	public void copyTo(TileWrapper target) {
-		target.aqcuisitionDate = this.aqcuisitionDate;
+		target.acquisitionDate = this.acquisitionDate;
 		target.band = this.band;
 		target.luCord = this.luCord.copy();
 		target.pathRow = this.pathRow;
@@ -266,10 +264,10 @@ public class TileWrapper implements Serializable {
 	}
 
 	public void serialize(DataOutputView target) throws IOException {
-		if (this.aqcuisitionDate != null) {
+		if (this.acquisitionDate != null) {
 			target.writeBoolean(true);
-//			writeString(target, aqcuisitionDate);
-			target.writeUTF(this.aqcuisitionDate);
+//			writeString(target, acquisitionDate);
+			target.writeUTF(this.acquisitionDate);
 		} else {
 			target.writeBoolean(false);
 		}
@@ -312,7 +310,7 @@ public class TileWrapper implements Serializable {
 
 	public void deserialize(DataInputView source) throws IOException {
 		if (source.readBoolean()) {
-			this.aqcuisitionDate = source.readUTF();
+			this.acquisitionDate = source.readUTF();
 		}
 		
 		this.band = source.readInt();

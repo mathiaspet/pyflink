@@ -106,8 +106,7 @@ public class TileSerializationTest {
 		Coordinate lu = new Coordinate(1.0, 1.0);
 		Coordinate rl = new Coordinate(4.0, 4.0);
 		out.setLuCord(lu);
-		out.setRlCord(rl);
-		out.setAqcuisitionDate("000202");
+		out.setAcquisitionDate("000202");
 		out.setPathRow("227064");
 		
 		TileInfoWrapper info = new TileInfoWrapper(testHeader.getBytes());
@@ -128,7 +127,7 @@ public class TileSerializationTest {
 		Tile tile = new Tile();
 		tile.deserialize(mock);
 		
-		assertThat(this.out.getAqcuisitionDate(), is(equalTo(tile.getAqcuisitionDate())));
+		assertThat(this.out.getAcquisitionDate(), is(equalTo(tile.getAcquisitionDate())));
 		assertThat(this.out.getPathRow(), is(equalTo(tile.getPathRow())));
 		
 		TileInfoWrapper outInfo = this.out.getTileInfo();
@@ -136,7 +135,10 @@ public class TileSerializationTest {
 		
 		assertThat(outInfo.getAcquisitionDate(), is(equalTo(tileInfo.getAcquisitionDate())));
 		assertThat(outInfo.getBands(), is(equalTo(tileInfo.getBands())));
+		//assertThat(outInfo.getByteOrder(), is(equalTo(tileInfo.getByteOrder())));
 		assertThat(outInfo.getDataIgnoreValue(), is(equalTo(tileInfo.getDataIgnoreValue())));
+		assertThat(outInfo.getDataType(), is(equalTo(tileInfo.getDataType())));
+		assertThat(outInfo.getHeaderOffset(), is(equalTo(tileInfo.getHeaderOffset())));
 		assertThat(outInfo.getInterleave(), is(equalTo(tileInfo.getInterleave())));
 		assertThat(outInfo.getLines(), is(equalTo(tileInfo.getLines())));
 		assertThat(outInfo.getPixelSize(), is(equalTo(tileInfo.getPixelSize())));

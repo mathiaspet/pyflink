@@ -71,8 +71,8 @@ public class CubeOutputFormat extends FileOutputFormat<Tile> {
 					+ tile.getNWCoord().lat + ", " + split[4] + ", " + split[5]
 					+ ", " + split[6] + ", " + split[7] + ", " + split[8];
 		}
-		String aqcuisitionDate = tile.getAqcuisitionDate();
-		this.bands.add(pathRow + "_" + aqcuisitionDate + "_B" + band);
+		String acquisitionDate = tile.getAcquisitionDate();
+		this.bands.add(pathRow + "_" + acquisitionDate + "_B" + band);
 
 		short[] s16Tile = tile.getS16Tile();
 		byte[] byteContent = new byte[s16Tile.length * 2];

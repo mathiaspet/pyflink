@@ -479,13 +479,13 @@ public class Sender implements Serializable {
 			//TODO: allocation
 
 
-			if (value.getAqcuisitionDate() != null) {
+			if (value.getAcquisitionDate() != null) {
 				this.boolSerializer.buffer.clear();
 				this.boolSerializer.serializeInternal(true);
 				length += this.boolSerializer.buffer.position();
 				this.buffers.add(this.boolSerializer.buffer);
 
-				String acqDate = value.getAqcuisitionDate();
+				String acqDate = value.getAcquisitionDate();
 				this.stringSerializer.buffer.clear();
 				this.stringSerializer.serializeInternal(acqDate);
 				length+= this.stringSerializer.buffer.position();
@@ -502,27 +502,6 @@ public class Sender implements Serializable {
 			this.intSerializer.serializeInternal(value.getBand());
 			length += this.intSerializer.buffer.position();
 			this.buffers.add(this.intSerializer.buffer);
-
-			this.doubleSerializer.buffer.clear();
-			this.doubleSerializer.serializeInternal(value.getLuCord().lon);
-			length += this.doubleSerializer.buffer.position();
-			this.buffers.add(this.doubleSerializer.buffer);
-
-			this.doubleSerializer2.buffer.clear();
-			this.doubleSerializer2.serializeInternal(value.getLuCord().lat);
-			length += this.doubleSerializer2.buffer.position();
-			this.buffers.add(this.doubleSerializer2.buffer);
-
-			this.doubleSerializer3.buffer.clear();
-			this.doubleSerializer3.serializeInternal(value.getRlCord().lon);
-			length += this.doubleSerializer3.buffer.position();
-			this.buffers.add(this.doubleSerializer3.buffer);
-
-			this.doubleSerializer4.buffer.clear();
-			this.doubleSerializer4.serializeInternal(value.getRlCord().lat);
-			length += this.doubleSerializer4.buffer.position();
-			this.buffers.add(this.doubleSerializer4.buffer);
-
 
 			if (value.getPathRow() != null) {
 				this.boolSerializer2.buffer.clear();

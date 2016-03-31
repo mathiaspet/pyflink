@@ -20,6 +20,10 @@ import sys
 from collections import deque
 from flink.connection import Connection, Iterator, Collector
 from flink.functions import RuntimeContext
+import os, sys, time, gdal
+import numpy as np
+from gdalconst import *
+import __builtin__ as builtins
 
 class PythonInputFormat(object):
     
@@ -30,6 +34,7 @@ class PythonInputFormat(object):
         self._collector = None
         self.context = None
         self._chain_operator = None
+        gdal.AllRegister() #TODO: register the ENVI driver only
     
     def _run(self):
         collector = self._collector
@@ -39,11 +44,30 @@ class PythonInputFormat(object):
         collector._close()
         
     def deliver(self, path, collector):
-        print(path)
-        collector.collect((1, "outputstring"))
-        collector.collect((1, "outputstring"))
-        collector.collect((1, "outputstring"))
-    
+
+        ds = gdal.Open(path[5:], GA_ReadOnly)
+        if ds is None:
+            print 'Could not open image'
+            return
+        else:
+            print 'opened image successfully'
+        rows = ds.RasterYSize
+        cols = ds.RasterXSize
+        bandsize = rows * cols
+        bands = ds.RasterCount
+
+        imageData = np.empty(bands * bandsize)
+        for j in range(bands):
+            band = ds.GetRasterBand(j+1)
+            data = np.array(band.ReadAsArray())
+            lower = j*bandsize
+            upper = (j+1)*bandsize
+            imageData[lower:upper] = data.ravel()
+        
+        metaData = self.readMetaData(path[5:-4])
+        print metaData
+
+
     def _configure(self, input_file, output_file, port):
         self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port)
         self._iterator = Iterator.Iterator(self._connection)
@@ -84,3 +108,43 @@ class PythonInputFormat(object):
             self._iterator._reset()
             self._connection.reset()
 
+    def readMetaData(self, path):
+        headerPath = path+'.hdr'
+        f = builtins.open(headerPath, 'r')
+
+        if f.readline().find("ENVI") == -1:
+            f.close()
+            raise IOError("Not an ENVI header.")
+
+        lines = f.readlines()
+        f.close()
+
+        dict = {}
+        try:
+            while lines:
+                line = lines.pop(0)
+                if line.find('=') == -1: continue
+                if line[0] == ';': continue
+
+                (key, sep, val) = line.partition('=')
+                key = key.strip().lower()
+                val = val.strip()
+                if val and val[0] == '{':
+                    str = val.strip()
+                    while str[-1] != '}':
+                        line = lines.pop(0)
+                        if line[0] == ';': continue
+
+                        str += '\n' + line.strip()
+                    if key == 'description':
+                        dict[key] = str.strip('{}').strip()
+                    else:
+                        vals = str[1:-1].split(',')
+                        for j in range(len(vals)):
+                            vals[j] = vals[j].strip()
+                        dict[key] = vals
+                else:
+                    dict[key] = val
+            return dict
+        except:
+            raise IOError("Error while reading ENVI file header.")

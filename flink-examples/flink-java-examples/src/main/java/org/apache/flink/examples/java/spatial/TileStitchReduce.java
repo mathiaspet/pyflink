@@ -17,13 +17,13 @@
  */
 package org.apache.flink.examples.java.spatial;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+// import java.util.ArrayList;
+// import java.util.Collections;
+// import java.util.HashMap;
+// import java.util.HashSet;
+// import java.util.List;
+// import java.util.Map;
+// import java.util.Set;
 
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.java.spatial.Coordinate;
@@ -49,80 +49,83 @@ public class TileStitchReduce implements GroupReduceFunction<Tile, Tile> {
 	@Override
 	public void reduce(Iterable<Tile> values, Collector<Tile> out)
 			throws Exception {
+			for (Tile t: values) {
+				out.collect(t);
+			}
 
-		Map<Integer, Set<Tile>> bandToTiles = new HashMap<Integer, Set<Tile>>();
-		for (Tile t : values) {
-			Set<Tile> tiles = bandToTiles.get(t.getBand());
-			if (tiles == null) {
-				tiles = new HashSet<Tile>();
-				bandToTiles.put(new Integer(t.getBand()), tiles);
-			}
-			tiles.add(t);
-		}
-		long origNotNullCounter = 0;
-		List<Integer> bands = new ArrayList<Integer>(bandToTiles.keySet());
-		Collections.sort(bands);
-		long insideCounter = 0;
-		long knownCounter = 0;
+		//Map<Integer, Set<Tile>> bandToTiles = new HashMap<Integer, Set<Tile>>();
+		//for (Tile t : values) {
+		//	Set<Tile> tiles = bandToTiles.get(t.getBand());
+		//	if (tiles == null) {
+		//		tiles = new HashSet<Tile>();
+		//		bandToTiles.put(new Integer(t.getBand()), tiles);
+		//	}
+		//	tiles.add(t);
+		//}
+		//long origNotNullCounter = 0;
+		//List<Integer> bands = new ArrayList<Integer>(bandToTiles.keySet());
+		//Collections.sort(bands);
+		//long insideCounter = 0;
+		//long knownCounter = 0;
 		
-		for (Integer band : bands) {
-			boolean updated = false;
-			Tile result = new Tile();
-			short[] content = new short[xSize * ySize];
-			result.setS16Tile(content);
-			// initialize with no data values
-			for (int i = 0; i < content.length; i++) {
-				content[i] = -9999; // TODO: get this from tile info
-			}
+		//for (Integer band : bands) {
+		//	boolean updated = false;
+		//	Tile result = new Tile();
+		//	short[] content = new short[xSize * ySize];
+		//	result.setS16Tile(content);
+		//	// initialize with no data values
+		//	for (int i = 0; i < content.length; i++) {
+		//		content[i] = -9999; // TODO: get this from tile info
+		//	}
 			
 
-			Set<Tile> inputTiles = bandToTiles.get(band);
-			for (Tile t : inputTiles) {
-				if (!updated) {
-					result.update(t.getTileInfo(), leftUpper, rightLower,
-							xSize, ySize, band, t.getPathRow(),
-							t.getAqcuisitionDate(), t.getTileInfo().getPixelWidth(),
-							t.getTileInfo().getPixelHeight());
-					updated = true;
-				}
+		//	Set<Tile> inputTiles = bandToTiles.get(band);
+		//	for (Tile t : inputTiles) {
+		//		if (!updated) {
+		//			result.update(t.getTileInfo(), leftUpper, rightLower,
+		//					xSize, ySize, band, t.getPathRow(),
+		//					t.getAcquisitionDate(), t.getTileInfo().getPixelWidth(),
+		//					t.getTileInfo().getPixelHeight());
+		//			updated = true;
+		//		}
 
-				// TODO: make this more efficient by operating on blocks
-				//TODO: use array copy
+		//		// TODO: make this more efficient by operating on blocks
+		//		//TODO: use array copy
 				
-				for (int i = 0; i < t.getS16Tile().length; i++) {
-					Coordinate pixelCoord = t.getCoordinate(i);
-					if(t.getS16Tile()[i] != -9999) {
-						origNotNullCounter++;
-					}
+		//		for (int i = 0; i < t.getS16Tile().length; i++) {
+		//			Coordinate pixelCoord = t.getCoordinate(i);
+		//			if(t.getS16Tile()[i] != -9999) {
+		//				origNotNullCounter++;
+		//			}
 					
-					if(
-							(this.leftUpper.lat >= pixelCoord.lat) 
-							&& (pixelCoord.lat >= this.rightLower.lat) 
+		//			if(
+		//					(this.leftUpper.lat >= pixelCoord.lat) 
+		//					&& (pixelCoord.lat >= this.rightLower.lat) 
 							
-							&& (this.leftUpper.lon <= pixelCoord.lon)
-							&& (pixelCoord.lon <= this.rightLower.lon)
-						) {
-						int index = result
-								.getContentIndexFromCoordinate(pixelCoord);
-						if (index >= 0 && index < content.length) {
-							insideCounter++;
-							short pixelValue = t.getS16Tile()[i];
-							if(pixelValue != -9999) {
-								knownCounter++;
-							}
+		//					&& (this.leftUpper.lon <= pixelCoord.lon)
+		//					&& (pixelCoord.lon <= this.rightLower.lon)
+		//				) {
+		//				int index = result
+		//						.getContentIndexFromCoordinate(pixelCoord);
+		//				if (index >= 0 && index < content.length) {
+		//					insideCounter++;
+		//					short pixelValue = t.getS16Tile()[i];
+		//					if(pixelValue != -9999) {
+		//						knownCounter++;
+		//					}
 							
-							content[index] = pixelValue;
-						}
-					}
+		//					content[index] = pixelValue;
+		//				}
+		//			}
 
-				}
-			}
+		//		}
+		//	}
 
-//			result.setS16Tile(content);
-			out.collect(result);
+////			result.setS16Tile(content);
+		//	out.collect(result);
 
-		}
-		System.out.println("Counted " + insideCounter + " and " + knownCounter + " originally not null: " + origNotNullCounter);
+		//}
+		//System.out.println("Counted " + insideCounter + " and " + knownCounter + " originally not null: " + origNotNullCounter);
 	}
 
 	public TileStitchReduce configure(Coordinate leftUpper,

@@ -34,35 +34,27 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataInputView;
 
 
-public class TileInfoWrapper {
+public class ImageInfoWrapper {
 	private Map<String, String> metaData;
 
-	public TileInfoWrapper() {
+	public ImageInfoWrapper() {
 		this.metaData = new HashMap<String, String>();
 	}
 
-	public TileInfoWrapper(InputStream is) throws IOException {
+	public ImageInfoWrapper(InputStream is) throws IOException {
 		this.metaData = parseHeader(readHeader(is));
 	}
 
-	public TileInfoWrapper(byte[] buf) {
+	public ImageInfoWrapper(byte[] buf) {
 		this.metaData = fromBytes(buf);
 	}
 
-	public TileInfoWrapper(TileInfoWrapper other) {
+	public ImageInfoWrapper(ImageInfoWrapper other) {
 		this.metaData = other.metaData;
 	}
 
-	public TileInfoWrapper copy() {
-		return new TileInfoWrapper(this);
-	}
-
-	public void update(Coordinate leftUpper, Coordinate rightLower, int width, int height,
-			int band, String pathRow, String acqDate, double xPixelWidth, double yPixelWidth) {
-		// TODO
-		this.setLeftUpper(leftUpper);
-		this.setSamples(width);
-		this.setLines(height);
+	public ImageInfoWrapper copy() {
+		return new ImageInfoWrapper(this);
 	}
 
 	private String readHeader(InputStream is) throws IOException {
@@ -184,6 +176,14 @@ public class TileInfoWrapper {
 		this.metaData.put("bands", Integer.toString(bands));
 	}
 
+	public String [] getBandNames() {
+		return getList("band names");
+	}
+
+	public void setBandNames(String [] bandNames) {
+		putList("band names", bandNames);
+	}
+
 	public int getLines() {
 		return Integer.parseInt(this.metaData.get("lines"));
 	}
@@ -233,6 +233,7 @@ public class TileInfoWrapper {
 			list.append(", ");
 			list.append(entries[i]);
 		}
+		list.append("}");
 		this.metaData.put(key, list.toString());
 	}
 
@@ -241,9 +242,21 @@ public class TileInfoWrapper {
 		return Double.parseDouble(mapInfo[5]);
 	}
 
+	public void setPixelWidth(double pixelWidth) {
+		String[] mapInfo = getMapInfo();
+		mapInfo[5] = Double.toString(pixelWidth);
+		putList("map info", mapInfo);
+	}
+
 	public double getPixelHeight() {
 		String[] mapInfo = getMapInfo();
 		return Double.parseDouble(mapInfo[6]);
+	}
+
+	public void setPixelHeight(double pixelHeight) {
+		String[] mapInfo = getMapInfo();
+		mapInfo[6] = Double.toString(pixelHeight);
+		putList("map info", mapInfo);
 	}
 
 	public Coordinate getLeftUpper() {
@@ -271,7 +284,7 @@ public class TileInfoWrapper {
 		return new Coordinate(lowerRightEasting, lowerRightNorthing);
 	}
 
-	private byte[] toBytes() {
+	public byte[] toBytes() {
 		StringBuilder strBuf = new StringBuilder();
 		for (Entry<String, String> e: this.metaData.entrySet()) {
 			strBuf.append(e.getKey() + '\0' + e.getValue() + '\0');
@@ -360,6 +373,4 @@ public class TileInfoWrapper {
 	public int getHeaderOffset() {
 		return Integer.parseInt(this.metaData.get("header offset"));
 	}
-
-
 }

@@ -17,26 +17,9 @@
  */
 package org.apache.flink.api.java.spatial;
 
-import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple3;
 
-/**
- * Extracts the aquisition time for a {@link Tile} and returns it as 
- * timestamp.
- * 
- * @author Mathias Peters <mathias.peters@informatik.hu-berlin.de>
- *
- * @param <Key>
- */
-public class TileTimeKeySelector<Key> implements KeySelector<Tile, Long>{
 
-	/**
-	 * 
-	 */
+public class ImageWrapper extends Tuple3<String, byte[], byte[]> {
 	private static final long serialVersionUID = 1L;
-
-	@Override
-	public Long getKey(Tile value) throws Exception {
-		return value.getAcquisitionDateAsLong();
-	}
-
 }
