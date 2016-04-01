@@ -18,18 +18,15 @@
 package org.apache.flink.examples.java.spatial;
 
 import org.apache.flink.api.common.functions.FilterFunction;
-// import org.apache.flink.api.common.typeinfo.BasicArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-// import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.envi.ImageInputFormat;
 import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
-// import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 
 

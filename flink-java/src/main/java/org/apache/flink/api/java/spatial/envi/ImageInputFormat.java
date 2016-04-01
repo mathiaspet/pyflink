@@ -17,20 +17,11 @@
  */
 package org.apache.flink.api.java.spatial.envi;
 
-// import java.io.Serializable;
-// import java.nio.ByteBuffer;
-// import java.nio.ByteOrder;
-// import java.util.Arrays;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-// import org.apache.flink.api.common.io.statistics.BaseStatistics;
-// import org.apache.flink.api.java.spatial.Coordinate;
-// import org.apache.flink.api.java.spatial.ImageWrapper;
-// import org.apache.flink.api.java.spatial.TileInfoWrapper;
-// import org.apache.flink.util.StringUtils;
 import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.java.spatial.ImageInfoWrapper;
 import org.apache.flink.api.java.tuple.Tuple3;

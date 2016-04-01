@@ -32,7 +32,7 @@ from flink.functions.ReduceFunction import ReduceFunction
 
 def deduct_output_type(dataset):
     skip = set([_Identifier.GROUP, _Identifier.SORT, _Identifier.UNION])
-    source = set([_Identifier.SOURCE_CSV, _Identifier.SOURCE_TEXT, _Identifier.SOURCE_VALUE, _Identifier.SOURCE_ENVI])
+    source = set([_Identifier.SOURCE_CSV, _Identifier.SOURCE_TEXT, _Identifier.SOURCE_VALUE, _Identifier.SOURCE_ENVI, _Identifier.SOURCE_IMAGE_TUPLE])
     default = set([_Identifier.CROSS, _Identifier.CROSSH, _Identifier.CROSST, _Identifier.JOINT, _Identifier.JOINH, _Identifier.JOIN])
 
     while True:
@@ -49,6 +49,8 @@ def deduct_output_type(dataset):
                 return dataset[_Fields.TYPES]
             if dataset_type == _Identifier.SOURCE_ENVI:
                 return TILE
+            if dataset_type == _Identifier.SOURCE_IMAGE_TUPLE:
+                return dataset[_Fields.TYPES]
         if dataset_type == _Identifier.PROJECTION:
             return tuple([deduct_output_type(dataset[_Fields.PARENT])[k] for k in dataset[_Fields.KEYS]])
         if dataset_type in default:
@@ -135,6 +137,15 @@ class Set(object):
     def write_envi(self, path, write_mode=WriteMode.OVERWRITE):
         child = dict()
         child[_Fields.IDENTIFIER] = _Identifier.SINK_ENVI
+        child[_Fields.PARENT] = self._info
+        child[_Fields.PATH] = path
+        child[_Fields.WRITE_MODE] = write_mode
+        self._info[_Fields.SINKS].append(child)
+        self._env._sinks.append(child)
+
+    def write_image_tuple(self, path, write_mode=WriteMode.OVERWRITE):
+        child = dict()
+        child[_Fields.IDENTIFIER] = _Identifier.SINK_IMAGE_TUPLE
         child[_Fields.PARENT] = self._info
         child[_Fields.PATH] = path
         child[_Fields.WRITE_MODE] = write_mode

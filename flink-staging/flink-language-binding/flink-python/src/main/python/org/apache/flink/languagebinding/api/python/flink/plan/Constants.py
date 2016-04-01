@@ -42,10 +42,12 @@ class _Identifier(object):
     SOURCE_TEXT = "source_text"
     SOURCE_VALUE = "source_value"
     SOURCE_ENVI = "source_envi"
+    SOURCE_IMAGE_TUPLE = "source_image_tuple"
     SINK_CSV = "sink_csv"
     SINK_TEXT = "sink_text"
     SINK_PRINT = "sink_print"
     SINK_ENVI = "sink_envi"
+    SINK_IMAGE_TUPLE = "sink_image_tuple"
     BROADCAST = "broadcast"
 
 

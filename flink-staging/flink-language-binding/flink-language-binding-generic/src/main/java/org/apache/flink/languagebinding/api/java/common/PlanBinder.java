@@ -15,6 +15,9 @@ package org.apache.flink.languagebinding.api.java.common;
 import java.io.IOException;
 import java.util.HashMap;
 
+// import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeutils.CompositeType;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -24,6 +27,7 @@ import org.apache.flink.api.java.io.PrintingOutputFormat;
 import org.apache.flink.api.java.operators.AggregateOperator;
 import org.apache.flink.api.java.operators.CrossOperator.DefaultCross;
 import org.apache.flink.api.java.operators.CrossOperator.ProjectCross;
+import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.operators.Grouping;
 import org.apache.flink.api.java.operators.JoinOperator.DefaultJoin;
 import org.apache.flink.api.java.operators.JoinOperator.ProjectJoin;
@@ -31,16 +35,20 @@ import org.apache.flink.api.java.operators.SortedGrouping;
 import org.apache.flink.api.java.operators.UdfOperator;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.envi.ImageInputFormat;
+import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint;
+import org.apache.flink.languagebinding.api.java.common.OperationInfo.ProjectionEntry;
+import org.apache.flink.languagebinding.api.java.common.streaming.Receiver;
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.HUGE;
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.NONE;
 import static org.apache.flink.languagebinding.api.java.common.OperationInfo.DatasizeHint.TINY;
-import org.apache.flink.languagebinding.api.java.common.OperationInfo.ProjectionEntry;
-import org.apache.flink.languagebinding.api.java.common.streaming.Receiver;
 
 /**
  * Generic class to construct a Flink plan based on external data.
@@ -60,7 +68,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	public static ExecutionEnvironment env;
 	protected Receiver receiver;
 
-	public static final int MAPPED_FILE_SIZE = 1024 * 1024 * 64;
+	public static final int MAPPED_FILE_SIZE = 1024 * 1024 * 1024;
 
 	//====Plan==========================================================================================================
 	protected void receivePlan() throws IOException {
@@ -111,8 +119,8 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	 * This enum contains the identifiers for all supported non-UDF DataSet operations.
 	 */
 	protected enum Operation {
-		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_ENVI, SINK_CSV, SINK_TEXT,
-		SINK_PRINT, SINK_ENVI, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
+		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_ENVI, SOURCE_IMAGE_TUPLE, SINK_CSV, SINK_TEXT,
+		SINK_PRINT, SINK_ENVI, SINK_IMAGE_TUPLE, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST
 	}
@@ -156,6 +164,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 					case SOURCE_ENVI:
 						createEnviSource();
 						break;
+					case SOURCE_IMAGE_TUPLE:
+						createImageTupleSource();
+						break;
 					case SINK_CSV:
 						createCsvSink(createOperationInfo(op));
 						break;
@@ -167,6 +178,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 						break;
 					case SINK_ENVI:
 						createEnviSink();
+						break;
+					case SINK_IMAGE_TUPLE:
+						createImageTupleSink();
 						break;
 					case BROADCAST:
 						createBroadcastVariable(createOperationInfo(op));
@@ -307,6 +321,17 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		sets.put(id.intValue(), enviReader.restrictTo(leftUpper, rightLower).build());
 	}
 
+	private void createImageTupleSource() throws IOException {
+		Long id = (Long) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		boolean separateBands = Boolean.parseBoolean((String) receiver.getRecord());
+
+		ImageInputFormat imageFormat = new ImageInputFormat(new Path(path));
+		imageFormat.configure(true);
+		TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, byte[], byte[]>>(BasicTypeInfo.STRING_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO);
+		sets.put(id.intValue(), new DataSource<Tuple3<String, byte[], byte[]>>(env, imageFormat, typeInfo, "imageSource"));
+	}
+
 	private void createCsvSink(OperationInfo info) throws IOException {
 		DataSet parent = (DataSet) sets.get(info.parentID);
 		parent.writeAsCsv(info.path, info.lineDelimiter, info.fieldDelimiter, info.writeMode).name("CsvSink");
@@ -320,6 +345,16 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 				: WriteMode.NO_OVERWRITE;
 		DataSet parent = (DataSet) sets.get(parentID.intValue());
 		parent.writeAsEnvi(path, writeMode).name("EnviSink");
+	}
+
+	private void createImageTupleSink() throws IOException {
+		Long parentID = (Long) receiver.getRecord();
+		String path = (String) receiver.getRecord();
+		WriteMode writeMode = ((Long) receiver.getRecord()) == 1
+				? WriteMode.OVERWRITE
+				: WriteMode.NO_OVERWRITE;
+		DataSet parent = (DataSet) sets.get(parentID.intValue());
+		parent.write(new ImageOutputFormat(), path);
 	}
 
 	private void createTextSink(OperationInfo info) throws IOException {
