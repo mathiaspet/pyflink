@@ -24,6 +24,7 @@ import os, sys, time, gdal
 import numpy as np
 from gdalconst import *
 import __builtin__ as builtins
+from flink.example.ImageWrapper import ImageWrapper, IMAGE_TUPLE
 
 class PythonInputFormat(object):
     
@@ -49,8 +50,6 @@ class PythonInputFormat(object):
         if ds is None:
             print 'Could not open image'
             return
-        else:
-            print 'opened image successfully'
         rows = ds.RasterYSize
         cols = ds.RasterXSize
         bandsize = rows * cols
@@ -63,9 +62,11 @@ class PythonInputFormat(object):
             lower = j*bandsize
             upper = (j+1)*bandsize
             imageData[lower:upper] = data.ravel()
-        
+
         metaData = self.readMetaData(path[5:-4])
-        print metaData
+        #print metaData
+        metaBytes = ImageWrapper._meta_to_bytes(metaData)
+        collector.collect((metaData['scene id'], metaBytes, imageData))
 
 
     def _configure(self, input_file, output_file, port):
