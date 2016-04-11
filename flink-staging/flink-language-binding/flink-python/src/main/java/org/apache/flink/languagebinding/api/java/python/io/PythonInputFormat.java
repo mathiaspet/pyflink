@@ -23,10 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileInputSplit;
+import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.languagebinding.api.java.python.streaming.PythonStreamer;
 import org.slf4j.Logger;
@@ -34,7 +36,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  */
-public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> implements ResultTypeQueryable<T> {
+//public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> implements ResultTypeQueryable<T> {
+public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> implements ResultTypeQueryable<T> {
 	
 	private PythonStreamer streamer;
 	private boolean streamerOpen;
@@ -43,30 +46,33 @@ public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> im
 	private TypeInformation<T> typeInformation;
 	private Path path;
 	private Configuration configuration;
-	PythonCollector<T> collector;
-	
+	private PythonCollector<T> collector;
+	protected int readRecords = 0;
+	private String filter;
+
 	public void setTypeInformation(TypeInformation<T> typeInformation) {
 		this.typeInformation = typeInformation;
 	}
 
-	public PythonInputFormat(Path path, int id, TypeInformation<T> info) {
+	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter) {
 		super(path);
 		this.path = path;
-		this.completeScene = true;
+		this.filter = filter;
 		this.streamer = new PythonStreamer(this, id);
 		this.typeInformation = info;
 		this.collector  = new PythonCollector<T>();
-	} 
-	
+	}
+
+	@Override
+	protected boolean acceptFile(FileStatus fileStatus) {
+		String name = fileStatus.getPath().getName();
+		return name.matches(this.filter) && super.acceptFile(fileStatus);
+	}
+
 	@Override
 	public T nextRecord(T record) throws IOException {
 		if(!readForSplit) {
-			if (!this.streamerOpen) {
-				this.streamer.open();
-				this.streamer.sendBroadCastVariables(this.configuration);
-				this.streamerOpen = true;
-			}
-
+			System.out.print("Java: " + this.path.toString());
 			readEnviTile();
 			this.readForSplit = true;
 		}
@@ -88,8 +94,6 @@ public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> im
 	}
 
 	private void readEnviTile() throws IOException {
-		//use streamer here
-
 		List<String> pathList = new ArrayList<String>();
 		pathList.add(this.path.toString());
 		this.streamer.streamBufferWithoutGroups(pathList.iterator(), collector);
@@ -105,10 +109,34 @@ public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> im
 		// TODO Auto-generated method stub
 		super.open(split);
 		this.path = split.getPath();
+		this.readForSplit = false;
+		this.collector.clear();
+		if (!this.streamerOpen) {
+			this.streamer.open();
+			this.streamer.sendBroadCastVariables(this.configuration);
+			this.streamerOpen = true;
+		}
+
+	}
+
+	@Override
+	public void close() throws IOException {
+		//reset streamer
+		System.out.println("close called in Java");
+		super.close();
 	}
 
 	@Override
 	public boolean reachedEnd() throws IOException {
 		return this.collector.isEmpty() && this.readForSplit;
+	}
+
+	public void destroy() throws Exception{
+		System.out.println("destroy() called in java");
+		ArrayList<String> list = new ArrayList<>();
+		list.add("close");
+		this.streamer.streamBufferWithoutGroups(list.iterator(), this.collector);
+		this.streamer.close();
+		super.destroy();
 	}
 }

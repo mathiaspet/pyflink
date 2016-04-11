@@ -181,6 +181,7 @@ public class DataSourceTask<OT> extends AbstractInvokable {
 				}
 			} // end for all input splits
 
+			format.destroy();
 			// close the collector. if it is a chaining task collector, it will close its chained tasks
 			this.output.close();
 

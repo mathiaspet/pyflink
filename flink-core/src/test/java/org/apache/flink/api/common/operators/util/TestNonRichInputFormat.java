@@ -47,4 +47,7 @@ public class TestNonRichInputFormat extends NonRichGenericInputFormat<String> im
 	public void reset(){
 		count = 0;
 	}
+
+	@Override
+	public void destroy() throws Exception {}
 }

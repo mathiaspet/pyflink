@@ -18,11 +18,12 @@
 # script to get pixel values at a set of coordinates
 # by reading in one pixel at a time
 # Took 0.47 seconds on my machine
-import os, sys, time, gdal
+import os, sys, time, gdal, struct, array
 import numpy as np
 from gdalconst import *
 import spectral.io.envi as envi
 import __builtin__ as builtins
+
 # start timing
 startTime = time.time()
 # coordinates to get pixel values for
@@ -46,17 +47,23 @@ bands = ds.RasterCount
 
 print 'Got ',cols,' columns and ',rows,' rows. The image contains ',bands,' bands.'
 
-imageData = np.empty(bands * bandsize)
+imageData = np.empty(bands * bandsize, dtype=np.int16)
 for j in range(bands):
     band = ds.GetRasterBand(j+1)
     data = np.array(band.ReadAsArray())
     lower = j*bandsize
     upper = (j+1)*bandsize
+    byteArr = bytearray(data.ravel())
+    print type(byteArr[0])
     imageData[lower:upper] = data.ravel()
     print 'read band',j+1
 
 print imageData.shape
+print type(imageData[0])
 
+
+
+exit(0)
 print ds.GetGeoTransform()
 
 f = builtins.open('227064_000321_BLA_SR.hdr', 'r')

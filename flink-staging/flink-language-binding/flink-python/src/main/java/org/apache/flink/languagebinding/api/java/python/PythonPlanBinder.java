@@ -450,7 +450,8 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 
 	@Override
 	protected InputFormat createCustomInputFormat(OperationInfo info) {
-		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types);
+		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter);
 		return format;
 	}
+
 }

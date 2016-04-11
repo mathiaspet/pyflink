@@ -113,4 +113,9 @@ public class FileCopyTaskInputFormat implements InputFormat<FileCopyTask, FileCo
 	public void close() throws IOException {
 		//no op
 	}
+
+	@Override
+	public void destroy() throws Exception {
+		//no op
+	}
 }

@@ -23,7 +23,7 @@ import sys
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 
-MAPPED_FILE_SIZE = 1024 * 1024 * 64
+MAPPED_FILE_SIZE = 1024 * 1024 * 1024
 
 SIGNAL_REQUEST_BUFFER = b"\x00\x00\x00\x00"
 SIGNAL_REQUEST_BUFFER_G0 = b"\xFF\xFF\xFF\xFD"

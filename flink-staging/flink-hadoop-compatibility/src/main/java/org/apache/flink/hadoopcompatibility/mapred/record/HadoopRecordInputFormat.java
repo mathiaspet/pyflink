@@ -128,7 +128,12 @@ public class HadoopRecordInputFormat<K, V> implements InputFormat<Record, Hadoop
 	public void close() throws IOException {
 		this.recordReader.close();
 	}
-	
+
+	@Override
+	public void destroy() throws Exception {
+		//no op
+	}
+
 	/**
 	 * Custom serialization methods.
 	 *  @see "http://docs.oracle.com/javase/7/docs/api/java/io/Serializable.html"

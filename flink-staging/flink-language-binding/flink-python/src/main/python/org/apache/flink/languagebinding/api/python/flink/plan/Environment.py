@@ -18,7 +18,7 @@
 from flink.connection import Connection
 from flink.connection import Collector
 from flink.plan.DataSet import DataSet
-from flink.plan.Constants import _Fields, _Identifier
+from flink.plan.Constants import _Fields, _Identifier, STRING, BYTES
 from flink.utilities import Switch
 import copy
 import sys
@@ -83,7 +83,7 @@ class Environment(object):
         self._sources.append(child)
         return child_set
     
-    def read_custom(self, path, format, types):
+    def read_custom(self, path, filter, format, types):
         """
         Creates a DataSet using a custom input format that is executed directly in the Python process.
         """
@@ -92,6 +92,7 @@ class Environment(object):
         
         child[_Fields.IDENTIFIER] = _Identifier.SOURCE_CUSTOM
         child[_Fields.PATH] = path
+        child[_Fields.FILTER] = filter
         child[_Fields.TYPES] = types
         child[_Fields.OPERATOR] = copy.deepcopy(format) 
         self._sources.append(child)
@@ -113,6 +114,20 @@ class Environment(object):
         child["pixelSize"] = pixelSize
         self._sources.append(child)
         return child_set
+
+    def read_image_tuple(self, path, separate_bands=False):
+        child = dict()
+        child_set = DataSet(self, child)
+        child[_Fields.IDENTIFIER] = _Identifier.SOURCE_IMAGE_TUPLE
+        child[_Fields.PATH] = path
+        child[_Fields.TYPES] = STRING, BYTES, BYTES
+        if separate_bands:
+            child["separateBands"] = "true"
+        else:
+            child["separateBands"] = "false"
+        self._sources.append(child)
+        return child_set
+
     def from_elements(self, *elements):
         """
         Creates a new data set that contains the given elements.
@@ -182,12 +197,9 @@ class Environment(object):
                 if found == False:
                     for set in self._sources:
                         if set[_Fields.ID] == id:
-                            print()
                             found = True
                             operator = set[_Fields.OPERATOR]
-                
-                
-                        
+
                 operator._configure(input_path, output_path, port)
                 operator._go()
                 sys.stdout.flush()
@@ -293,6 +305,7 @@ class Environment(object):
                     break
                 if case(_Identifier.SOURCE_CUSTOM):
                     collect(source[_Fields.PATH])
+                    collect(source[_Fields.FILTER])
                     collect(source[_Fields.TYPES])
                     break
                 if case(_Identifier.SOURCE_VALUE):
@@ -306,6 +319,10 @@ class Environment(object):
                     self._collector.collect(source["leftLat"])
                     self._collector.collect(source["blockSize"])
                     self._collector.collect(source["pixelSize"])
+                    break
+                if case(_Identifier.SOURCE_IMAGE_TUPLE):
+                    self._collector.collect(source[_Fields.PATH])
+                    self._collector.collect(source["separateBands"])
                     break
 
     def _send_operations(self):
@@ -380,7 +397,7 @@ class Environment(object):
                     collect(sink[_Fields.DELIMITER_FIELD])
                     collect(sink[_Fields.DELIMITER_LINE])
                     collect(sink[_Fields.WRITE_MODE])
-                    break;
+                    break
                 if case(_Identifier.SINK_TEXT):
                     collect(sink[_Fields.PATH])
                     collect(sink[_Fields.WRITE_MODE])
@@ -389,6 +406,10 @@ class Environment(object):
                     collect(sink[_Fields.TO_ERR])
                     break
                 if case(_Identifier.SINK_ENVI):
+                    collect(sink[_Fields.PATH])
+                    collect(sink[_Fields.WRITE_MODE])
+                    break
+                if case(_Identifier.SINK_IMAGE_TUPLE):
                     collect(sink[_Fields.PATH])
                     collect(sink[_Fields.WRITE_MODE])
                     break

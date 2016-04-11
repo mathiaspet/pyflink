@@ -34,6 +34,7 @@ import org.apache.flink.api.java.io.{DiscardingOutputFormat, PrintingOutputForma
 import org.apache.flink.api.java.operators.Keys.ExpressionKeys
 import org.apache.flink.api.java.operators._
 import org.apache.flink.api.java.operators.join.JoinType
+import org.apache.flink.api.java.spatial.envi.CubeOutputFormat
 import org.apache.flink.api.java.{DataSet => JavaDataSet, Utils}
 import org.apache.flink.api.scala.operators.{ScalaAggregateOperator, ScalaCsvOutputFormat}
 import org.apache.flink.configuration.Configuration
@@ -93,7 +94,8 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
 
   /**
    * Returns the execution environment associated with the current DataSet.
-   * @return associated execution environment
+    *
+    * @return associated execution environment
    */
   def getExecutionEnvironment: ExecutionEnvironment =
     new ExecutionEnvironment(set.getExecutionEnvironment)
@@ -515,8 +517,7 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * Convenience method to get the count (number of elements) of a DataSet
    *
    * @return A long integer that represents the number of elements in the set
-   *
-   * @see org.apache.flink.api.java.Utils.CountHelper
+    * @see org.apache.flink.api.java.Utils.CountHelper
    */
   @throws(classOf[Exception])
   def count(): Long = {
@@ -531,8 +532,7 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * As DataSet can contain a lot of data, this method should be used with caution.
    *
    * @return A Seq containing the elements of the DataSet
-   *
-   * @see org.apache.flink.api.java.Utils.CollectHelper
+    * @see org.apache.flink.api.java.Utils.CollectHelper
    */
   @throws(classOf[Exception])
   def collect(): Seq[T] = {
@@ -1508,6 +1508,22 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
   }
 
   /**
+    * Writes `this` DataSet to the specified location using a custom
+    * [[CubeOutputFormat]].
+    */
+  def writeAsEnvi(
+             filePath: String,
+             writeMode: FileSystem.WriteMode = null): DataSink[T] = {
+    require(filePath != null, "File path must not be null.")
+    val of = new CubeOutputFormat(new Path(filePath))
+    if (writeMode != null) {
+      of.setWriteMode(writeMode)
+    }
+    output(of.asInstanceOf[OutputFormat[T]])
+  }
+
+
+  /**
    * Emits `this` DataSet using a custom [[org.apache.flink.api.common.io.OutputFormat]].
    */
   def output(outputFormat: OutputFormat[T]): DataSink[T] = {
@@ -1566,9 +1582,9 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
    * *
    * Writes a DataSet to the standard output stream (stdout) with a sink identifier prefixed.
    * This uses [[AnyRef.toString]] on each element.
-   * @param sinkIdentifier The string to prefix the output with.
-   * 
-   * @deprecated Use [[printOnTaskManager(String)]] instead.
+    *
+    * @param sinkIdentifier The string to prefix the output with.
+    * @deprecated Use [[printOnTaskManager(String)]] instead.
    */
   @Deprecated
   @deprecated
@@ -1579,9 +1595,9 @@ class DataSet[T: ClassTag](set: JavaDataSet[T]) {
   /**
    * Writes a DataSet to the standard error stream (stderr) with a sink identifier prefixed.
    * This uses [[AnyRef.toString]] on each element.
-   * @param sinkIdentifier The string to prefix the output with.
-   * 
-   * @deprecated Use [[printOnTaskManager(String)]] instead.
+    *
+    * @param sinkIdentifier The string to prefix the output with.
+    * @deprecated Use [[printOnTaskManager(String)]] instead.
    */
   @Deprecated
   @deprecated

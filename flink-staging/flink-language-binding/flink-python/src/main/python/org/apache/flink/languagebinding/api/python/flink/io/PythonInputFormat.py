@@ -20,53 +20,39 @@ import sys
 from collections import deque
 from flink.connection import Connection, Iterator, Collector
 from flink.functions import RuntimeContext
-import os, sys, time, gdal
-import numpy as np
-from gdalconst import *
-import __builtin__ as builtins
-from flink.example.ImageWrapper import ImageWrapper, IMAGE_TUPLE
 
 class PythonInputFormat(object):
     
-    def __init__(self, path):
-        self.path = path
+    def __init__(self):
         self._connection = None
         self._iterator = None
         self._collector = None
         self.context = None
         self._chain_operator = None
-        gdal.AllRegister() #TODO: register the ENVI driver only
-    
+        self._nextRun = True
+        self._userInit()
+
+    def _userInit(self):
+        pass
+
     def _run(self):
         collector = self._collector
         function = self.deliver
         for value in self._iterator:
-            function(value, collector)
-        collector._close()
-        
+            if value is not None:
+                if value != "close":
+                    function(value, collector)
+                    self._connection.send_end_signal()
+                else:
+                    self._nextRun = False
+                    self._collector._close()
+
+        #self._iterator._reset()
+        self._connection.reset()
+
+
     def deliver(self, path, collector):
-
-        ds = gdal.Open(path[5:], GA_ReadOnly)
-        if ds is None:
-            print 'Could not open image'
-            return
-        rows = ds.RasterYSize
-        cols = ds.RasterXSize
-        bandsize = rows * cols
-        bands = ds.RasterCount
-
-        imageData = np.empty(bands * bandsize)
-        for j in range(bands):
-            band = ds.GetRasterBand(j+1)
-            data = np.array(band.ReadAsArray())
-            lower = j*bandsize
-            upper = (j+1)*bandsize
-            imageData[lower:upper] = data.ravel()
-
-        metaData = self.readMetaData(path[5:-4])
-        #print metaData
-        metaBytes = ImageWrapper._meta_to_bytes(metaData)
-        collector.collect((metaData['scene id'], metaBytes, imageData))
+        pass
 
 
     def _configure(self, input_file, output_file, port):
@@ -83,16 +69,15 @@ class PythonInputFormat(object):
             self._collector._open()
         else:
             self._collector = collector
-            
-    def open(self, inputsplit):
-        self.split = inputsplit
-    
+
     def close(self):
         self.close()
     
     def _go(self):
         self._receive_broadcast_variables()
-        self._run()
+        while(self._nextRun):
+            self._run()
+
 
     def _receive_broadcast_variables(self):
         broadcast_count = self._iterator.next()
@@ -108,44 +93,3 @@ class PythonInputFormat(object):
             self.context._add_broadcast_variable(name, bc)
             self._iterator._reset()
             self._connection.reset()
-
-    def readMetaData(self, path):
-        headerPath = path+'.hdr'
-        f = builtins.open(headerPath, 'r')
-
-        if f.readline().find("ENVI") == -1:
-            f.close()
-            raise IOError("Not an ENVI header.")
-
-        lines = f.readlines()
-        f.close()
-
-        dict = {}
-        try:
-            while lines:
-                line = lines.pop(0)
-                if line.find('=') == -1: continue
-                if line[0] == ';': continue
-
-                (key, sep, val) = line.partition('=')
-                key = key.strip().lower()
-                val = val.strip()
-                if val and val[0] == '{':
-                    str = val.strip()
-                    while str[-1] != '}':
-                        line = lines.pop(0)
-                        if line[0] == ';': continue
-
-                        str += '\n' + line.strip()
-                    if key == 'description':
-                        dict[key] = str.strip('{}').strip()
-                    else:
-                        vals = str[1:-1].split(',')
-                        for j in range(len(vals)):
-                            vals[j] = vals[j].strip()
-                        dict[key] = vals
-                else:
-                    dict[key] = val
-            return dict
-        except:
-            raise IOError("Error while reading ENVI file header.")

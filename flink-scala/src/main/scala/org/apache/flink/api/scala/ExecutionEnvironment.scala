@@ -331,6 +331,14 @@ class ExecutionEnvironment(javaEnv: JavaEnv) {
     wrap(new DataSource[T](javaEnv, inputFormat, typeInfo, getCallLocationName()))
   }
 
+  @Deprecated
+  def readEnviFile(
+       filePath: String,
+       xPixel: Int = 0,
+       yPixel: Int = 0): DataSet[StringValue] = {
+    null
+  }
+
   /**
    * Creates a DataSet that represents the primitive type produced by reading the
    * given file in delimited way.This method is similar to [[readCsvFile]] with

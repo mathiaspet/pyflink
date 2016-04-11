@@ -43,10 +43,12 @@ class _Identifier(object):
     SOURCE_VALUE = "source_value"
     SOURCE_ENVI = "source_envi"
     SOURCE_CUSTOM = "source_custom"
+    SOURCE_IMAGE_TUPLE = "source_image_tuple"
     SINK_CSV = "sink_csv"
     SINK_TEXT = "sink_text"
     SINK_PRINT = "sink_print"
     SINK_ENVI = "sink_envi"
+    SINK_IMAGE_TUPLE = "sink_image_tuple"
     BROADCAST = "broadcast"
 
 
@@ -69,6 +71,7 @@ class _Fields(object):
     DELIMITER_FIELD = "del_f"
     WRITE_MODE = "write"
     PATH = "path"
+    FILTER = "filter"
     VALUES = "values"
     COMBINEOP = "combineop"
     CHILDREN = "children"

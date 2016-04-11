@@ -47,4 +47,10 @@ public abstract class RichInputFormat<OT, T extends InputSplit> implements Input
 			"it in one of the other life cycle methods.");
 		}
 	}
+
+	/**
+	 * This empty implementation makes this method optional for input splits.
+	 * @throws Exception
+	 */
+	public void destroy() throws Exception {}
 }

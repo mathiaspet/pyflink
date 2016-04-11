@@ -153,4 +153,10 @@ public interface InputFormat<OT, T extends InputSplit> extends InputSplitSource<
 	 * @throws IOException Thrown, if the input could not be closed properly.
 	 */
 	void close() throws IOException;
+
+	/**
+	 * Method that gives the input format itself the possibility to perform shutdown actions across multiple splits.
+	 * @throws Exception
+	 */
+	void destroy() throws Exception;
 }

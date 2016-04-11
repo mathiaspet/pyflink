@@ -46,6 +46,7 @@ public class OperationInfo {
 	public int[] fields;
 	public Order order;
 	public String path;
+	public String filter;
 	public String fieldDelimiter;
 	public String lineDelimiter;
 	public long from;
@@ -88,6 +89,7 @@ public class OperationInfo {
 			case SOURCE_CUSTOM:
 				setID = (Integer) receiver.getRecord(true);
 				path = (String) receiver.getRecord();
+				filter = (String) receiver.getRecord();
 				tmpType = (Tuple) receiver.getRecord();
 				types = tmpType == null ? null : getForObject(tmpType);
 				return;

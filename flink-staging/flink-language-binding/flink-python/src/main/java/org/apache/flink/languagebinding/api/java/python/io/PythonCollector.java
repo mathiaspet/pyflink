@@ -50,4 +50,7 @@ public class PythonCollector<T> implements Collector<T>, Serializable {
 		return this.content.isEmpty();
 	}
 
+	public int size() {return this.content.size();}
+
+	public void clear() {this.content.clear();}
 }

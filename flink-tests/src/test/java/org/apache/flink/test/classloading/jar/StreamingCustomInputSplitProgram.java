@@ -119,6 +119,11 @@ public class StreamingCustomInputSplitProgram {
 		public void close() {}
 
 		@Override
+		public void destroy() throws Exception {
+			//no op
+		}
+
+		@Override
 		public TypeInformation<Integer> getProducedType() {
 			return BasicTypeInfo.INT_TYPE_INFO;
 		}

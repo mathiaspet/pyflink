@@ -155,6 +155,10 @@ public class TypeExtractorInputFormatsTest {
 
 		@Override
 		public void close() {}
+
+		@Override
+		public void destroy() throws Exception {
+		}
 	}
 	
 	// --------------------------------------------------------------------------------------------
@@ -225,6 +229,9 @@ public class TypeExtractorInputFormatsTest {
 
 		@Override
 		public void close() {}
+
+		@Override
+		public void destroy() throws Exception {}
 
 		@Override
 		public TypeInformation<Double> getProducedType() {
