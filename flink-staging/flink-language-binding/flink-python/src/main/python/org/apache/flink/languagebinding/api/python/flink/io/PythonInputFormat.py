@@ -50,6 +50,8 @@ class PythonInputFormat(object):
         #self._iterator._reset()
         self._connection.reset()
 
+    def _chain(self, operator):
+        self._chain_operator = operator
 
     def deliver(self, path, collector):
         pass

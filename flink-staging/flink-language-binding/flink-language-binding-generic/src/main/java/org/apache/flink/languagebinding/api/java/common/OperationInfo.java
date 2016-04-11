@@ -89,6 +89,7 @@ public class OperationInfo {
 			case SOURCE_CUSTOM:
 				setID = (Integer) receiver.getRecord(true);
 				path = (String) receiver.getRecord();
+				name = (String) receiver.getRecord();
 				filter = (String) receiver.getRecord();
 				tmpType = (Tuple) receiver.getRecord();
 				types = tmpType == null ? null : getForObject(tmpType);

@@ -34,6 +34,7 @@ import __builtin__ as builtins
 
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
+        print "Just a dumb map function"
         collector.collect(value)
 
 

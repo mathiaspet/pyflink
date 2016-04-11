@@ -91,6 +91,7 @@ class Environment(object):
         child_set = DataSet(self, child)
         
         child[_Fields.IDENTIFIER] = _Identifier.SOURCE_CUSTOM
+        child[_Fields.NAME] = "PythonInputFormat"
         child[_Fields.PATH] = path
         child[_Fields.FILTER] = filter
         child[_Fields.TYPES] = types
@@ -218,7 +219,7 @@ class Environment(object):
         udf = set([_Identifier.MAP, _Identifier.FLATMAP, _Identifier.FILTER, _Identifier.MAPPARTITION,
                    _Identifier.GROUPREDUCE, _Identifier.REDUCE, _Identifier.COGROUP,
                    _Identifier.CROSS, _Identifier.CROSSH, _Identifier.CROSST,
-                   _Identifier.JOIN, _Identifier.JOINH, _Identifier.JOINT])
+                   _Identifier.JOIN, _Identifier.JOINH, _Identifier.JOINT, _Identifier.SOURCE_CUSTOM])
         chainable = set([_Identifier.MAP, _Identifier.FILTER, _Identifier.FLATMAP, _Identifier.GROUPREDUCE, _Identifier.REDUCE])
         multi_input = set([_Identifier.JOIN, _Identifier.JOINH, _Identifier.JOINT, _Identifier.CROSS, _Identifier.CROSSH, _Identifier.CROSST, _Identifier.COGROUP, _Identifier.UNION])
         x = len(self._sets) - 1
@@ -305,6 +306,7 @@ class Environment(object):
                     break
                 if case(_Identifier.SOURCE_CUSTOM):
                     collect(source[_Fields.PATH])
+                    collect(source[_Fields.NAME])
                     collect(source[_Fields.FILTER])
                     collect(source[_Fields.TYPES])
                     break

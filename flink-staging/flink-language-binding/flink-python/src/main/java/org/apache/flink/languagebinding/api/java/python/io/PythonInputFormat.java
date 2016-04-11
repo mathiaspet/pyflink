@@ -72,7 +72,6 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	@Override
 	public T nextRecord(T record) throws IOException {
 		if(!readForSplit) {
-			System.out.print("Java: " + this.path.toString());
 			readEnviTile();
 			this.readForSplit = true;
 		}
@@ -121,8 +120,6 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 
 	@Override
 	public void close() throws IOException {
-		//reset streamer
-		System.out.println("close called in Java");
 		super.close();
 	}
 
@@ -132,7 +129,8 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	}
 
 	public void destroy() throws Exception{
-		System.out.println("destroy() called in java");
+		//this is ugly but works atm
+		//TODO: create proper close signal
 		ArrayList<String> list = new ArrayList<>();
 		list.add("close");
 		this.streamer.streamBufferWithoutGroups(list.iterator(), this.collector);
