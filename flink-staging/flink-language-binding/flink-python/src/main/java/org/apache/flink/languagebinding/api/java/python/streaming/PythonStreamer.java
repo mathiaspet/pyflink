@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.api.common.io.RichInputFormat;
+import org.apache.flink.api.common.io.RichOutputFormat;
 import org.apache.flink.languagebinding.api.java.common.streaming.StreamPrinter;
 import org.apache.flink.languagebinding.api.java.common.streaming.Streamer;
 import org.apache.flink.languagebinding.api.java.python.PythonPlanBinder;
@@ -47,7 +48,6 @@ public class PythonStreamer extends Streamer {
 	 * This code duplication of constructors is ugly and only necessary because the 
 	 * RuntimeContext is not available during construction. 
 	 */
-	
 	public PythonStreamer(RichInputFormat format, int id) {
 		super(format);
 		this.id = id;
@@ -55,7 +55,17 @@ public class PythonStreamer extends Streamer {
 		this.debug = DEBUG;
 		planArguments = PythonPlanBinder.arguments.toString();
 	}
-	
+
+	public PythonStreamer(RichOutputFormat format, int id) {
+		super(format);
+		this.id = id;
+		this.usePython3 = PythonPlanBinder.usePython3;
+		this.debug = DEBUG;
+		planArguments = PythonPlanBinder.arguments.toString();
+	}
+
+
+
 	public PythonStreamer(AbstractRichFunction function, int id) {
 		super(function);
 		this.id = id;

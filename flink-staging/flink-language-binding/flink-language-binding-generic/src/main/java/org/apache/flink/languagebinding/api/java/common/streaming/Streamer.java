@@ -24,6 +24,7 @@ import java.util.Iterator;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.io.RichInputFormat;
+import org.apache.flink.api.common.io.RichOutputFormat;
 import org.apache.flink.configuration.Configuration;
 
 import static org.apache.flink.languagebinding.api.java.common.PlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
@@ -62,7 +63,8 @@ public abstract class Streamer implements Serializable {
 	//TODO: refactor this since both variables are just here to provide access to a runtime context
 	//however, at the time of construction this context is unavailable
 	protected /*final*/ AbstractRichFunction function;
-	protected RichInputFormat format;
+	protected RichInputFormat inputFormat;
+	protected RichOutputFormat outputFormat;
 	
 	protected RuntimeContext context;
 
@@ -73,11 +75,19 @@ public abstract class Streamer implements Serializable {
 	}
 	
 	public Streamer(RichInputFormat format) {
-		this.format = format;
+		this.inputFormat = format;
 		this.sender = new Sender();
 		this.receiver = new Receiver();
 	}
-	
+
+	public Streamer(RichOutputFormat format) {
+		this.outputFormat = format;
+		this.sender = new Sender();
+		this.receiver = new Receiver();
+	}
+
+
+
 	public void open() throws IOException {
 		server = new ServerSocket(0);
 		setupProcess();
@@ -165,6 +175,19 @@ public abstract class Streamer implements Serializable {
 				}
 				sender.reset();
 			}
+		} catch (SocketTimeoutException ste) {
+			throw new RuntimeException("External process for task " + this.context.getTaskName() + " stopped responding." + msg);
+		}
+	}
+
+	public final void sendCloseMessage(String closeMessage) throws IOException {
+		this.setContext();
+		try {
+			in.read(buffer, 0, 4);
+			checkForError();
+			int size = sender.sendRecord(closeMessage);
+			sendWriteNotification(size, false);
+			sender.reset();
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + this.context.getTaskName() + " stopped responding." + msg);
 		}
@@ -292,9 +315,15 @@ public abstract class Streamer implements Serializable {
 			return;
 		}
 		
-		if(this.format != null)
+		if(this.inputFormat != null)
 		{
-			this.context = this.format.getRuntimeContext();
+			this.context = this.inputFormat.getRuntimeContext();
+			return;
+		}
+
+		if(this.outputFormat != null) {
+			this.context = this.outputFormat.getRuntimeContext();
+			return;
 		}
 	}
 

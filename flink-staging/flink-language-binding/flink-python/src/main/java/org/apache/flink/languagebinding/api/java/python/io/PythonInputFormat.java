@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  */
-//public class PythonInputFormat<T extends Tuple> extends SpatialInputFormat<T> implements ResultTypeQueryable<T> {
 public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> implements ResultTypeQueryable<T> {
 	
 	private PythonStreamer streamer;
@@ -129,11 +128,7 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	}
 
 	public void destroy() throws Exception{
-		//this is ugly but works atm
-		//TODO: create proper close signal
-		ArrayList<String> list = new ArrayList<>();
-		list.add("close");
-		this.streamer.streamBufferWithoutGroups(list.iterator(), this.collector);
+		this.streamer.sendCloseMessage("close");
 		this.streamer.close();
 		super.destroy();
 	}

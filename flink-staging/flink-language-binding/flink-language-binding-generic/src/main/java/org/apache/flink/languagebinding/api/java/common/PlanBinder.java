@@ -19,6 +19,7 @@ import static org.apache.flink.languagebinding.api.java.common.OperationInfo.Dat
 import java.io.IOException;
 import java.util.HashMap;
 
+import org.apache.flink.api.common.io.FileOutputFormat;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
@@ -127,7 +128,7 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 	 */
 	protected enum Operation {
 		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_ENVI, SOURCE_IMAGE_TUPLE, SOURCE_CUSTOM, SINK_CSV, SINK_TEXT,
-		SINK_PRINT, SINK_ENVI, SINK_IMAGE_TUPLE, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
+		SINK_PRINT, SINK_ENVI, SINK_IMAGE_TUPLE, SINK_CUSTOM, PROJECTION, SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST
 	}
@@ -191,6 +192,9 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 						break;
 					case SINK_IMAGE_TUPLE:
 						createImageTupleSink();
+						break;
+					case SINK_CUSTOM:
+						createCustomSink(createOperationInfo(op));
 						break;
 					case BROADCAST:
 						createBroadcastVariable(createOperationInfo(op));
@@ -318,6 +322,11 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		sets.put(info.setID, env.createInput(format));
 	}
 
+	/**
+	 * Use createImageTupleSource() instead.
+	 * @throws IOException
+	 */
+	@Deprecated
 	private void createEnviSource() throws IOException {
 		Long id = (Long) receiver.getRecord();
 		String path = (String) receiver.getRecord();
@@ -352,6 +361,11 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 		parent.writeAsCsv(info.path, info.lineDelimiter, info.fieldDelimiter, info.writeMode).name("CsvSink");
 	}
 
+	/**
+	 * Use createImageTupleSink() instead.
+	 * @throws IOException
+	 */
+	@Deprecated
 	private void createEnviSink() throws IOException {
 		Long parentID = (Long) receiver.getRecord();
 		String path = (String) receiver.getRecord();
@@ -369,8 +383,18 @@ public abstract class PlanBinder<INFO extends OperationInfo> {
 				? WriteMode.OVERWRITE
 				: WriteMode.NO_OVERWRITE;
 		DataSet parent = (DataSet) sets.get(parentID.intValue());
-		parent.write(new ImageOutputFormat(), path);
+		parent.write(new ImageOutputFormat(), path, writeMode);
 	}
+
+	protected void createCustomSink(OperationInfo info) throws IOException{
+		FileOutputFormat format = createCustomOutputFormat(info);
+		DataSet parent = (DataSet) sets.get(info.parentID);
+		parent.write(format, info.path, info.writeMode);
+	}
+
+	protected abstract FileOutputFormat createCustomOutputFormat(OperationInfo info);
+
+
 
 	private void createTextSink(OperationInfo info) throws IOException {
 		DataSet parent = (DataSet) sets.get(info.parentID);

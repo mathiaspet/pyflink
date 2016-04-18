@@ -17,6 +17,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 
+import org.apache.flink.api.common.io.FileOutputFormat;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -45,6 +46,7 @@ import org.apache.flink.languagebinding.api.java.python.io.PythonInputFormat;
 //CHECKSTYLE.ON: AvoidStarImport
 import org.apache.flink.languagebinding.api.java.common.streaming.Receiver;
 import org.apache.flink.languagebinding.api.java.common.streaming.StreamPrinter;
+import org.apache.flink.languagebinding.api.java.python.io.PythonOutputFormat;
 import org.apache.flink.runtime.filecache.FileCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -453,5 +455,12 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter);
 		return format;
 	}
+
+	@Override
+	protected FileOutputFormat createCustomOutputFormat(OperationInfo info) {
+		FileOutputFormat format = new PythonOutputFormat(new Path(), info.setID);
+		return format;
+	}
+
 
 }

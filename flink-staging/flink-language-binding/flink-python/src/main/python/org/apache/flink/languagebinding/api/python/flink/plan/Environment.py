@@ -188,6 +188,11 @@ class Environment(object):
 
                 operator = None
                 found = False
+                for set in self._sinks:
+                    if set[_Fields.IDENTIFIER] == _Identifier.SINK_CUSTOM and set[_Fields.ID] == id:
+                        found = True
+                        operator = set[_Fields.OPERATOR]
+
                 for set in self._sets:
                     if set[_Fields.ID] == id:
                         found = True
@@ -414,6 +419,12 @@ class Environment(object):
                 if case(_Identifier.SINK_IMAGE_TUPLE):
                     collect(sink[_Fields.PATH])
                     collect(sink[_Fields.WRITE_MODE])
+                    break
+                if case(_Identifier.SINK_CUSTOM):
+                    collect(sink[_Fields.ID])
+                    collect(sink[_Fields.PATH])
+                    collect(sink[_Fields.WRITE_MODE])
+                    collect(sink[_Fields.NAME])
                     break
 
     def _send_broadcast(self):

@@ -110,6 +110,15 @@ public class OperationInfo {
 						? WriteMode.OVERWRITE
 						: WriteMode.NO_OVERWRITE;
 				return;
+			case SINK_CUSTOM:
+				parentID = (Integer) receiver.getRecord(true);
+				setID = (Integer) receiver.getRecord(true);
+				path = (String) receiver.getRecord();
+				writeMode = ((Integer) receiver.getRecord(true)) == 1
+						? WriteMode.OVERWRITE
+						: WriteMode.NO_OVERWRITE;
+				name = (String) receiver.getRecord();
+				return;
 			case SINK_PRINT:
 				parentID = (Integer) receiver.getRecord(true);
 				toError = (Boolean) receiver.getRecord();

@@ -49,6 +49,7 @@ class _Identifier(object):
     SINK_PRINT = "sink_print"
     SINK_ENVI = "sink_envi"
     SINK_IMAGE_TUPLE = "sink_image_tuple"
+    SINK_CUSTOM = "sink_custom"
     BROADCAST = "broadcast"
 
 

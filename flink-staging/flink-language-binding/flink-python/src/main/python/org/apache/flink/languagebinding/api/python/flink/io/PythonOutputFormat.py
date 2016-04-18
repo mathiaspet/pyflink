@@ -15,20 +15,16 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-from abc import ABCMeta, abstractmethod
-import sys
 from collections import deque
 from flink.connection import Connection, Iterator, Collector
 from flink.functions import RuntimeContext
 
-class PythonInputFormat(object):
-    
+class PythonOutputFormat(object):
+
     def __init__(self):
         self._connection = None
         self._iterator = None
-        self._collector = None
         self.context = None
-        self._chain_operator = None
         self._nextRun = True
         self._userInit()
 
@@ -36,44 +32,31 @@ class PythonInputFormat(object):
         pass
 
     def _run(self):
-        collector = self._collector
         function = self.deliver
         for value in self._iterator:
             if value is not None:
                 if value != "close":
-                    function(value, collector)
+                    function(value)
                     self._connection.send_end_signal()
                 else:
+                    print "received close message"
                     self._nextRun = False
                     self._collector._close()
-
         self._connection.reset()
 
-    def _chain(self, operator):
-        self._chain_operator = operator
 
-    def deliver(self, path, collector):
+    def deliver(self, input):
         pass
 
 
     def _configure(self, input_file, output_file, port):
         self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port)
         self._iterator = Iterator.Iterator(self._connection)
-        self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)
-        self._configure_chain(Collector.Collector(self._connection))
-
-    def _configure_chain(self, collector):
-        if self._chain_operator is not None:
-            self._collector = self._chain_operator
-            self._collector.context = self.context
-            self._collector._configure_chain(collector)
-            self._collector._open()
-        else:
-            self._collector = collector
+        self.context = RuntimeContext.RuntimeContext(self._iterator, None)
 
     def close(self):
         self.close()
-    
+
     def _go(self):
         self._receive_broadcast_variables()
         while(self._nextRun):
