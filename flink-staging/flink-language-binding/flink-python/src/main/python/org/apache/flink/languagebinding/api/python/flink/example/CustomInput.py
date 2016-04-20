@@ -131,7 +131,7 @@ class Filter(FilterFunction):
 if __name__ == "__main__":
     env = get_environment()
     
-    data = env.read_custom("file:///opt/gms_sample/", ".*?\\.bsq", False, GDALInputFormat(), (STRING, BYTES, BYTES))
+    data = env.read_custom("file:///opt/gms_sample/", ".*?\\.bsq", True, GDALInputFormat(), (STRING, BYTES, BYTES))
     
     result = data \
        .flat_map(Tokenizer(), (STRING, BYTES, BYTES)) \

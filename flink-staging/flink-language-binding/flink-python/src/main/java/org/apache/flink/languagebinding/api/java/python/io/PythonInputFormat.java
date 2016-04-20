@@ -48,6 +48,7 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	private Path path;
 	private Configuration configuration;
 	private PythonCollector<T> collector;
+	private PythonCollector<String> splitCollector;
 	protected int readRecords = 0;
 	private String filter;
 	private boolean splitsInPython;
@@ -64,6 +65,7 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 		this.splitStreamer = new PythonStreamer(this, id, true);
 		this.typeInformation = info;
 		this.collector  = new PythonCollector<T>();
+		this.splitCollector = new PythonCollector<String>();
 		this.splitsInPython = computeSplitsInPython;
 	}
 
@@ -77,7 +79,14 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 			//TODO send computation request here
 			//TODO: refactor sendCloseMessage to send Message
 			this.splitStreamer.sendMessage("compute_splits");
-			return null;
+			List<String> pathList = new ArrayList<String>();
+			pathList.add(this.path.toString());
+			this.splitStreamer.streamBufferWithoutGroups(pathList.iterator(), this.splitCollector);
+			String path1 = this.splitCollector.poll();
+			FileInputSplit split1 = new FileInputSplit(0, new Path(path1), 0, 1, new String[]{"mifune2"});
+			String path2 = this.splitCollector.poll();
+			FileInputSplit split2 = new FileInputSplit(0, new Path(path2), 0, 1, new String[]{"mifune2"});
+			return new FileInputSplit[]{split1, split2};
 		}else {
 			FileInputSplit[] inputSplits = super.createInputSplits(minNumSplits);
 			System.out.println("break");

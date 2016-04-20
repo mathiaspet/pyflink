@@ -75,7 +75,12 @@ class PythonInputFormat(object):
         self.close()
 
     def computeSplits(self):
-        pass
+        self._collector = Collector.Collector(self._connection)
+        path = self._iterator.next()
+        print("path: ", path)
+        self._collector.collect("file:/opt/gms_sample/227064_000202_BLA_SR.bsq");
+        self._collector.collect("file:/opt/gms_sample/227064_000321_BLA_SR.bsq");
+        self._collector._close()
     
     def _go(self):
         command = self._iterator.next()
