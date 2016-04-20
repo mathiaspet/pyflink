@@ -37,7 +37,9 @@ import org.slf4j.LoggerFactory;
 /**
  */
 public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> implements ResultTypeQueryable<T> {
-	
+
+	//exclusively needed for executing split logic in python
+	private final PythonStreamer splitStreamer;
 	private PythonStreamer streamer;
 	private boolean streamerOpen;
 	private boolean readForSplit;
@@ -48,18 +50,39 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	private PythonCollector<T> collector;
 	protected int readRecords = 0;
 	private String filter;
+	private boolean splitsInPython;
 
 	public void setTypeInformation(TypeInformation<T> typeInformation) {
 		this.typeInformation = typeInformation;
 	}
 
-	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter) {
+	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter, boolean computeSplitsInPython) {
 		super(path);
 		this.path = path;
 		this.filter = filter;
 		this.streamer = new PythonStreamer(this, id);
+		this.splitStreamer = new PythonStreamer(this, id, true);
 		this.typeInformation = info;
 		this.collector  = new PythonCollector<T>();
+		this.splitsInPython = computeSplitsInPython;
+	}
+
+	@Override
+	public FileInputSplit[] createInputSplits(int minNumSplits) throws IOException {
+		if(this.splitsInPython) {
+			//do fancy stuff in python here
+			//TODO: make sure runtime context is not used
+			//TODO: make special methods to execute this part on the JobManager
+			this.splitStreamer.open();
+			//TODO send computation request here
+			//TODO: refactor sendCloseMessage to send Message
+			this.splitStreamer.sendMessage("compute_splits");
+			return null;
+		}else {
+			FileInputSplit[] inputSplits = super.createInputSplits(minNumSplits);
+			System.out.println("break");
+			return inputSplits;
+		}
 	}
 
 	@Override
@@ -111,7 +134,9 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 		this.collector.clear();
 		if (!this.streamerOpen) {
 			this.streamer.open();
+			this.streamer.sendMessage("open_task");
 			this.streamer.sendBroadCastVariables(this.configuration);
+			System.out.println("Java: sent BC vars");
 			this.streamerOpen = true;
 		}
 
@@ -128,8 +153,10 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 	}
 
 	public void destroy() throws Exception{
-		this.streamer.sendCloseMessage("close");
-		this.streamer.close();
+		if(this.streamerOpen) {
+			this.streamer.sendMessage("close");
+			this.streamer.close();
+		}
 		super.destroy();
 	}
 }

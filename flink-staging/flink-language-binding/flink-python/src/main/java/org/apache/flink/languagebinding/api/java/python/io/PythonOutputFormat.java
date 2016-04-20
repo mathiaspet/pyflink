@@ -67,7 +67,7 @@ public class PythonOutputFormat extends FileOutputFormat{
 
 	@Override
 	public void close() throws IOException {
-		this.streamer.sendCloseMessage("close");
+		this.streamer.sendMessage("close");
 		this.streamer.close();
 
 		super.close();

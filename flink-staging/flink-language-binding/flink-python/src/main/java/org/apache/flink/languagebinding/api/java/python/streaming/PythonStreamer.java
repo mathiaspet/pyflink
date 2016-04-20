@@ -18,6 +18,8 @@ import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_DC_ID;
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
+import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_DIR;
+
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -49,7 +51,15 @@ public class PythonStreamer extends Streamer {
 	 * RuntimeContext is not available during construction. 
 	 */
 	public PythonStreamer(RichInputFormat format, int id) {
-		super(format);
+		super(format, false);
+		this.id = id;
+		this.usePython3 = PythonPlanBinder.usePython3;
+		this.debug = DEBUG;
+		planArguments = PythonPlanBinder.arguments.toString();
+	}
+
+	public PythonStreamer(RichInputFormat format, int id, boolean atJobManager) {
+		super(format, atJobManager);
 		this.id = id;
 		this.usePython3 = PythonPlanBinder.usePython3;
 		this.debug = DEBUG;
@@ -85,6 +95,88 @@ public class PythonStreamer extends Streamer {
 	}
 
 	private void startPython() throws IOException {
+		if(this.atJobManager) {
+			startJobProcess();
+		}else {
+			startTaskProcess();
+		}
+	}
+
+	/**
+	 * Does essentially the same as startTaskProcess() but without
+	 * references to subtasks. This method is used for executing Python code
+	 * directly at the job manager during job creation.
+	 * @throws IOException
+	 */
+	private void startJobProcess() throws IOException {
+
+
+		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + "output";
+		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + "input";
+
+		sender.open(inputFilePath);
+		receiver.open(outputFilePath);
+		//TODO: use the systems value here
+		String path = System.getProperty("java.io.tmpdir") + "/" + FLINK_PYTHON_DC_ID;
+		String planPath = path + FLINK_PYTHON_PLAN_NAME;
+
+		String pythonBinaryPath = usePython3 ? FLINK_PYTHON3_BINARY_PATH : FLINK_PYTHON2_BINARY_PATH;
+
+		try {
+			Runtime.getRuntime().exec(pythonBinaryPath);
+		} catch (IOException ex) {
+			throw new RuntimeException(pythonBinaryPath + " does not point to a valid python binary.");
+		}
+
+		if (debug) {
+			socket.setSoTimeout(0);
+			LOG.info("Waiting for Python Process : " + this.context.getTaskName()
+					+ " Run python " + planPath + planArguments);
+		} else {
+			process = Runtime.getRuntime().exec(pythonBinaryPath + " -O -B " + planPath + planArguments);
+			new StreamPrinter(process.getInputStream()).start();
+			new StreamPrinter(process.getErrorStream(), true, msg).start();
+		}
+
+		shutdownThread = new Thread() {
+			@Override
+			public void run() {
+				try {
+					destroyProcess();
+				} catch (IOException ex) {
+				}
+			}
+		};
+
+		Runtime.getRuntime().addShutdownHook(shutdownThread);
+
+		OutputStream processOutput = process.getOutputStream();
+		processOutput.write("operator\n".getBytes());
+		processOutput.write(("" + server.getLocalPort() + "\n").getBytes());
+		processOutput.write((id + "\n").getBytes());
+		processOutput.write((inputFilePath + "\n").getBytes());
+		processOutput.write((outputFilePath + "\n").getBytes());
+		processOutput.flush();
+
+		try { // wait a bit to catch syntax errors
+			Thread.sleep(2000);
+		} catch (InterruptedException ex) {
+		}
+		if (!debug) {
+			try {
+				process.exitValue();
+				throw new RuntimeException("External process for task " + this.id + " terminated prematurely." + msg);
+			} catch (IllegalThreadStateException ise) { //process still active -> start receiving data
+			}
+		}
+
+		socket = server.accept();
+		in = socket.getInputStream();
+		out = socket.getOutputStream();
+	}
+
+
+	private void startTaskProcess() throws IOException {
 		this.setContext();
 		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.context.getIndexOfThisSubtask() + "output";
 		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + this.context.getIndexOfThisSubtask() + "input";

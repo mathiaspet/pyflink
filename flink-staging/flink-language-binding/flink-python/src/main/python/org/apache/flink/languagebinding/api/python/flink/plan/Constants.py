@@ -80,6 +80,7 @@ class _Fields(object):
     PROJECTIONS = "projections"
     ID = "id"
     TO_ERR = "to_error"
+    COMPUTESPLITS = "computesplits"
 
 
 class WriteMode(object):

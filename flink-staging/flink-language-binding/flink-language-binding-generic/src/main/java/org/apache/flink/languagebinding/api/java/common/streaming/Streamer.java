@@ -67,6 +67,7 @@ public abstract class Streamer implements Serializable {
 	protected RichOutputFormat outputFormat;
 	
 	protected RuntimeContext context;
+	protected boolean atJobManager;
 
 	public Streamer(AbstractRichFunction function) {
 		this.function = function;
@@ -74,10 +75,11 @@ public abstract class Streamer implements Serializable {
 		receiver = new Receiver(function);
 	}
 	
-	public Streamer(RichInputFormat format) {
+	public Streamer(RichInputFormat format, boolean atJobManager) {
 		this.inputFormat = format;
 		this.sender = new Sender();
 		this.receiver = new Receiver();
+		this.atJobManager = atJobManager;
 	}
 
 	public Streamer(RichOutputFormat format) {
@@ -180,7 +182,7 @@ public abstract class Streamer implements Serializable {
 		}
 	}
 
-	public final void sendCloseMessage(String closeMessage) throws IOException {
+	public final void sendMessage(String closeMessage) throws IOException {
 		this.setContext();
 		try {
 			in.read(buffer, 0, 4);
@@ -304,7 +306,7 @@ public abstract class Streamer implements Serializable {
 	 * stores it into this.context.
 	 */
 	protected void setContext(){
-		if(this.context != null)
+		if(this.atJobManager || this.context != null)
 		{
 			return;
 		}

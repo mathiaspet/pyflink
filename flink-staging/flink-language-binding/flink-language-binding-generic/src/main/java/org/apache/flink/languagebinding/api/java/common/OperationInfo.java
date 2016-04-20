@@ -91,6 +91,7 @@ public class OperationInfo {
 				path = (String) receiver.getRecord();
 				name = (String) receiver.getRecord();
 				filter = (String) receiver.getRecord();
+				toError = (Boolean) receiver.getRecord();
 				tmpType = (Tuple) receiver.getRecord();
 				types = tmpType == null ? null : getForObject(tmpType);
 				return;

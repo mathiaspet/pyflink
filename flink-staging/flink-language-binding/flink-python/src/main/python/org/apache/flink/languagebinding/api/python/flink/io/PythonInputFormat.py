@@ -73,11 +73,22 @@ class PythonInputFormat(object):
 
     def close(self):
         self.close()
+
+    def computeSplits(self):
+        pass
     
     def _go(self):
-        self._receive_broadcast_variables()
-        while(self._nextRun):
-            self._run()
+        command = self._iterator.next()
+        self._iterator._reset()
+        self._connection.reset()
+        if command is not None and command == "compute_splits":
+            self.computeSplits()
+            self._connection.send_end_signal()
+        else:
+            self._receive_broadcast_variables()
+            while(self._nextRun):
+                self._run()
+
 
 
     def _receive_broadcast_variables(self):

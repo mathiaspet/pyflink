@@ -83,7 +83,7 @@ class Environment(object):
         self._sources.append(child)
         return child_set
     
-    def read_custom(self, path, filter, format, types):
+    def read_custom(self, path, filter, splits, format, types):
         """
         Creates a DataSet using a custom input format that is executed directly in the Python process.
         """
@@ -94,6 +94,7 @@ class Environment(object):
         child[_Fields.NAME] = "PythonInputFormat"
         child[_Fields.PATH] = path
         child[_Fields.FILTER] = filter
+        child[_Fields.COMPUTESPLITS] = splits
         child[_Fields.TYPES] = types
         child[_Fields.OPERATOR] = copy.deepcopy(format) 
         self._sources.append(child)
@@ -313,6 +314,7 @@ class Environment(object):
                     collect(source[_Fields.PATH])
                     collect(source[_Fields.NAME])
                     collect(source[_Fields.FILTER])
+                    collect(source[_Fields.COMPUTESPLITS])
                     collect(source[_Fields.TYPES])
                     break
                 if case(_Identifier.SOURCE_VALUE):

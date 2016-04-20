@@ -67,10 +67,11 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 	public static final String FLINK_PYTHON3_BINARY_KEY = "python.binary.python3";
 	public static String FLINK_PYTHON2_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON2_BINARY_KEY, "python");
 	public static String FLINK_PYTHON3_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON3_BINARY_KEY, "python3");
+	public static final String FLINK_DIR = System.getenv("FLINK_ROOT_DIR");
 
 	private static final String FLINK_PYTHON_FILE_PATH = System.getProperty("java.io.tmpdir") + "/flink_plan";
 	protected static final String FLINK_PYTHON_REL_LOCAL_PATH = "/resources/python";
-	protected static final String FLINK_DIR = System.getenv("FLINK_ROOT_DIR");
+
 	protected static String FULL_PATH;
 
 	public static StringBuilder arguments = new StringBuilder();
@@ -452,7 +453,7 @@ public class PythonPlanBinder extends PlanBinder<PythonOperationInfo> {
 
 	@Override
 	protected InputFormat createCustomInputFormat(OperationInfo info) {
-		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter);
+		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter, info.toError);
 		return format;
 	}
 
