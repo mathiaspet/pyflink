@@ -18,7 +18,7 @@ import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_DC_ID;
 import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
-import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_DIR;
+// import static org.apache.flink.languagebinding.api.java.python.PythonPlanBinder.FLINK_DIR;
 
 
 import java.io.IOException;
@@ -74,8 +74,6 @@ public class PythonStreamer extends Streamer {
 		planArguments = PythonPlanBinder.arguments.toString();
 	}
 
-
-
 	public PythonStreamer(AbstractRichFunction function, int id) {
 		super(function);
 		this.id = id;
@@ -109,8 +107,6 @@ public class PythonStreamer extends Streamer {
 	 * @throws IOException
 	 */
 	private void startJobProcess() throws IOException {
-
-
 		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + "output";
 		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + "input";
 

@@ -15,14 +15,12 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-from abc import ABCMeta, abstractmethod
-import sys
 from collections import deque
 from flink.connection import Connection, Iterator, Collector
 from flink.functions import RuntimeContext
 
+
 class PythonInputFormat(object):
-    
     def __init__(self):
         self._connection = None
         self._iterator = None
@@ -30,17 +28,13 @@ class PythonInputFormat(object):
         self.context = None
         self._chain_operator = None
         self._nextRun = True
-        self._userInit()
-
-    def _userInit(self):
-        pass
 
     def _run(self):
         collector = self._collector
         function = self.deliver
         for value in self._iterator:
             if value is not None:
-                if value != "close":
+                if value != "close_streamer":
                     function(value, collector)
                     self._connection.send_end_signal()
                 else:
@@ -54,7 +48,6 @@ class PythonInputFormat(object):
 
     def deliver(self, path, collector):
         pass
-
 
     def _configure(self, input_file, output_file, port):
         self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port)
@@ -75,13 +68,8 @@ class PythonInputFormat(object):
         self.close()
 
     def computeSplits(self):
-        self._collector = Collector.Collector(self._connection)
-        path = self._iterator.next()
-        print("path: ", path)
-        self._collector.collect("file:/opt/gms_sample/227064_000202_BLA_SR.bsq");
-        self._collector.collect("file:/opt/gms_sample/227064_000321_BLA_SR.bsq");
-        self._collector._close()
-    
+        pass
+
     def _go(self):
         command = self._iterator.next()
         self._iterator._reset()
@@ -93,8 +81,6 @@ class PythonInputFormat(object):
             self._receive_broadcast_variables()
             while(self._nextRun):
                 self._run()
-
-
 
     def _receive_broadcast_variables(self):
         broadcast_count = self._iterator.next()

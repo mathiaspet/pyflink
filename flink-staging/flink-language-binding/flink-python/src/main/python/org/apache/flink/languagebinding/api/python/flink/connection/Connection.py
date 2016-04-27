@@ -44,7 +44,7 @@ class OneWayBusyBufferingMappedFileConnection(object):
         self._out = deque()
         self._out_size = 0
 
-        self._offset_limit = MAPPED_FILE_SIZE - 1024 * 1024 * 3
+        self._offset_limit = MAPPED_FILE_SIZE - 1024 * 1024 * 1024
 
     def write(self, msg):
         self._out.append(msg)
@@ -162,5 +162,3 @@ class TwinBufferingTCPMappedFileConnection(BufferingTCPMappedFileConnection):
         self._input_size = [0, 0]
         self._input_offset = [0, 0]
         self._input = [b"", b""]
-
-

@@ -82,11 +82,23 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 			List<String> pathList = new ArrayList<String>();
 			pathList.add(this.path.toString());
 			this.splitStreamer.streamBufferWithoutGroups(pathList.iterator(), this.splitCollector);
-			String path1 = this.splitCollector.poll();
-			FileInputSplit split1 = new FileInputSplit(0, new Path(path1), 0, 1, new String[]{"mifune2"});
-			String path2 = this.splitCollector.poll();
-			FileInputSplit split2 = new FileInputSplit(0, new Path(path2), 0, 1, new String[]{"mifune2"});
-			return new FileInputSplit[]{split1, split2};
+
+			String[] hosts = {"localhost"};
+			List<FileInputSplit> splits = new ArrayList<FileInputSplit>();
+			int n = 0;
+			while (!this.splitCollector.isEmpty()) {
+				String path = this.splitCollector.poll();
+				System.out.println("ja: received: " + path);
+				splits.add(new FileInputSplit(n, new Path(path), 0, 1, hosts));
+				n++;
+			}
+			return splits.toArray(new FileInputSplit[0]);
+
+			// String path1 = this.splitCollector.poll();
+			// FileInputSplit split1 = new FileInputSplit(0, new Path(path1), 0, 1, new String[]{"localhost"});
+			// String path2 = this.splitCollector.poll();
+			// FileInputSplit split2 = new FileInputSplit(0, new Path(path2), 0, 1, new String[]{"localhost"});
+			// return new FileInputSplit[]{split1, split2};
 		}else {
 			FileInputSplit[] inputSplits = super.createInputSplits(minNumSplits);
 			System.out.println("break");
@@ -163,7 +175,7 @@ public class PythonInputFormat<T extends Tuple> extends FileInputFormat<T> imple
 
 	public void destroy() throws Exception{
 		if(this.streamerOpen) {
-			this.streamer.sendMessage("close");
+			this.streamer.sendMessage("close_streamer");
 			this.streamer.close();
 		}
 		super.destroy();

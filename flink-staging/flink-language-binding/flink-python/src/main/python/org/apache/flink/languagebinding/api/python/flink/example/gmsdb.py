@@ -16,9 +16,11 @@
 # limitations under the License.
 ################################################################################
 from __future__ import print_function
+
 import os.path
 
 import numpy as np
+import psycopg2
 import gdal
 from gdalconst import GA_ReadOnly
 
@@ -32,42 +34,62 @@ from flink.plan.Constants import INT
 from flink.plan.Environment import get_environment
 
 
-class Tokenizer(FlatMapFunction):
-    def flat_map(self, value, collector):
-        print("Just a dumb map function")
-        collector.collect(value)
-
-
-class GDALInputFormat(PythonInputFormat):
-    def __init__(self, jobID):
-        super(GDALInputFormat, self).__init__()
+class GMSDB(PythonInputFormat):
+    def __init__(self, dataPath, connection, jobID):
+        super(GMSDB, self).__init__()
+        gdal.AllRegister()  # TODO: register the ENVI driver only
+        self.dataPath = dataPath
+        self.connection = connection
         self.jobID = jobID
 
-    def getFiles(self):
-        # get sceneids for jobid:
-        # SELECT sceneids FROM scenejobs WHERE id = ?
-        # get filenames for sceneids:
-        # SELECT filename FROM scenes WHERE id = ?
-        # filter bsq?
-        files = [
-                "file:/home/dettmerh/gms_sample/227064_000202_BLA_SR.bsq",
-                "file:/home/dettmerh/gms_sample/227064_000321_BLA_SR.bsq"
-            ]
-        return files
+        # get files for predetermining splits
+        self.files = dict()
+        conn = psycopg2.connect(**connection)
+        curs = conn.cursor()
+        curs.execute("""SELECT id, filename FROM scenes
+                        WHERE id IN (SELECT unnest(sceneids) FROM scenes_jobs WHERE id = %s)""",
+                     (self.jobID, ))
+        for scene, filename in curs:
+            self.files[os.path.join(self.dataPath, filename)] = scene
+        curs.close()
+        conn.close()
 
     def computeSplits(self):
         self._collector = Collector.Collector(self._connection)
         path = self._iterator.next()
         print("path: ", path)
-        for f in self.getFiles():
+        for f in self.files.keys():
             self._collector.collect(f)
         self._collector._close()
 
-    def _userInit(self):
-        gdal.AllRegister()  # TODO: register the ENVI driver only
-
     def deliver(self, path, collector):
-        print(path)
+        # Basic meta data
+        """SELECT
+                s.datasetid,
+                s.acquisitiondate,
+                s.entityid,
+                s.filename,
+                p.proc_level,
+                d.image_type,
+                sat.name,
+                sen.name,
+                sub.name
+            FROM
+                scenes s
+            LEFT OUTER JOIN
+                scenes_proc p ON p.sceneid = s.id
+            LEFT OUTER JOIN
+                datasets d ON d.id = s.datasetid
+            LEFT OUTER JOIN
+                satellites sat ON sat.id = s.satelliteid
+            LEFT OUTER JOIN
+                sensors sen ON sen.id = s.sensorid
+            LEFT OUTER JOIN
+                subsystems sub ON sub.id = s.subsystemid
+            WHERE
+                s.id = %s"""
+
+        print("py: received path:", path)
         ds = gdal.Open(path[5:], GA_ReadOnly)
         if ds is None:
             print('Could not open image', path[5:])
@@ -102,7 +124,7 @@ class GDALInputFormat(PythonInputFormat):
         lines = f.readlines()
         f.close()
 
-        dict = {}
+        d = {}
         try:
             while lines:
                 line = lines.pop(0)
@@ -121,17 +143,23 @@ class GDALInputFormat(PythonInputFormat):
 
                         txt += '\n' + line.strip()
                     if key == 'description':
-                        dict[key] = txt.strip('{}').strip()
+                        d[key] = txt.strip('{}').strip()
                     else:
                         vals = txt[1:-1].split(',')
                         for j in range(len(vals)):
                             vals[j] = vals[j].strip()
-                        dict[key] = vals
+                        d[key] = vals
                 else:
-                    dict[key] = val
-            return dict
+                    d[key] = val
+            return d
         except:
             raise IOError("Error while reading ENVI file header.")
+
+
+class Tokenizer(FlatMapFunction):
+    def flat_map(self, value, collector):
+        print("Just a dumb map function")
+        collector.collect(value)
 
 
 class Adder(GroupReduceFunction):
@@ -158,14 +186,20 @@ class Filter(FilterFunction):
 
 
 def main():
+    dataPath = "/home/henry/Studium/Arbeit/gms_sample_small"
+    connection = {
+            "database": "usgscache",
+            "user": "gmsdb",
+            "password": "gmsdb",
+            "host": "localhost",
+            "connect_timeout": 3,
+            "options": "-c statement_timeout=10000"
+        }
+
+    inputFormat = GMSDB(dataPath, connection, 26184107)
+
     env = get_environment()
-
-    inputFormat = GDALInputFormat(26184107)
-
-    data = env.read_custom("/home/dettmerh/gms_sample/", ".*?\\.bsq", True,
-                           inputFormat, IMAGE_TUPLE)
-    # data = env.read_custom("/home/dettmerh/gms_sample/", ".*?\\.bsq", True,
-    #                        GDALInputFormat(), (STRING, BYTES, BYTES))
+    data = env.read_custom(dataPath, ".*?\\.bsq", True, inputFormat, IMAGE_TUPLE)
 
     result = data \
         .flat_map(Tokenizer(), IMAGE_TUPLE) \
