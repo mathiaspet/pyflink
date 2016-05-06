@@ -18,6 +18,7 @@
 from __future__ import print_function
 
 import os.path
+import sys
 
 import numpy as np
 import psycopg2
@@ -42,23 +43,23 @@ class GMSDB(PythonInputFormat):
         self.connection = connection
         self.jobID = jobID
 
+    def computeSplits(self):
         # get files for predetermining splits
-        self.files = dict()
-        conn = psycopg2.connect(**connection)
+        files = dict()
+        conn = psycopg2.connect(**self.connection)
         curs = conn.cursor()
         curs.execute("""SELECT id, filename FROM scenes
                         WHERE id IN (SELECT unnest(sceneids) FROM scenes_jobs WHERE id = %s)""",
                      (self.jobID, ))
         for scene, filename in curs:
-            self.files[os.path.join(self.dataPath, filename)] = scene
+            files[os.path.join(self.dataPath, filename)] = scene
         curs.close()
         conn.close()
 
-    def computeSplits(self):
         self._collector = Collector.Collector(self._connection)
         path = self._iterator.next()
         print("path: ", path)
-        for f in self.files.keys():
+        for f in files.keys():
             self._collector.collect(f)
         self._collector._close()
 
@@ -186,7 +187,11 @@ class Filter(FilterFunction):
 
 
 def main():
-    dataPath = "/home/henry/Studium/Arbeit/gms_sample_small"
+    try:
+        dataPath = sys.argv[1]
+    except IndexError:
+        dataPath = "/data1/gfz-fe/GeoMultiSens/database/sampledata/"
+
     connection = {
             "database": "usgscache",
             "user": "gmsdb",
