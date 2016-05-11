@@ -39,7 +39,7 @@ class PythonInputFormat(object):
                     self._connection.send_end_signal()
                 else:
                     self._nextRun = False
-                    self._collector._close()
+                    self.close()
 
         self._connection.reset()
 
@@ -65,7 +65,7 @@ class PythonInputFormat(object):
             self._collector = collector
 
     def close(self):
-        self.close()
+        self._collector._close()
 
     def computeSplits(self):
         pass
