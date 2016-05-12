@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.Random;
 
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.io.FileOutputFormat;
+import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -53,6 +55,8 @@ import org.apache.flink.python.api.functions.PythonMapPartition;
 import org.apache.flink.python.api.functions.util.KeyDiscarder;
 import org.apache.flink.python.api.functions.util.SerializerMap;
 import org.apache.flink.python.api.functions.util.StringDeserializerMap;
+import org.apache.flink.python.api.io.PythonInputFormat;
+import org.apache.flink.python.api.io.PythonOutputFormat;
 import org.apache.flink.python.api.streaming.plan.PythonPlanStreamer;
 import org.apache.flink.runtime.filecache.FileCache;
 import org.slf4j.Logger;
@@ -273,7 +277,7 @@ public class PythonPlanBinder {
 	 * This enum contains the identifiers for all supported DataSet operations.
 	 */
 	protected enum Operation {
-		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SINK_CSV, SINK_TEXT, SINK_PRINT,
+		SOURCE_CSV, SOURCE_TEXT, SOURCE_VALUE, SOURCE_SEQ, SOURCE_CUSTOM, SINK_CSV, SINK_TEXT, SINK_PRINT,
 		SORT, UNION, FIRST, DISTINCT, GROUPBY, AGGREGATE,
 		REBALANCE, PARTITION_HASH,
 		BROADCAST,
@@ -302,6 +306,9 @@ public class PythonPlanBinder {
 					break;
 				case SOURCE_SEQ:
 					createSequenceSource(info);
+					break;
+				case SOURCE_CUSTOM:
+					createCustomSource(info);
 					break;
 				case SINK_CSV:
 					createCsvSink(info);
@@ -413,6 +420,13 @@ public class PythonPlanBinder {
 		sets.put(info.setID, env.generateSequence(info.from, info.to).setParallelism(getParallelism(info)).name("SequenceSource")
 				.map(new SerializerMap<Long>()).setParallelism(getParallelism(info)).name("SequenceSourcePostStep"));
 	}
+
+	//TODO: is the post step really necessary?
+	private void createCustomSource(PythonOperationInfo info) {
+		InputFormat format = createCustomInputFormat(info);
+		sets.put(info.setID, env.createInput(format).setParallelism(getParallelism(info)).name("CustomSource"));
+	}
+
 
 	@SuppressWarnings("unchecked")
 	private void createCsvSink(PythonOperationInfo info) throws IOException {
@@ -658,4 +672,15 @@ public class PythonPlanBinder {
 		return op1.reduceGroup(new IdentityGroupReduce()).setCombinable(false).setParallelism(getParallelism(info)).name("PythonReducePreStep")
 				.mapPartition(new PythonMapPartition(info.setID, info.types)).setParallelism(getParallelism(info)).name(info.name);
 	}
+
+	protected InputFormat createCustomInputFormat(PythonOperationInfo info) {
+		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter, info.computeSplits);
+		return format;
+	}
+
+	protected FileOutputFormat createCustomOutputFormat(PythonOperationInfo info) {
+		FileOutputFormat format = new PythonOutputFormat(new Path(), info.setID);
+		return format;
+	}
+
 }

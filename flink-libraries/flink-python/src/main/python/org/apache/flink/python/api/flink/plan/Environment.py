@@ -118,6 +118,23 @@ class Environment(object):
         self._sources.append(child)
         return child_set
 
+    def read_custom(self, path, filter, splits, format, types):
+        """
+        Creates a DataSet using a custom input format that is executed directly in the Python process.
+        """
+        child = OperationInfo()
+        child_set = DataSet(self, child)
+
+        child.identifier = _Identifier.SOURCE_CUSTOM
+        child.name = "PythonInputFormat"
+        child.path = path
+        child.filter = filter
+        child.computeSplits = splits
+        child.types = types
+        child.operator = copy.deepcopy(format)
+        self._sources.append(child)
+        return child_set
+
     def set_parallelism(self, parallelism):
         """
         Sets the parallelism for operations executed through this environment.
@@ -173,10 +190,20 @@ class Environment(object):
 
                 used_set = None
                 operator = None
+                found = False
                 for set in self._sets:
                     if set.id == id:
+                        found = True
                         used_set = set
                         operator = set.operator
+
+                if found == False:
+                    for set in self._sources:
+                        if set.id == id:
+                            found = True
+                            used_set = set
+                            operator = set.operator
+
                 operator._configure(input_path, output_path, port, self, used_set)
                 operator._go()
                 operator._close()
@@ -277,6 +304,8 @@ class Environment(object):
         for value in set.values:
             collect(value)
         collect(set.parallelism.value)
+        collect(set.filter)
+        collect(set.computeSplits)
 
     def _receive_result(self):
         jer = JobExecutionResult()
