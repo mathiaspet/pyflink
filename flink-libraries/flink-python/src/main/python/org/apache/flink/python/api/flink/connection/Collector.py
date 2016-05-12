@@ -50,7 +50,6 @@ class Collector(object):
         serialized_value = self._serializer.serialize(value)
         self._connection.write(serialized_value)
 
-
 class PlanCollector(object):
     def __init__(self, con, env):
         self._connection = con

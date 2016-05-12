@@ -33,6 +33,7 @@ public class PythonSender<IN> implements Serializable {
 	public static final byte TYPE_ARRAY = (byte) 63;
 	public static final byte TYPE_KEY_VALUE = (byte) 62;
 	public static final byte TYPE_VALUE_VALUE = (byte) 61;
+	public static final byte TYPE_STRING_VALUE = (byte) 28;
 
 	private File outputFile;
 	private RandomAccessFile outputRAF;
@@ -169,6 +170,10 @@ public class PythonSender<IN> implements Serializable {
 		if (value instanceof byte[]) {
 			return new ArraySerializer();
 		}
+
+		if (value instanceof String){
+			return new StringSerializer();
+		}
 		if (((Tuple2) value).f0 instanceof byte[]) {
 			return new ValuePairSerializer();
 		}
@@ -223,6 +228,18 @@ public class PythonSender<IN> implements Serializable {
 				buffer.put((byte[]) value.f0.getField(x));
 			}
 			buffer.put(value.f1);
+		}
+	}
+
+	private class StringSerializer extends Serializer<String> {
+
+		@Override
+		public void serializeInternal(String value) {
+			byte[] bytes = value.getBytes();
+			buffer = ByteBuffer.allocate(bytes.length + 5);
+			buffer.put(TYPE_STRING_VALUE);
+			buffer.putInt(bytes.length);
+			buffer.put(bytes);
 		}
 	}
 }
