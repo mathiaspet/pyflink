@@ -15,9 +15,6 @@ package org.apache.flink.python.api.streaming.data;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 
-import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.api.common.io.RichInputFormat;
-import org.apache.flink.api.common.io.RichOutputFormat;
 import org.apache.flink.python.api.streaming.util.StreamPrinter;
 import java.io.IOException;
 import java.io.OutputStream;
