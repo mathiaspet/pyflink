@@ -20,6 +20,7 @@ import sys
 from flink.plan.Environment import get_environment
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
+from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 
 
 class Tokenizer(FlatMapFunction):
@@ -35,6 +36,18 @@ class Adder(GroupReduceFunction):
         collector.collect((count, word))
 
 
+class MyFormat(PythonInputFormat):
+    def __init__(self):
+        super(MyFormat, self).__init__()
+
+    def createInputSplits(self, minNumSplits, path, collector):
+        collector.collect(FileInputSplit(path, 0, 1, ("localhost",)))
+
+    def deliver(self, path, collector):
+        collector.collect("hello")
+        collector.collect("world")
+
+
 if __name__ == "__main__":
     env = get_environment()
     if len(sys.argv) != 1 and len(sys.argv) != 3:
@@ -43,7 +56,8 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         data = env.read_text(sys.argv[1])
     else:
-        data = env.from_elements("hello","world","hello","car","tree","data","hello")
+        data = env.read_custom("<some-file>", "*", True, MyFormat())
+        #data = env.from_elements("hello","world","hello","car","tree","data","hello")
 
     result = data \
         .flat_map(Tokenizer()) \

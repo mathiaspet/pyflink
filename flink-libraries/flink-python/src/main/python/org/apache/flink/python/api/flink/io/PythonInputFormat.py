@@ -20,100 +20,47 @@ import sys
 from collections import deque
 from flink.connection import Connection, Iterator, Collector
 from flink.plan.OperationInfo import OperationInfo
-from flink.functions import RuntimeContext
-from flink.plan.Constants import BYTES, STRING
+from flink.functions import RuntimeContext, Function
+from flink.plan.Constants import _createArrayTypeInfo
+import sys
+
+class FileInputSplit(object):
+    def __init__(self, path, start, end, hosts):
+        self.path = path
+        self.start = start
+        self.end = end
+        self.hosts = hosts
 
 
-class PythonInputFormat(object):
-    
+class PythonInputFormat(Function.Function):
     def __init__(self):
-        self._connection = None
-        self._iterator = None
-        self._collector = None
-        self.context = None
-        self._chain_operator = None
-        self._env = None
-        self._info = None
-        self._nextRun = True
-        self._userInit()
-
-    def _userInit(self):
-        pass
+        super(PythonInputFormat, self).__init__()
 
     def _run(self):
         collector = self._collector
         function = self.deliver
-        for value in self._iterator:
-            if value is not None:
-                if value != "close_streamer":
-                    function(value, collector)
-                    self._connection.send_end_signal()
-                else:
-                    self._nextRun = False
-                    self.close()
-
-        self._connection.reset()
-
-    def _chain(self, operator):
-        self._chain_operator = operator
+        split = self._iterator.next()
+        while split is not None:
+            function(split, collector)
+            self._iterator._reset()
+            collector._close()
+            split = self._iterator.next()
 
     def deliver(self, path, collector):
         pass
 
-    def _configure(self, input_file, output_file, port, env, info):
-        self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port)
-        self._iterator = Iterator.Iterator(self._connection, env)
-        self._collector = Collector.Collector(self._connection, env, info)
-        self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)
-        self._env = env
-        self._info = info
-        if info.chained_info is not None:
-            info.chained_info.operator._configure_chain(self.context, self._collector, info.chained_info)
-            self._collector = info.chained_info.operator
+    def computeSplits(self, env, con):
+        iterator = Iterator.PlanIterator(con, env)
+        collector = Collector.SplitCollector(con, env)
 
-    def _configure_chain(self, context, collector, info):
-        self.context = context
-        if info.chained_info is None:
-            self._collector = collector
-        else:
-            self._collector = info.chained_info.operator
-            info.chained_info.operator._configure_chain(context, collector, info.chained_info)
+        min_num_splits = iterator.next()
+        path = iterator.next()
+
+        self.createInputSplits(min_num_splits, path, collector)
+
+        collector._close()
+        self._connection.send_end_signal()
 
 
-    def close(self):
-        self._collector._close()
-
-    def computeSplits(self):
+    def createInputSplits(self, minNumSplits, path, collector):
         pass
-
-    def _go(self):
-        command = self._iterator.next()
-        self._iterator._reset()
-        self._connection.reset()
-        if command is not None and command == "compute_splits":
-            info = OperationInfo()
-            info.types = [STRING, STRING]
-            self._collector = Collector.Collector(self._connection, self._env, info)
-            self.computeSplits()
-            self._connection.send_end_signal()
-        else:
-            self._receive_broadcast_variables()
-            while(self._nextRun):
-                self._run()
-
-
-
-    def _receive_broadcast_variables(self):
-        broadcast_count = self._iterator.next()
-        self._iterator._reset()
-        self._connection.reset()
-        for _ in range(broadcast_count):
-            name = self._iterator.next()
-            self._iterator._reset()
-            self._connection.reset()
-            bc = deque()
-            while(self._iterator.has_next()):
-                bc.append(self._iterator.next())
-            self.context._add_broadcast_variable(name, bc)
-            self._iterator._reset()
-            self._connection.reset()
