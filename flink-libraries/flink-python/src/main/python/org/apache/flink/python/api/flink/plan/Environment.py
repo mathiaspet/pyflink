@@ -19,7 +19,7 @@ from flink.connection import Connection
 from flink.connection import Collector
 from flink.connection import Iterator
 from flink.plan.DataSet import DataSet
-from flink.plan.Constants import _Identifier
+from flink.plan.Constants import _Identifier, _createArrayTypeInfo
 from flink.plan.OperationInfo import OperationInfo
 from flink.utilities import Switch
 import socket as SOCKET
@@ -118,20 +118,19 @@ class Environment(object):
         self._sources.append(child)
         return child_set
 
-    def read_custom(self, path, filter, splits, format, types):
+    def read_custom(self, path, filter, splits, format):
         """
         Creates a DataSet using a custom input format that is executed directly in the Python process.
         """
         child = OperationInfo()
         child_set = DataSet(self, child)
-
         child.identifier = _Identifier.SOURCE_CUSTOM
         child.name = "PythonInputFormat"
         child.path = path
         child.filter = filter
         child.computeSplits = splits
-        child.types = types
         child.operator = copy.deepcopy(format)
+        child.types = _createArrayTypeInfo()
         self._sources.append(child)
         return child_set
 
@@ -167,9 +166,9 @@ class Environment(object):
         self._local_mode = local
         self._optimize_plan()
 
-        plan_mode = sys.stdin.readline().rstrip('\n') == "plan"
+        mode = sys.stdin.readline().rstrip('\n')
 
-        if plan_mode:
+        if mode == "plan":
             port = int(sys.stdin.readline().rstrip('\n'))
             self._connection = Connection.PureTCPConnection(port)
             self._iterator = Iterator.PlanIterator(self._connection, self)
@@ -178,6 +177,19 @@ class Environment(object):
             result = self._receive_result()
             self._connection.close()
             return result
+        elif mode == "splits":
+            port = int(sys.stdin.readline().rstrip('\n'))
+            id = int(sys.stdin.readline().rstrip('\n'))
+
+            operator = None
+            for set in self._sources:
+                if set.id == id:
+                    operator = set.operator
+
+            operator.computeSplits(self, Connection.PureTCPConnection(port))
+            self._connection.close()
+            sys.stdout.flush()
+            sys.stderr.flush()
         else:
             import struct
             operator = None
@@ -190,17 +202,15 @@ class Environment(object):
 
                 used_set = None
                 operator = None
-                found = False
-                for set in self._sets:
-                    if set.id == id:
-                        found = True
-                        used_set = set
-                        operator = set.operator
 
-                if found == False:
+                if mode == "operator":
+                    for set in self._sets:
+                        if set.id == id:
+                            used_set = set
+                            operator = set.operator
+                else:
                     for set in self._sources:
                         if set.id == id:
-                            found = True
                             used_set = set
                             operator = set.operator
 
