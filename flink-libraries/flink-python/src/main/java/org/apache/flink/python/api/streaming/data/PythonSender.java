@@ -171,9 +171,6 @@ public class PythonSender<IN> implements Serializable {
 			return new ArraySerializer();
 		}
 
-		if (value instanceof String){
-			return new StringSerializer();
-		}
 		if (((Tuple2) value).f0 instanceof byte[]) {
 			return new ValuePairSerializer();
 		}
@@ -228,18 +225,6 @@ public class PythonSender<IN> implements Serializable {
 				buffer.put((byte[]) value.f0.getField(x));
 			}
 			buffer.put(value.f1);
-		}
-	}
-
-	private class StringSerializer extends Serializer<String> {
-
-		@Override
-		public void serializeInternal(String value) {
-			byte[] bytes = value.getBytes();
-			buffer = ByteBuffer.allocate(bytes.length + 5);
-			buffer.put(TYPE_STRING_VALUE);
-			buffer.putInt(bytes.length);
-			buffer.put(bytes);
 		}
 	}
 }
