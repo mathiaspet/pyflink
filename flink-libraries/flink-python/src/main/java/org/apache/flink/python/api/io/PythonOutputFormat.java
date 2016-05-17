@@ -38,7 +38,8 @@ public class PythonOutputFormat extends FileOutputFormat {
 	public PythonOutputFormat(Path outputPath, int id) {
 		super();
 		super.setOutputFilePath(outputPath);
-		this.streamer = new PythonStreamer(this, id);
+		//FIXME: this is just to make it compile
+		this.streamer = new PythonStreamer(null, id, true);
 	}
 
 	@Override
