@@ -190,11 +190,6 @@ class Iterator(defIter.Iterator):
             read = self._read
             if self._deserializer is None:
                 type = read(1)
-                print("Found type: ", type)
-                if type == Types.TYPE_STRING:
-                    print("in string branch")
-                    self._deserializer = StringDeserializer()
-                    return self._deserializer.deserialize(read)
                 if type == Types.TYPE_ARRAY:
                     key_des = _get_deserializer(read, custom_types)
                     self._deserializer = ArrayDeserializer(key_des)

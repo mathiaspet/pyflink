@@ -64,6 +64,32 @@ class PlanCollector(object):
         self._connection.write(b"".join([type, serializer.serialize(value)]))
 
 
+class SplitCollector(object):
+    def __init__(self, con, env):
+        self._connection = con
+        self._env = env
+        self._splits = []
+
+    def _close(self):
+        write = self._write
+        write(len(self._splits))
+        for split in self._splits:
+            write(split.path)
+            write(split.start)
+            write(split.end)
+            write(len(split.hosts))
+            for host in split.hosts:
+                write(host)
+
+    def collect(self, value):
+        self._splits.append(value)
+
+    def _write(self, value):
+        type = _get_type_info(value, self._env._types)
+        serializer = _get_serializer(value, self._env._types)
+        self._connection.write(b"".join([type, serializer.serialize(value)]))
+
+
 #=====Serializer=======================================================================================================
 class Serializer(object):
     def serialize(self, value):
