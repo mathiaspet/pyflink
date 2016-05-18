@@ -85,8 +85,8 @@ class ImageWrapper(object):
     def _meta_to_bytes(meta):
         all_strings = []
         for k, v in meta.items():
-            if(type(v) == type([])):
-                #TODO: add proper hierarchichal value handling here; this is just a test to make something else work
+            if isinstance(v, list):
+                # TODO: add proper hierarchichal value handling here; this is just a test to make something else work
                 value = ""
                 for s in v:
                     value += s

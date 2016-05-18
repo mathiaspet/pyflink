@@ -47,7 +47,7 @@ def deduct_output_type(dataset):
                 return dataset[_Fields.VALUES][0]
             if dataset_type == _Identifier.SOURCE_CSV:
                 return dataset[_Fields.TYPES]
-	    if dataset_type == _Identifier.SOURCE_CUSTOM:
+            if dataset_type == _Identifier.SOURCE_CUSTOM:
                 return dataset[_Fields.TYPES]
             if dataset_type == _Identifier.SOURCE_ENVI:
                 return TILE
