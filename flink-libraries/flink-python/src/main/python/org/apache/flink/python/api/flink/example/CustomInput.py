@@ -16,20 +16,18 @@
 # limitations under the License.
 ################################################################################
 from __future__ import print_function
-import os.path
-import sys
 import numpy as np
 import gdal
 from gdalconst import GA_ReadOnly
 
-from flink.connection import Collector
-#from flink.example.ImageWrapper import ImageWrapper, IMAGE_TUPLE
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
-from flink.io.PythonInputFormat import PythonInputFormat
-from flink.plan.Constants import INT, STRING, BYTES
+from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.plan.Environment import get_environment
+from flink.spatial.ImageWrapper import ImageWrapper
+
+
 
 
 class Tokenizer(FlatMapFunction):
@@ -55,19 +53,16 @@ class GDALInputFormat(PythonInputFormat):
             ]
         return files
 
-    def computeSplits(self):
-        path = self._iterator.next()
+    def createInputSplits(self, minNumSplits, path, collector):
         for f in self.getFiles():
-            self._collector.collect((f,f))
-
-        self._collector._close()
+            collector.collect(FileInputSplit(f, 0, 1, ("localhost",)))
 
 
     def _userInit(self):
         gdal.AllRegister()  # TODO: register the ENVI driver only
 
-    def deliver(self, path, collector):
-        print(path)
+    def deliver(self, split, collector):
+        path = split[0]
         ds = gdal.Open(path[5:], GA_ReadOnly)
         if ds is None:
             print('Could not open image', path[5:])
@@ -149,12 +144,9 @@ class Adder(GroupReduceFunction):
 class Filter(FilterFunction):
     def __init__(self):
         super(Filter, self).__init__()
-        self.count = 0
 
     def filter(self, value):
-        self.count += 1
-        print("Image:", value[0], self.count)
-        return True
+        return False
 
 
 def main():
@@ -163,7 +155,7 @@ def main():
     inputFormat = GDALInputFormat(26184107)
 
     data = env.read_custom("/opt/gms_sample/", ".*?\\.bsq", True,
-                           inputFormat, [STRING, BYTES, BYTES])
+                           inputFormat)
     # data = env.read_custom("/home/dettmerh/gms_sample/", ".*?\\.bsq", True,
     #                        GDALInputFormat(), (STRING, BYTES, BYTES))
 
