@@ -15,14 +15,8 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-from abc import ABCMeta, abstractmethod
-import sys
-from collections import deque
 from flink.connection import Connection, Iterator, Collector
-from flink.plan.OperationInfo import OperationInfo
 from flink.functions import RuntimeContext, Function
-from flink.plan.Constants import _createArrayTypeInfo
-import sys
 
 class FileInputSplit(object):
     def __init__(self, path, start, end, hosts):
@@ -59,7 +53,7 @@ class PythonInputFormat(Function.Function):
         self.createInputSplits(min_num_splits, path, collector)
 
         collector._close()
-        self._connection.send_end_signal()
+        #self._connection.send_end_signal()
 
 
     def createInputSplits(self, minNumSplits, path, collector):

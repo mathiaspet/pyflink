@@ -16,7 +16,9 @@
 # limitations under the License.
 ################################################################################
 from flink.functions.FlatMapFunction import FlatMapFunction
-from flink.plan.Constants import Tile, STRING, BYTES
+from flink.plan.Constants import STRING, BYTES
+from flink.spatial.Types import Tile
+
 
 
 IMAGE_TUPLE = STRING, BYTES, BYTES
