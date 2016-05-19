@@ -18,6 +18,7 @@
 from __future__ import print_function
 import numpy as np
 import gdal
+import sys
 from gdalconst import GA_ReadOnly
 
 from flink.functions.FilterFunction import FilterFunction
@@ -25,14 +26,15 @@ from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.plan.Environment import get_environment
-from flink.spatial.ImageWrapper import ImageWrapper
+from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
 
 
 
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
-        print("Just a dumb map function")
+        print("Setting keys to pathrow", type(value))
+        sys.stdout.flush()
         collector.collect(value)
 
 
@@ -156,13 +158,11 @@ def main():
 
     data = env.read_custom("/opt/gms_sample/", ".*?\\.bsq", True,
                            inputFormat)
-    # data = env.read_custom("/home/dettmerh/gms_sample/", ".*?\\.bsq", True,
-    #                        GDALInputFormat(), (STRING, BYTES, BYTES))
 
     result = data \
+        .flat_map(TupleToTile()) \
         .flat_map(Tokenizer()) \
         .filter(Filter())
-
     result.output()
 
     env.set_parallelism(1)

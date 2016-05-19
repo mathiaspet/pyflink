@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 ################################################################################
 #  Licensed to the Apache Software Foundation (ASF) under one
 #  or more contributor license agreements.  See the NOTICE file
@@ -15,3 +17,15 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import os.path
+
+
+def process(job, metadata):
+    assert os.path.isfile(metadata['path']) and not os.path.isdir(metadata['path'])
+
+    if metadata['image_type'] == 'RSD' and 'oli' in metadata['sensor']:
+        metadata['georef'] = True
+    else:
+        metadata['georef'] = False
+
+    return metadata
