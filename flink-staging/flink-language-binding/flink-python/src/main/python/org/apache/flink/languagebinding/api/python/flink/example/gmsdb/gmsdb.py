@@ -17,12 +17,9 @@
 ################################################################################
 from __future__ import print_function
 
-import os.path
 import sys
 import pickle
 
-import psycopg2
-import psycopg2.extras
 import gdal
 
 from flink.connection import Collector
@@ -34,7 +31,8 @@ from flink.io.PythonInputFormat import PythonInputFormat
 from flink.plan.Constants import INT
 from flink.plan.Environment import get_environment
 
-from flink.example.gmsdb.lvl0a import get_metadata
+from flink.example.gmsdb.lvl0a import process as lvl0a
+from flink.example.gmsdb.lvl0b import process as lvl0b
 from flink.example.gmsdb.misc import get_path, get_scenes
 
 
@@ -50,41 +48,11 @@ class GMSDB(PythonInputFormat):
                 'skip_thermal': False
             }
 
-    def get_path(self, scene):
-        conn = psycopg2.connect(**self.job['connection'])
-        curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-        curs.execute(
-                """SELECT
-                        s.filename,
-                        sat.name AS satellite,
-                        sen.name AS sensor
-                    FROM
-                        scenes s
-                    LEFT OUTER JOIN
-                        satellites sat ON sat.id = s.satelliteid
-                    LEFT OUTER JOIN
-                        sensors sen ON sen.id = s.sensorid
-                    WHERE
-                        s.id = %s""", (scene,)
-            )
-
-        row = curs.fetchone()
-        if row['sensor'].startswith('ETM+'):
-            row['sensor'] = 'ETM+'
-
-        path = os.path.join(self.job['data_path'], row['satellite'], row['sensor'], row['filename'])
-
-        curs.close()
-        conn.close()
-
-        return path
-
     def computeSplits(self):
         # get scenes for job
         scenes = get_scenes(self.job)
 
-        _ = self._iterator.next()  # TODO: don't send path for custom splits
+        self._iterator.next()  # TODO: don't send path for custom splits
         self._collector = Collector.Collector(self._connection)
         # get path for each scene and send split
         for s in scenes:
@@ -96,7 +64,7 @@ class GMSDB(PythonInputFormat):
 
     def deliver(self, path, collector):
         # get metadata for lvl0a
-        metadata = get_metadata(self.job, path)
+        metadata = lvl0a(self.job, path)
         key = str(metadata['id'])
         collector.collect((key, bytearray(pickle.dumps(metadata)), bytearray(1)))
 

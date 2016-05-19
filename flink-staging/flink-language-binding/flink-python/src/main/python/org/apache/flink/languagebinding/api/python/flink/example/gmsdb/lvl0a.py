@@ -28,7 +28,7 @@ def get_sensormode(dataset):
         return 'M'
 
 
-def get_metadata(job, path):
+def process(job, path):
     filename = os.path.basename(path)
     conn = psycopg2.connect(**job['connection'])
     curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)

@@ -6,6 +6,7 @@ import tarfile
 import zipfile
 
 import psycopg2
+import psycopg2.extras
 
 
 def get_scenes(job):
@@ -53,27 +54,24 @@ def get_path(job, scene):
 
 
 def open_in_archive(path_archive, matching_expression, read_mode='r'):
+    count_matching_files = 0
     if zipfile.is_zipfile(path_archive):
         archive = zipfile.ZipFile(path_archive, 'r')
         matching_files = fnmatch.filter(archive.namelist(), matching_expression)
         count_matching_files = len(matching_files)
         content_file = archive.read(matching_files[0])
         filename_file = os.path.join(path_archive, matching_files[0])
+        archive.close()
 
     elif tarfile.is_tarfile(path_archive):
         archive = tarfile.open(path_archive, 'r|gz')
-        count_matching_files = 0
         for F in archive:
             if fnmatch.fnmatch(F.name, matching_expression):
                 content_file = archive.extractfile(F)
                 content_file = content_file.read()
                 filename_file = os.path.join(path_archive, F.name)
                 count_matching_files += 1
-
-    else:
-        return None
-
-    archive.close()
+        archive.close()
 
     assert count_matching_files > 0,\
         'Matching expression matches no file. Please revise your expression!'
