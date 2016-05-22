@@ -55,7 +55,7 @@ public class ImageTest {
 				return true;
 			}
 		});
-		filtered.write(new ImageOutputFormat(), outputFilePath);
+		filtered.write(new ImageOutputFormat(), outputFilePath).setParallelism(1);
 		env.execute("Image Test");
 	}
 
