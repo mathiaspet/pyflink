@@ -42,6 +42,7 @@ class L11Processor(FlatMapFunction):
         return tile
 
 #represents the reduce step that adds the corner points of a scene
+#TODO: change into combine
 class CornerpointAdder(GroupReduceFunction):
     def reduce(self, iterator, collector):
         for i in iterator:
@@ -57,6 +58,10 @@ class L12Processor(FlatMapFunction):
         value = self.addOrbitParams(value)
         value = self.applyNoDataMask(value)
         collector.collect(value)
+
+    def setTrueCornerPoints(self, value):
+        #TODO: implement me
+        return value
 
     def addAqcuisitionDate(self, value):
         #TODO: implement me

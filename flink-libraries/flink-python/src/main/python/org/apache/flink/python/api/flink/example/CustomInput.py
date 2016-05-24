@@ -25,6 +25,7 @@ from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
+from flink.io.PythonOutputFormat import PythonOutputFormat
 from flink.plan.Environment import get_environment
 from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
@@ -33,8 +34,6 @@ from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
-        print("Setting keys to pathrow", type(value))
-        sys.stdout.flush()
         collector.collect(value)
 
 
@@ -82,7 +81,19 @@ class GDALInputFormat(PythonInputFormat):
             upper = (j+1)*bandsize
             imageData[lower:upper] = data.ravel()
 
+
         metaData = self.readMetaData(path[5:-4])
+
+        #this is just a hack to cope with the hacky readMetaData-fct (since this is just a throwaway example anyway)
+        leftlatlong = metaData["upperleftcornerlatlong"]
+        rightlatlong = metaData["lowerrightcornerlatlong"]
+        metaData["coordinates"] = [leftlatlong[0], leftlatlong[1], rightlatlong[0], rightlatlong[1]]
+        metaData["width"] = metaData["samples"]
+        metaData["height"] = metaData["lines"]
+        metaData["band"] = "0"
+        metaData["xPixelWidth"] = metaData["pixelsize"]
+        metaData["yPixelWidth"] = metaData["pixelsize"]
+
         metaBytes = ImageWrapper._meta_to_bytes(metaData)
         bArr = bytearray(imageData)
         retVal = (metaData['scene id'], metaBytes, bArr)
@@ -130,18 +141,10 @@ class GDALInputFormat(PythonInputFormat):
         except:
             raise IOError("Error while reading ENVI file header.")
 
-
-class Adder(GroupReduceFunction):
-    def __init__(self):
-        super(Adder, self).__init__()
-        self.counter = 0
-
-    def reduce(self, iterator, collector):
-        for i in iterator:
-            self.counter += 1
-
-        collector.collect(self.counter)
-
+class GMSOF(PythonOutputFormat):
+    def write(self, value):
+        print("value", type(value))
+        sys.stdout.flush()
 
 class Filter(FilterFunction):
     def __init__(self):
@@ -161,9 +164,9 @@ def main():
 
     result = data \
         .flat_map(TupleToTile()) \
-        .flat_map(Tokenizer()) \
-        .filter(Filter())
-    result.output()
+        .flat_map(Tokenizer())
+
+    result.write_custom(GMSOF("/opt/output"))
 
     env.set_parallelism(1)
 

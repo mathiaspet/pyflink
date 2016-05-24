@@ -45,6 +45,7 @@ class _Identifier(object):
     SINK_CSV = "sink_csv"
     SINK_TEXT = "sink_text"
     SINK_PRINT = "sink_print"
+    SINK_CUSTOM = "sink_custom"
     BROADCAST = "broadcast"
     FIRST = "first"
     DISTINCT = "distinct"
