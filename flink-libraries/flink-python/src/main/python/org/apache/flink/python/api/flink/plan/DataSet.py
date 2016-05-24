@@ -140,6 +140,11 @@ class DataSet(object):
         self._env._sinks.append(child)
         return child_set
 
+
+    def write_custom(self, format):
+        return self.flat_map(format)._output(False)
+
+
     def reduce_group(self, operator, combinable=False):
         """
         Applies a GroupReduce transformation.
