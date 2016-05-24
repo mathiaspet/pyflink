@@ -41,7 +41,17 @@ public class ImageOutputFormat<T extends Tuple3<String, byte[], byte[]>> extends
 
 	@Override
 	public void writeRecord(T record) throws IOException {
-		this.header = record.f1;
+
+		// When adding a band to an already written one, we need to adjust the header
+		if (this.header == null) {
+			this.header = record.f1;
+		} else {
+			ImageInfoWrapper newHeader = new ImageInfoWrapper(record.f1);
+			ImageInfoWrapper currentHeader = new ImageInfoWrapper(this.header);
+			currentHeader.add(newHeader);
+			this.header = currentHeader.toBytes();
+		}
+
 		this.stream.write(record.f2);
 		this.stream.flush();
 	}
@@ -53,6 +63,11 @@ public class ImageOutputFormat<T extends Tuple3<String, byte[], byte[]>> extends
 		Path p = this.outputFilePath;
 		if (p == null) {
 			throw new IOException("The file path is null.");
+		}
+
+		// When no record was written via this outputFormat
+		if (this.header == null) {
+			throw new IOException("No header present when closing ImageOutputFormat");
 		}
 
 		final FileSystem fs = p.getFileSystem();
