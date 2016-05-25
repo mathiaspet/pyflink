@@ -19,14 +19,15 @@ from __future__ import print_function
 
 import sys
 from flink.plan.Environment import get_environment
-from flink.gmsdb.GMSPreprocessInputFormat import GMSDB
-from flink.gmsdb.L1Processor import L11Processor, CornerpointAdder, L12Processor
-from flink.functions.FilterFunction import FilterFunction
+from flink.example.gmsdb.GMSPreprocessInputFormat import GMSDB
+from flink.example.gmsdb.L1Processor import L11Processor, L12Processor, CornerpointAdder
+from flink.io.PythonOutputFormat import PythonOutputFormat
 
-#purely to filter out everything
-#this way we can run programs w/o proper output format
-class DumbFilter(FilterFunction):
-    def filter(self, value):
+
+class PrintOutput(PythonOutputFormat):
+    def write(self, value):
+        print("writing output of type '{}'".format(value))
+        sys.stdout.flush()
         return False
 
 
@@ -50,15 +51,11 @@ def main():
     env = get_environment()
     level0Set = env.read_custom(data_path, ".*?\\.bsq", True, inputFormat)
     level1Set = level0Set.flat_map(L11Processor())
-    level1SceneSet = level1Set.group_by(0).reduce()
+    level1SceneSet = level1Set.group_by(0).reduce(CornerpointAdder())
     level12Set = level1SceneSet.flat_map(L12Processor())
+    level12Set.write_custom(PrintOutput("/opt/output"))
 
-    #just to make program complete
-    result = level12Set.filter(DumbFilter())
-    result.output()
-
-    env.set_degree_of_parallelism(1)
-
+    env.set_parallelism(1)
     env.execute(local=True)
 
 

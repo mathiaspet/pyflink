@@ -18,11 +18,12 @@
 from flink.functions.FlatMapFunction import FlatMapFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 
-#represents the map steps until the reduce
+
 class L11Processor(FlatMapFunction):
+    # represents the map steps until the reduce
     def flat_map(self, value, collector):
-        #value is a tile here that has been splitted as a last step in the preceeding IF
-        #TODO: make adjustments here
+        # value is a tile here that has been splitted as a last step in the preceeding IF
+        # TODO: make adjustments here
         value = self.toaReflectance(value)
         value = self.addNoDataMask(value)
         value = self.addCloudMask(value)
@@ -30,28 +31,30 @@ class L11Processor(FlatMapFunction):
         collector.collect(value)
 
     def toaReflectance(self, tile):
-        #TODO: implement me
+        # TODO: implement me
         return tile
 
     def addNoDataMask(self, tile):
-        #TODO: implement me
+        # TODO: implement me
         return tile
 
     def addCloudMask(self, tile):
-        #TODO: implement me
+        # TODO: implement me
         return tile
 
-#represents the reduce step that adds the corner points of a scene
-#TODO: change into combine
+
 class CornerpointAdder(GroupReduceFunction):
+    # represents the reduce step that adds the corner points of a scene
+    # TODO: change into combine
     def reduce(self, iterator, collector):
         for i in iterator:
-            #TODO: implement me
-            #Question: does this function return a scene or a set of tiles?
+            # TODO: implement me
+            # Question: does this function return a scene or a set of tiles?
             collector.collect(i)
 
-#represents the map steps after the reduce
+
 class L12Processor(FlatMapFunction):
+    # represents the map steps after the reduce
     def flat_map(self, value, collector):
         value = self.addAqcuisitionDate(value)
         value = self.addVAAAqcuisitionAngle(value)
@@ -60,22 +63,21 @@ class L12Processor(FlatMapFunction):
         collector.collect(value)
 
     def setTrueCornerPoints(self, value):
-        #TODO: implement me
+        # TODO: implement me
         return value
 
     def addAqcuisitionDate(self, value):
-        #TODO: implement me
+        # TODO: implement me
         return value
 
     def addVAAAqcuisitionAngle(self, value):
-        #TODO: implement me
+        # TODO: implement me
         return value
 
     def addOrbitParams(self, value):
-        #TODO: implement me
+        # TODO: implement me
         return value
 
     def applyNoDataMask(self, value):
-        #TODO: implement me
+        # TODO: implement me
         return value
-

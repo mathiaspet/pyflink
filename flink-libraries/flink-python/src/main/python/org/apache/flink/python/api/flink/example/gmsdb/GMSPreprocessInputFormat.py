@@ -15,12 +15,19 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import sys
+
 import pickle
 import gdal
 from flink.io.PythonInputFormat import PythonInputFormat
 from flink.example.gmsdb.lvl0a import process as lvl0a
 from flink.example.gmsdb.lvl0b import process as lvl0b
 from flink.example.gmsdb.misc import get_path, get_scenes
+
+
+def p(*args, **kwargs):
+    print(*args, **kwargs)
+    sys.stdout.flush()
 
 
 class GMSDB(PythonInputFormat):
@@ -34,18 +41,19 @@ class GMSDB(PythonInputFormat):
             'skip_pan': False,
             'skip_thermal': False
         }
+    p("finished init")
 
     def createInputSplits(self, minNumSplits, splitPath, collector):
+        p("creating splits")
         # get scenes for job
         scenes = get_scenes(self.job)
+        p("scenes are", scenes)
 
         # get path for each scene and send split
         for s in scenes:
             path = get_path(self.job, s)
-            print("py: sending split '{}'".format(path))
-            sys.stdout.flush()
             collector.collect(path)
-
+            p("sent split for ", path)
 
     def deliver(self, split, collector):
         path = split[0]
@@ -57,4 +65,3 @@ class GMSDB(PythonInputFormat):
         print("py: received path:", path)
         print("py: retrieved metadata:", metadata)
         sys.stdout.flush()
-
