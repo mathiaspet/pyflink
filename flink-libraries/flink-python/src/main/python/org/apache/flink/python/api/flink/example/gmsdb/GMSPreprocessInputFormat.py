@@ -19,15 +19,10 @@ import sys
 
 import pickle
 import gdal
-from flink.io.PythonInputFormat import PythonInputFormat
+from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.example.gmsdb.lvl0a import process as lvl0a
 from flink.example.gmsdb.lvl0b import process as lvl0b
 from flink.example.gmsdb.misc import get_path, get_scenes
-
-
-def p(*args, **kwargs):
-    print(*args, **kwargs)
-    sys.stdout.flush()
 
 
 class GMSDB(PythonInputFormat):
@@ -41,19 +36,23 @@ class GMSDB(PythonInputFormat):
             'skip_pan': False,
             'skip_thermal': False
         }
-    p("finished init")
+        print("finished init")
+        sys.stdout.flush()
 
     def createInputSplits(self, minNumSplits, splitPath, collector):
-        p("creating splits")
+        print("creating splits")
+        sys.stdout.flush()
         # get scenes for job
         scenes = get_scenes(self.job)
-        p("scenes are", scenes)
+        print("scenes are", scenes)
+        sys.stdout.flush()
 
         # get path for each scene and send split
         for s in scenes:
             path = get_path(self.job, s)
-            collector.collect(path)
-            p("sent split for ", path)
+            collector.collect(FileInputSplit(path, 0, 1, ("localhost",)))
+            print("sent split for ", path)
+            sys.stdout.flush()
 
     def deliver(self, split, collector):
         path = split[0]

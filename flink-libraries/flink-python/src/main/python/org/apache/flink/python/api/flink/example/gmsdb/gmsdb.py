@@ -18,10 +18,11 @@
 from __future__ import print_function
 
 import sys
+
+from flink.io.PythonOutputFormat import PythonOutputFormat
 from flink.plan.Environment import get_environment
 from flink.example.gmsdb.GMSPreprocessInputFormat import GMSDB
 from flink.example.gmsdb.L1Processor import L11Processor, L12Processor, CornerpointAdder
-from flink.io.PythonOutputFormat import PythonOutputFormat
 
 
 class PrintOutput(PythonOutputFormat):
