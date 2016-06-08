@@ -15,9 +15,11 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import os
+import pickle
 import sys
 
-import pickle
+import psycopg2
 import gdal
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.example.gmsdb.lvl0a import process as lvl0a
@@ -31,7 +33,9 @@ class GMSDB(PythonInputFormat):
         gdal.AllRegister()  # TODO: register the ENVI driver only
         self.job = {
             'id': job_id,
-            'data_path': data_path,
+            'data_path': data_path,  # select path_data_root from config
+            'path_procdata': None,  # select foldername_procdata from config
+            'path_archive': None,  # select foldername_download from config
             'connection': connection,
             'skip_pan': False,
             'skip_thermal': False
@@ -46,6 +50,25 @@ class GMSDB(PythonInputFormat):
         scenes = get_scenes(self.job)
         print("scenes are", scenes)
         sys.stdout.flush()
+
+        # get base pathnames
+        conn = psycopg2.connect(**self.job['connection'])
+        curs = conn.cursor()
+
+        if not self.job['data_path']:
+            curs.execute("SELECT value FROM config WHERE key = 'path_data_root'")
+            self.job['data_path'] = curs.fetchone()[0]
+
+        curs.execute("SELECT value FROM config WHERE key = 'foldername_procdata'")
+        self.job['path_procdata'] = os.path.join(self.job['data_path'], curs.fetchone()[0])
+
+        curs.execute("SELECT value FROM config WHERE key = 'foldername_download'")
+        self.job['path_archive'] = os.path.join(self.job['data_path'], curs.fetchone()[0])
+
+        curs.close()
+        conn.close()
+
+        print("job:", self.job)
 
         # get path for each scene and send split
         for s in scenes:
