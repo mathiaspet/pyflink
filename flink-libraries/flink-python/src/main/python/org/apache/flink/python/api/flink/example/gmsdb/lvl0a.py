@@ -89,10 +89,10 @@ def process(job, path):
     # if metadata['subsystem'] is None:
     #     metadata['subsystem'] = ''
 
-    # TODO: apply as filter because files were already promised as splits?
-    # if job.skip_thermal and metadata['subsystem'] == 'TIR':
-    #     continue   # removes ASTER TIR in case of skip_thermal
-    # if job.skip_pan and metadata['sensormode'] == 'P':
-    #     continue  # removes e.g. SPOT PAN in case of skip_pan
+    # return None if scene should be skipped
+    if job['skip_thermal'] and metadata['subsystem'] == 'TIR':
+        return None
+    elif job['skip_pan'] and metadata['sensormode'] == 'P':
+        return None
 
     return metadata

@@ -19,13 +19,25 @@
 ################################################################################
 import os.path
 
+from flink.example.gmsdb.misc import PathGenerator
 
-def process(job, metadata):
-    assert os.path.isfile(metadata['path']) and not os.path.isdir(metadata['path'])
 
-    if metadata['image_type'] == 'RSD' and 'oli' in metadata['sensor']:
-        metadata['georef'] = True
+def process(job, lvl0a_data):
+    assert os.path.isfile(lvl0a_data['path']) and not os.path.isdir(lvl0a_data['path'])
+
+    print('lvl0b for', lvl0a_data)
+
+    path_gen = PathGenerator(job, lvl0a_data)
+    lvl0a_data['baseN'] = path_gen.get_baseN()
+    lvl0a_data['path_procdata'] = path_gen.get_path_procdata()
+    lvl0a_data['path_logfile'] = path_gen.get_path_logfile()
+    lvl0a_data['path_archive'] = path_gen.get_local_archive_path_baseN()
+    # self.logger = HLP_F.setup_logger('log__' + self.baseN, self.path_logfile, self.job_CPUs, append=0)
+    # path_gen = PG.path_generator(self.__dict__)  # passes a logger in addition to previous attributes
+
+    if lvl0a_data['image_type'] == 'RSD' and 'oli' in lvl0a_data['sensor']:
+        lvl0a_data['georef'] = True
     else:
-        metadata['georef'] = False
+        lvl0a_data['georef'] = False
 
-    return metadata
+    return lvl0a_data
