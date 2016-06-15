@@ -30,8 +30,6 @@ from flink.plan.Environment import get_environment
 from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
 
-
-
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
         collector.collect(value)
@@ -151,6 +149,7 @@ class Filter(FilterFunction):
         super(Filter, self).__init__()
 
     def filter(self, value):
+        print(0)
         return False
 
 
@@ -164,9 +163,14 @@ def main():
 
     result = data \
         .flat_map(TupleToTile()) \
-        .flat_map(Tokenizer())
+        .flat_map(Tokenizer()) \
+        .flat_map(TileToTuple())
 
     result.write_custom(GMSOF("/opt/output"))
+
+
+    filtered = result.filter(Filter())
+    filtered.write_custom(GMSOF("/opt/output"))
 
     env.set_parallelism(1)
 
