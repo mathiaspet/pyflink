@@ -19,8 +19,10 @@ import sys
 
 from flink.plan.Environment import get_environment
 from flink.functions.FlatMapFunction import FlatMapFunction
+from flink.functions.FilterFunction import FilterFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
+from flink.io.PythonOutputFormat import PythonOutputFormat
 
 
 class Tokenizer(FlatMapFunction):
@@ -47,6 +49,20 @@ class MyFormat(PythonInputFormat):
         collector.collect("hello")
         collector.collect("world")
 
+class Filter(FilterFunction):
+    def __init__(self):
+        super(Filter, self).__init__()
+
+    def filter(self, value):
+        print(0)
+        return False
+
+class GMSOF(PythonOutputFormat):
+    def write(self, value):
+        print("value", type(value))
+        sys.stdout.flush()
+
+
 
 if __name__ == "__main__":
     env = get_environment()
@@ -56,7 +72,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         data = env.read_text(sys.argv[1])
     else:
-        data = env.read_custom("<some-file>", "*", True, MyFormat())
+        data = env.read_custom("/opt/gms_sample/227064_000202_BLA_SR.hdr", "*", True, MyFormat())
         #data = env.from_elements("hello","world","hello","car","tree","data","hello")
 
     result = data \
@@ -67,7 +83,10 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         result.write_csv(sys.argv[2])
     else:
-        result.output()
+        result.write_custom(GMSOF("/opt/output"))
+        filtered = result.filter(Filter())
+        filtered.write_custom(GMSOF("/opt/output"))
+        #result.output()
 
     env.set_parallelism(1)
 

@@ -28,7 +28,7 @@ class TileToTuple(FlatMapFunction):
     def flat_map(self, value, collector):
         tile_meta = {
             "acquisitionDate": value._aquisitionDate,
-            "coordinates": (value._leftUpperLat, value._rightLowerLat, value._leftUpperLon, value._rightLowerLon),
+            #"coordinates": (value._leftUpperLat, value._rightLowerLat, value._leftUpperLon, value._rightLowerLon),
             "width": value._width,
             "height": value._height,
             "band": value._band,
@@ -39,7 +39,8 @@ class TileToTuple(FlatMapFunction):
 
         collector.collect((
             value._aquisitionDate,
-            self._meta_to_bytes(tile_meta),
+            #self._meta_to_bytes(tile_meta),
+            ImageWrapper._meta_to_bytes(tile_meta),
             value._content
         ))
 
