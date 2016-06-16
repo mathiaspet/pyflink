@@ -32,6 +32,8 @@ from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
+        print("collecting")
+        sys.stdout.flush()
         collector.collect(value)
 
 
@@ -155,6 +157,7 @@ class Filter(FilterFunction):
 
 def main():
     env = get_environment()
+    env.set_sendLargeTuples(True)
 
     inputFormat = GDALInputFormat(26184107)
 
