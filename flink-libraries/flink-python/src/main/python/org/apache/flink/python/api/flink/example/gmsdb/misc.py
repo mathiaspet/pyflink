@@ -17,7 +17,6 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-
 import fnmatch
 import os.path
 import tarfile
@@ -100,3 +99,58 @@ def open_in_archive(path_archive, matching_expression, read_mode='r'):
         content_file = content_file.decode('latin-1')
 
     return content_file, filename_file
+
+
+class PathGenerator:
+    def __init__(self, job, metadata):
+        self.proc_level = metadata['proc_level'] or ''
+        self.image_type = metadata['image_type'] or ''
+        self.satellite = metadata['satellite'] or ''
+        self.sensor = metadata['sensor'] or ''
+        self.subsystem = metadata['subsystem'] or ''
+        self.AcqDate = metadata['acquisitiondate'] or ''
+        self.entity_ID = metadata['entityid'] or ''
+        self.job = job
+
+    def get_path_procdata(self):
+        return os.path.join(self.job['path_procdata'], self.satellite, self.sensor,
+                            self.AcqDate.strftime('%Y-%m-%d'), self.entity_ID)
+
+    def get_baseN(self):
+        if not self.subsystem:
+            return '__'.join([self.sensor, self.entity_ID])
+        else:
+            return '__'.join([self.sensor, self.subsystem, self.entity_ID])
+
+    def get_path_logfile(self):
+        return os.path.join(self.get_path_procdata(), self.get_baseN()+'.log')
+
+    def get_local_archive_path_baseN(self):  # must be callable from L0A-P
+        if self.image_type == 'RSD' and self.satellite is not None:
+            folder_rawdata = os.path.join(self.job['path_archive'], self.satellite, self.sensor)
+            for ext in ['.tar.gz', '.zip', '.hdf']:
+                archive = os.path.join(folder_rawdata, self.entity_ID + ext)
+                if os.path.exists(archive):
+                    return archive
+
+            raise AssertionError("Can't find dataset for %s at %s"
+                                 % (self.entity_ID, folder_rawdata))
+
+        if self.image_type == 'DGM' and self.satellite and 'SRTM' in self.satellite.upper():
+            return os.path.join(self.job['path_archive'], 'srtm2/', self.entity_ID+'_sub.bsq')
+
+        if self.image_type == 'ATM':
+            return os.path.join(self.job['path_archive'], 'atm_data/', self.entity_ID + '.bsq')
+
+        # # unsupported image type
+        raise AssertionError('Given dataset specification is not yet supported. '
+                             'Specified parameters: image_type: %s; satellite: %s; sensor: %s'
+                             % (self.image_type, self.satellite, self.sensor))
+
+    def get_path_gmsfile(self):
+        return os.path.join(self.get_path_procdata(),
+                            '%s_%s.gms' % (self.get_baseN(), self.proc_level))
+
+    def get_path_imagedata(self):
+        return os.path.join(self.get_path_procdata(),
+                            '%s_%s.bsq' % (self.get_baseN(), self.proc_level))
