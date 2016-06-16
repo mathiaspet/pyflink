@@ -196,7 +196,6 @@ class Environment(object):
                     operator = set.operator
 
             operator.computeSplits(self, Connection.PureTCPConnection(port))
-            self._connection.close()
             sys.stdout.flush()
             sys.stderr.flush()
         else:

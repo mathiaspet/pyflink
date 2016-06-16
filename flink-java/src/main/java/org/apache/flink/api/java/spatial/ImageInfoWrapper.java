@@ -18,6 +18,7 @@
 
 package org.apache.flink.api.java.spatial;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
@@ -58,6 +59,25 @@ public class ImageInfoWrapper implements Serializable {
 
 	public ImageInfoWrapper copy() {
 		return new ImageInfoWrapper(this);
+	}
+
+	/**
+	 * Merges the metadadate from other with this. That means, increasing the number of bands of this by the number of
+	 * bands from other, adding the bands names.
+	 *
+	 * TODO Adding the proper wavelengths
+	 *
+	 * @param other
+	 * @return
+     */
+	public void add(ImageInfoWrapper other) {
+
+		// TODO Some sanity-checks would be great (equal number of pixels, same position and so on)
+
+		this.setBands(other.getBands() + this.getBands());
+
+		String[] allBandNames = (String[]) ArrayUtils.addAll(this.getBandNames(), other.getBandNames());
+		this.setBandNames(allBandNames);
 	}
 
 	private String readHeader(InputStream is) throws IOException {
