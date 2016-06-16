@@ -53,8 +53,6 @@ class PythonInputFormat(Function.Function):
         self.createInputSplits(min_num_splits, path, collector)
 
         collector._close()
-        #self._connection.send_end_signal()
-
-
+    
     def createInputSplits(self, minNumSplits, path, collector):
         pass

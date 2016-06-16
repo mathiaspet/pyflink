@@ -21,7 +21,6 @@ package org.apache.flink.examples.java.assoc;
 import org.apache.flink.api.common.functions.CrossFunction;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatJoinFunction;
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
@@ -199,11 +198,14 @@ public class APriori {
 		public boolean containsItem(Integer item) {
 
 			if(this.f1 == null || this.f1.length == 0)
+			{
 				return false;
+			}
 
 			for(Integer i : this.f1){
-				if(i == item)
+				if(i == item) {
 					return true;
+				}
 			}
 
 			return false;
@@ -235,9 +237,13 @@ public class APriori {
 				//since both arrays, this.f1 and the itemSet param, are sorted
 				//one pass over both is enough
 				if(currentPos == itemSet.length)
+				{
 					return true;
+				}
 				else
+				{
 					return false;
+				}
 			}
 
 			return false;
@@ -274,7 +280,9 @@ public class APriori {
 
 
 			if(first.f1.equals(second.f1))
+			{
 				return;
+			}
 
 			Integer leftSuffix = Integer.parseInt(first.f1.substring(first.f0.length()+1));
 			Integer rightSuffix = Integer.parseInt(second.f1.substring(second.f0.length()+1));

@@ -92,6 +92,9 @@ class BufferingTCPMappedFileConnection(object):
 
     def write(self, msg):
         length = len(msg)
+        print("msg type is: ", type(msg), " length is ", length)
+        sys.stdout.flush()
+
         if length > MAPPED_FILE_SIZE:
             raise Exception("Serialized object does not fit into a single buffer.")
         tmp = self._out_size + length

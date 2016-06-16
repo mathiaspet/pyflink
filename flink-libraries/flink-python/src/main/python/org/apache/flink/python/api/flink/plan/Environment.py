@@ -56,6 +56,9 @@ class Environment(object):
 
         self._types = []
 
+        #large tuples
+        self._sendLargeTuples = False
+
     def register_type(self, type, serializer, deserializer):
         """
         Registers the given type with this environment, allowing all operators within to
@@ -150,6 +153,12 @@ class Environment(object):
         :return The parallelism used by operations.
         """
         return self._dop
+
+    def set_sendLargeTuples(self, large):
+        self._sendLargeTuples = large
+
+    def get_sendLargeTuples(self):
+        return self._sendLargeTuples
 
     def set_number_of_execution_retries(self, count):
         self._retry = count
