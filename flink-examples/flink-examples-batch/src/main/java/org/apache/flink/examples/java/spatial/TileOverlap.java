@@ -19,6 +19,7 @@
 package org.apache.flink.examples.java.spatial;
 
 
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
@@ -33,6 +34,8 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.core.fs.Path;
+import org.apache.hadoop.fs.FilterFileSystem;
+import org.apache.flink.api.java.spatial.envi.OverlappingTileInputFormat;
 
 public class TileOverlap {
 
@@ -40,7 +43,7 @@ public class TileOverlap {
     private static int dop;
     private static String filePath;
     private static Coordinate aoiLeftUpper, aoiRightLower;
-    private static int blockSize, aoi_edge; // in pixel, squared blocks
+    private static int blockSize, aoi_edge, overlapSize; // in pixel, squared blocks
     private static String outputFilePath;
 
     public static void main(String[] args) throws Exception {
@@ -49,21 +52,25 @@ public class TileOverlap {
             return;
         }
 
+        // TODO Scenen überlappend in Tiles schneiden
+
+
         final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(dop);
 
-        DataSet<Tuple3<String, byte[], byte[]>> allTiles = readTiles(env);
-        DataSet<Tuple3<String, byte[], byte[]>> overlappingTiles = allTiles.flatMap(new InvolvedTileSelector( //TODO ));
+        DataSet<Tuple3<String, byte[], byte[]>> allTiles = getTiles(env);
+        DataSet<Tuple3<String, byte[], byte[]>> overlappingTiles = allTiles.filter(new InvolvedTileSelector()); // weitere Schritte noch
 
         DataSink<Tuple3<String, byte[], byte[]>> writeAsEnvi = overlappingTiles.write(new ImageOutputFormat(), outputFilePath);
         writeAsEnvi.setParallelism(1);
-        env.execute("Tile Overlapping");
+        env.execute("Tile Overlap");
 
         /* TODO:
-            - AOI und Tiles an Mapper verteilen. oder filter
-            - Je Mapper: AOI und Tiles vergleichen, ob ueberlappung
-            - WIE Sortieren? nach welchem Kiterium nachbarschaft festlegen??
-            - groupBy nach nachbarschaftskey, sccenenweise gruppieren. bei 2 scenen: reducer für die scenen und reducer für die schnittestelle der scenen, dann uberlappung berechnen
+            - AOI und Tiles an Mapper verteilen. --> filter
+            - Je Mapper: AOI und Tiles vergleichen, ob Ueberlappung
+            - Reducer für Scenenweise Berechnung der Tile Überlappung
+            - Reducer für Berechnung der Tile Überlappung im Schnittbereich der Scenen
+            - Vll einen Coordinaten-"extracter" schreiben
          */
 
     }
@@ -71,13 +78,13 @@ public class TileOverlap {
     private static boolean parseParameters(String[] params) {
 
         if (params.length > 0) {
-            // input A, 2 coordinates: dop, input dir, left_upper_long, left_upper_lat, right_lower_long, right_lower_lat, pixel_size, output dir = 7
-            // input B, 1 coordinate and 1 edge: dop, input dir, left_upper_long, left_upper_lat, aoi_edge, output dir = 6
+            // input A, 2 coordinates: dop, input dir, left_upper_long, left_upper_lat, right_lower_long, right_lower_lat, blockSize, overlapSize, output dir = 9
+            // input B, 1 coordinate and 1 edge: dop, input dir, left_upper_long, left_upper_lat, aoi_edge, blockSize, overlapSize, output dir = 8
 
             // ** A -- 2 Coordinates **
-            if (params.length != 7) {
+            if (params.length != 9) {
                 System.out.println("Usage: <dop> <input directory> <left-upper-longitude> " +
-                        "<left-upper-latitude> <right-lower-longitude> <right-lower-latitude> <output path>");
+                        "<left-upper-latitude> <right-lower-longitude> <right-lower-latitude> <blockSize> <overlapSize> <output path>");
                 return false;
             } else {
                 dop = Integer.parseInt(params[0]);
@@ -88,13 +95,15 @@ public class TileOverlap {
                 String rightLat = params[5];
                 aoiLeftUpper = new Coordinate(Double.parseDouble(leftLong), Double.parseDouble(leftLat));
                 aoiRightLower = new Coordinate(Double.parseDouble(rightLong), Double.parseDouble(rightLat));
-                outputFilePath = params[6];
+                blockSize = Integer.parseInt(params[6]);
+                overlapSize = Integer.parseInt(params[7]);
+                outputFilePath = params[8];
             }
 
             // ** B -- 1 Coordinate and 1 Edge **
-            if (params.length != 6) {
+            if (params.length != 8) {
                 System.out.println("Usage: <dop> <input directory> <left-upper-longitude> " +
-                        "<left-upper-latitude> <aoi_edge> <output path>");
+                        "<left-upper-latitude> <aoi_edge> <blockSize> <overlapSize> <output path>");
                 return false;
             } else {
                 dop = Integer.parseInt(params[0]);
@@ -106,7 +115,9 @@ public class TileOverlap {
                 double rightLong = Double.parseDouble(leftLong) + aoi_edge;
                 double rightLat = Double.parseDouble(leftLat) - aoi_edge;
                 aoiRightLower = new Coordinate(rightLong, rightLat);
-                outputFilePath = params[5];
+                blockSize = Integer.parseInt(params[5]);
+                overlapSize = Integer.parseInt(params[6]);
+                outputFilePath = params[7];
             }
         } else {
             System.out.println(" Input parameters necessary!");
@@ -115,50 +126,28 @@ public class TileOverlap {
         return true;
     }
 
-    private static DataSet<Tuple3<String, byte[], byte[]>> readTiles(ExecutionEnvironment env) {
+    private static DataSet<Tuple3<String, byte[], byte[]>> getTiles(ExecutionEnvironment env) {
         //TODO: auf ueberlappende Tiles anpassen
-        TileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new TileInputFormat<Tuple3<String, byte[], byte[]>>(new Path(filePath));
+        OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
         enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
         enviFormat.setTileSize(blockSize, blockSize);
-        TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, byte[], byte[]>>(BasicTypeInfo.STRING_TYPE_INFO,
+        TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<>(BasicTypeInfo.STRING_TYPE_INFO,
                 PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO,
                 PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO);
-        return new DataSource<Tuple3<String, byte[], byte[]>>(env, enviFormat, typeInfo, "enviSource");
+        return new DataSource<>(env, enviFormat, typeInfo, "enviSource");
     }
 
 
-    public static class InvolvedTileSelector implements FlatMapFunction<Tuple2<Coordinate, Coordinate>, Tuple3<String, byte[], byte[]>> {
-
-        public void flatMap(Tuple2<Coordinate, Coordinate> aoi, Tuple3<String, byte[], byte[]> tile){
-
-            Coordinate aoiLU = aoi.getField(0);
-            Coordinate aoiRL = aoi.getField(1);
-            Coordinate aoiRU = new Coordinate(aoiRL.lon, aoiLU.lat);
-            Coordinate aoiLL = new Coordinate(aoiLU.lon, aoiRL.lat);
 
 
-            //TODO: Tile Koordinaten extrahieren: in tile oject sollten die koord. drinn sein
-            Coordinate tileLU; //TODO
-            Coordinate tileRL; //TODO
-            Coordinate tileRU = new Coordinate(tileRL.lon, tileLU.lat);
-            Coordinate tileLL = new Coordinate(tileLU.lon, tileRL.lat);
+    public static class InvolvedTileSelector implements FilterFunction<Tuple3<String, byte[], byte[]>> {
 
-            // compare coordinates
-            Coordinate lu_rl_Diff = aoiLU.diff(tileRL);
-            Coordinate rl_lu_Diff = aoiRL.diff(tileLU);
-            Coordinate lu_lu_Diff = aoiLU.diff(tileLU);
-            Coordinate rl_rl_Diff = aoiRL.diff(tileRL);
-
-            // if tile coordinate within aoi
-            if((lu_rl_Diff.lon<0 && lu_rl_Diff.lat>0) && (lu_lu_Diff.lon>0 && lu_lu_Diff.lat<0)){
-
-            }
-
-            if((rl_rl_Diff.lat<0 && rl_rl_Diff.lon>0) && (rl_lu_Diff.lon>0 && rl_lu_Diff.lat<0)){
-                   // return Tile cuz involved
-            }
-
-
+        @Override
+        public boolean filter(Tuple3<String, byte[], byte[]> tile) throws Exception {
+            // TODO aus dem Tuple3 die Tile Koordinaten extrahieren
+            OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
+            Coordinate tileLeftUpper, tileRightLower;
+            return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
         }
     }
 
