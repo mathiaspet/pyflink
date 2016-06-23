@@ -17,6 +17,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import org.apache.flink.api.java.tuple.Tuple;
@@ -106,12 +107,14 @@ public class PythonReceiver implements Serializable {
 	}
 
 	public void collectBufferedResult(byte[] buffer, Collector c) {
-		//TODO: fix this somehow w/o rewriting all the serializers
+		c.collect(deserializer.deserializeFromBytes(buffer));
 	}
 
 	//=====Deserializer=================================================================================================
 	private interface Deserializer<T> {
 		public T deserialize();
+
+		public T deserializeFromBytes(byte[] buffer);
 	}
 
 	private class ByteArrayDeserializer implements Deserializer<byte[]> {
@@ -122,8 +125,14 @@ public class PythonReceiver implements Serializable {
 			fileBuffer.get(value);
 			return value;
 		}
+
+		@Override
+		public byte[] deserializeFromBytes(byte[] buffer) {
+			return buffer;
+		}
 	}
 
+	//TODO: merge functionalities
 	private class TupleDeserializer implements Deserializer<Tuple2<Tuple, byte[]>> {
 		@Override
 		public Tuple2<Tuple, byte[]> deserialize() {
@@ -138,6 +147,21 @@ public class PythonReceiver implements Serializable {
 			fileBuffer.get(value);
 			return new Tuple2<>(keys, value);
 		}
+
+		public Tuple2<Tuple, byte[]> deserializeFromBytes(byte[] buffer) {
+			ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+			int keyTupleSize = byteBuffer.get();
+			Tuple keys = createTuple(keyTupleSize);
+			for (int x = 0; x < keyTupleSize; x++) {
+				byte[] data = new byte[byteBuffer.getInt()];
+				byteBuffer.get(data);
+				keys.setField(data, x);
+			}
+			byte[] value = new byte[byteBuffer.getInt()];
+			byteBuffer.get(value);
+			return new Tuple2<>(keys, value);
+		}
+
 	}
 
 	public static Tuple createTuple(int size) {

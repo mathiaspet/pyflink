@@ -250,7 +250,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	private SerializationUtils.Serializer serializer;
 
 	public final void transmitSplit(FileInputSplit split) throws IOException {
-		if (in.readInt() != SIGNAL_BUFFER_REQUEST) {
+		int signal = in.readInt(); //for debugging
+		if (signal != SIGNAL_BUFFER_REQUEST) {
 			throw new RuntimeException("yo aint getting no buffer");
 		}
 		Tuple3<String, Long, Long> tuple = new Tuple3<>(split.getPath().toString(), split.getStart(), split.getLength());
@@ -270,7 +271,13 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		}
 	}
 
-
+	/**
+	 * refactor this logic into the receiver such that it can be reused
+	 * @param c
+	 * @return
+	 * @throws IOException
+	 */
+	@Deprecated
 	public final boolean receiveUnbufferedResults(Collector c) throws IOException {
 		try {
 			int sig = in.readInt();
@@ -294,8 +301,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		}
 	}
 	/**
-	 * TODO: atm just a copy to test
-	 * @param c
+	 * Receive tuples that are larger than the mapped file size. This is done in round trips and involves a different deserialization logic.
+	 * @param c the Collector to give the results to.
 	 * @return
 	 * @throws IOException
 	 */
@@ -303,23 +310,15 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		try {
 			while(true) {
 				int sig = in.readInt();
-				System.out.println("caught signal: " + sig);
 				switch (sig) {
-					case SIGNAL_MULTIPLES_END:
-						System.out.println("end collecting buffered results");
-						sendReadConfirmation();
-						return true;
 					case SIGNAL_FINISHED:
-						System.out.println("end collecting buffered results(finished)");
 						sendReadConfirmation();
-						return true;
+						return false;
 					case SIGNAL_MULTIPLES:
-						System.out.println("begin collecting buffered results");
+						//just the start for receiving the actual data
 					default:
 						int size = in.readInt();
-
 						int numTrips = in.readInt();
-						System.out.println("collecting data in " + numTrips + " buffer trips");
 
 						int remainder = size % MAPPED_FILE_SIZE;
 						byte[] recBuff = new byte[size];
@@ -332,7 +331,6 @@ public class PythonSplitProcessorStreamer implements Serializable {
 							System.arraycopy(buff, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
 						}
 						//read remainder
-
 						if(remainder == 0) {
 							//TODO: remove the following variable
 							remainder = MAPPED_FILE_SIZE;
@@ -342,7 +340,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 						sendReadConfirmation();
 						System.arraycopy(buff, 0, recBuff, (numTrips - 1)*MAPPED_FILE_SIZE, remainder);
 						//deserialize and collect
-
+						receiver.collectBufferedResult(recBuff, c);
+						return true;
 				}
 			}
 		} catch (SocketTimeoutException ste) {

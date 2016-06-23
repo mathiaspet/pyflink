@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.configuration.Configuration;
@@ -34,6 +35,7 @@ import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_PLAN_NAM
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_TMP_DATA_DIR;
 import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
 import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_NAME_PREFIX;
+import static org.apache.flink.python.api.PythonPlanBinder.MAPPED_FILE_SIZE;
 import org.apache.flink.python.api.streaming.util.SerializationUtils.IntSerializer;
 import org.apache.flink.python.api.streaming.util.SerializationUtils.StringSerializer;
 import org.apache.flink.util.Collector;
@@ -245,6 +247,47 @@ public class PythonStreamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithoutGroups(Iterator i, Collector c) throws IOException {
+		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
+			transferLargeTuples(i, c);
+		}else {
+
+			try {
+				int size;
+				if (i.hasNext()) {
+					while (true) {
+						int sig = in.readInt();
+						switch (sig) {
+							case SIGNAL_BUFFER_REQUEST:
+								if (i.hasNext() || sender.hasRemaining(0)) {
+									size = sender.sendBuffer(i, 0);
+									sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
+								} else {
+									throw new RuntimeException("External process requested data even though none is available.");
+								}
+								break;
+							case SIGNAL_FINISHED:
+								return;
+							case SIGNAL_ERROR:
+								try { //wait before terminating to ensure that the complete error message is printed
+									Thread.sleep(2000);
+								} catch (InterruptedException ex) {
+								}
+								throw new RuntimeException(
+									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+							default:
+								receiver.collectBuffer(c, sig);
+								sendReadConfirmation();
+								break;
+						}
+					}
+				}
+			} catch (SocketTimeoutException ste) {
+				throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
+			}
+		}
+	}
+
+	private void transferLargeTuples(Iterator i, Collector c) throws IOException {
 		try {
 			int size;
 			if (i.hasNext()) {
@@ -253,8 +296,36 @@ public class PythonStreamer implements Serializable {
 					switch (sig) {
 						case SIGNAL_BUFFER_REQUEST:
 							if (i.hasNext() || sender.hasRemaining(0)) {
-								size = sender.sendBuffer(i, 0);
-								sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
+								//while iterator is not empty
+								//get next tuple
+								//serialize tuple
+								//chunk tuple
+								//transmit chunks
+
+
+								ByteBuffer buffer = sender.serialize(i.next());
+								int tupleSize = buffer.limit();
+								//send size
+								sender.sendRecord(tupleSize);
+								int numTrips = tupleSize / MAPPED_FILE_SIZE;
+								//send numTrips?
+								int remainder = tupleSize % MAPPED_FILE_SIZE;
+
+								byte[] chunk = new byte[MAPPED_FILE_SIZE];
+								for(int j = 0; j < numTrips; j++) {
+									buffer.get(chunk, j * MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
+									sender.transmitChunk(chunk);
+									sendWriteNotification(MAPPED_FILE_SIZE, true);
+								}
+
+								if(remainder != 0) {
+									chunk = new byte[remainder];
+									buffer.get(chunk, numTrips * MAPPED_FILE_SIZE, remainder);
+									sender.transmitChunk(chunk);
+									sendWriteNotification(MAPPED_FILE_SIZE, true);
+								}
+								//send confirmation that this record has been the last
+								//sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
 							} else {
 								throw new RuntimeException("External process requested data even though none is available.");
 							}
@@ -267,8 +338,9 @@ public class PythonStreamer implements Serializable {
 							} catch (InterruptedException ex) {
 							}
 							throw new RuntimeException(
-									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+								"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
 						default:
+							//TODO: rewrite this like in PythonSplitProcessorStreamer
 							receiver.collectBuffer(c, sig);
 							sendReadConfirmation();
 							break;

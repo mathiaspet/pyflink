@@ -180,6 +180,14 @@ public class PythonSender<IN> implements Serializable {
 		throw new IllegalArgumentException("This object can't be serialized: " + value.toString());
 	}
 
+	public ByteBuffer serialize(Object next) {
+		return getSerializer(next).serialize(next);
+	}
+
+	public void transmitChunk(byte[] chunk) {
+		//write this into the fileBuffer
+	}
+
 	private abstract class Serializer<T> {
 		protected ByteBuffer buffer;
 
