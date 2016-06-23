@@ -96,9 +96,6 @@ class BufferingTCPMappedFileConnection(object):
 
     def write(self, msg):
         length = len(msg)
-        print("msg type is: ", type(msg), " length is ", length)
-        sys.stdout.flush()
-
         if self._transferLargeMsg:
             self._write_large_msg(msg)
         else:
@@ -116,28 +113,18 @@ class BufferingTCPMappedFileConnection(object):
                 self._out_size = tmp
 
     def _write_large_msg(self, msg):
-        print("in transfer large msg fct")
-        sys.stdout.flush()
-        #return
         #TODO: maybe write buffer first
         self._socket.send(SIGNAL_MULTIPLES)
-        print("python: ", SIGNAL_MULTIPLES)
-        sys.stdout.flush()
-
         length = len(msg)
         self._socket.send(pack(">i", length))
 
         numTrips = int(length / MAPPED_FILE_SIZE)
         if length % MAPPED_FILE_SIZE > 0:
             numTrips += 1
-        #send num trips here
-        print("Sending ", numTrips, " chunks")
-        sys.stdout.flush()
+
         self._socket.send(pack(">i", numTrips))
         for i in range(0, numTrips):
             #send substrings here
-            print("sending chunk ", i * MAPPED_FILE_SIZE, " till ", (i+1)*MAPPED_FILE_SIZE)
-            sys.stdout.flush()
             chunk = msg[i*MAPPED_FILE_SIZE:(i+1)*MAPPED_FILE_SIZE]
             self._out.append(chunk)
             if i < numTrips-1:
@@ -145,11 +132,6 @@ class BufferingTCPMappedFileConnection(object):
             else:
                 self._out_size = length % MAPPED_FILE_SIZE
             self._write_buffer()
-
-
-        self._socket.send(SIGNAL_MULTIPLES_DONE)
-        print("python: ", SIGNAL_MULTIPLES_DONE)
-        sys.stdout.flush()
 
     def _write_buffer(self):
         self._file_output_buffer.seek(0, 0)
