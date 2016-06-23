@@ -22,6 +22,7 @@ import org.apache.flink.api.common.io.FileInputFormat;
 import org.apache.flink.api.common.io.statistics.BaseStatistics;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.TileInfoWrapper;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.core.fs.BlockLocation;
 import org.apache.flink.core.fs.FSDataInputStream;
@@ -153,7 +154,7 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
                 int pystart;
                 if(currentYSplit==0){
                     pystart = currentYSplit * ysize;
-                }else{ pystart = currentYSplit * ysize - overlapSize;}
+                 }else{ pystart = currentYSplit * ysize - overlapSize;}
 
                 int pynext = (currentYSplit + 1) * ysize - overlapSize;
 
@@ -164,17 +165,13 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
                         pxstart = currentXSplit * xsize;
                     }else{ pxstart = currentXSplit * xsize - overlapSize;}
 
-                    int pxnext = ((currentXSplit + 1) % xsplits) * xsize - overlapSize; // EXCLUSIVE
-                    int pxnextNoWrapped = (currentXSplit + 1) * xsize - overlapSize; // EXCLUSIVE
+                    int pxnext = ((currentXSplit + 1) % xsplits) * xsize - overlapSize;
+                    int pxnextNoWrapped = (currentXSplit + 1) * xsize - overlapSize;
 
-                    Coordinate tileUpperLeft, tileLowerRight;
-                    if(currentYSplit==0 && currentXSplit==0){
-                        tileUpperLeft = new Coordinate(upperLeftCorner.lon, upperLeftCorner.lat);
-                        tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight); //TODO rethink
-                    }else {
-                        tileUpperLeft = new Coordinate(upperLeftCorner.lon + pxstart * pixelWidth, upperLeftCorner.lat - pystart * pixelHeight);
-                        tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize - 1) * pixelWidth, tileUpperLeft.lat - (ysize - 1) * pixelHeight);//TODO rethink
-                    }
+                    Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + pxstart * pixelWidth, upperLeftCorner.lat - pystart * pixelHeight);
+                    Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
+
+                    info.setLeftUpper(tileUpperLeft);
 
                     // Filter this tile if no pixel is contained in the selected region:
                     if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
@@ -213,6 +210,8 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
             }
         }
     }
+
+
 
     /**
     * Return true iff the rectangle with the given left upper and lower right points, which is oriented along the latitudinal
