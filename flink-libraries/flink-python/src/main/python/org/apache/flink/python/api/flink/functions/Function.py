@@ -33,7 +33,7 @@ class Function(object):
         self._env = None
 
     def _configure(self, input_file, output_file, port, env, info):
-        self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port)
+        self._connection = Connection.BufferingTCPMappedFileConnection(input_file, output_file, port, env.get_sendLargeTuples())
         self._iterator = Iterator.Iterator(self._connection, env)
         self._collector = Collector.Collector(self._connection, env, info)
         self.context = RuntimeContext.RuntimeContext(self._iterator, self._collector)

@@ -30,6 +30,9 @@ SIGNAL_REQUEST_BUFFER_G0 = b"\xFF\xFF\xFF\xFD"
 SIGNAL_REQUEST_BUFFER_G1 = b"\xFF\xFF\xFF\xFC"
 SIGNAL_FINISHED = b"\xFF\xFF\xFF\xFF"
 
+SIGNAL_MULTIPLES = b"\xFF\xFF\xFF\xFB"
+SIGNAL_MULTIPLES_DONE = b"\xFF\xFF\xFF\xFA"
+
 if PY2:
     SIGNAL_WAS_LAST = "\x20"
 else:
@@ -67,7 +70,7 @@ class PureTCPConnection(object):
 
 
 class BufferingTCPMappedFileConnection(object):
-    def __init__(self, input_file, output_file, port):
+    def __init__(self, input_file, output_file, port, transferLargeMsg = False):
         self._input_file = open(input_file, "rb+")
         self._output_file = open(output_file, "rb+")
         if hasattr(mmap, 'MAP_SHARED'):
@@ -86,6 +89,7 @@ class BufferingTCPMappedFileConnection(object):
         self._input_offset = 0
         self._input_size = 0
         self._was_last = False
+        self._transferLargeMsg = transferLargeMsg
 
     def close(self):
         self._socket.close()
@@ -95,15 +99,57 @@ class BufferingTCPMappedFileConnection(object):
         print("msg type is: ", type(msg), " length is ", length)
         sys.stdout.flush()
 
-        if length > MAPPED_FILE_SIZE:
-            raise Exception("Serialized object does not fit into a single buffer.")
-        tmp = self._out_size + length
-        if tmp > MAPPED_FILE_SIZE:
-            self._write_buffer()
-            self.write(msg)
+        if self._transferLargeMsg:
+            self._write_large_msg(msg)
         else:
-            self._out.append(msg)
-            self._out_size = tmp
+            if length > MAPPED_FILE_SIZE:
+                raise Exception("Serialized object does not fit into a single buffer.")
+            tmp = self._out_size + length
+            #current msg does not fit into buffer anymore
+            if tmp > MAPPED_FILE_SIZE:
+                #empty the buffer first
+                self._write_buffer()
+                #write message to the buffer
+                self.write(msg)
+            else:
+                self._out.append(msg)
+                self._out_size = tmp
+
+    def _write_large_msg(self, msg):
+        print("in transfer large msg fct")
+        sys.stdout.flush()
+        #return
+        #TODO: maybe write buffer first
+        self._socket.send(SIGNAL_MULTIPLES)
+        print("python: ", SIGNAL_MULTIPLES)
+        sys.stdout.flush()
+
+        length = len(msg)
+        self._socket.send(pack(">i", length))
+
+        numTrips = int(length / MAPPED_FILE_SIZE)
+        if length % MAPPED_FILE_SIZE > 0:
+            numTrips += 1
+        #send num trips here
+        print("Sending ", numTrips, " chunks")
+        sys.stdout.flush()
+        self._socket.send(pack(">i", numTrips))
+        for i in range(0, numTrips):
+            #send substrings here
+            print("sending chunk ", i * MAPPED_FILE_SIZE, " till ", (i+1)*MAPPED_FILE_SIZE)
+            sys.stdout.flush()
+            chunk = msg[i*MAPPED_FILE_SIZE:(i+1)*MAPPED_FILE_SIZE]
+            self._out.append(chunk)
+            if i < numTrips-1:
+                self._out_size = MAPPED_FILE_SIZE
+            else:
+                self._out_size = length % MAPPED_FILE_SIZE
+            self._write_buffer()
+
+
+        self._socket.send(SIGNAL_MULTIPLES_DONE)
+        print("python: ", SIGNAL_MULTIPLES_DONE)
+        sys.stdout.flush()
 
     def _write_buffer(self):
         self._file_output_buffer.seek(0, 0)

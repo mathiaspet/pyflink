@@ -97,6 +97,18 @@ public class PythonReceiver implements Serializable {
 		}
 	}
 
+	public byte[] collectUnserialized(int bufferSize) throws IOException {
+		fileBuffer.position(0);
+		byte[] retVal = new byte[bufferSize];
+		fileBuffer.get(retVal);
+
+		return retVal;
+	}
+
+	public void collectBufferedResult(byte[] buffer, Collector c) {
+		//TODO: fix this somehow w/o rewriting all the serializers
+	}
+
 	//=====Deserializer=================================================================================================
 	private interface Deserializer<T> {
 		public T deserialize();
