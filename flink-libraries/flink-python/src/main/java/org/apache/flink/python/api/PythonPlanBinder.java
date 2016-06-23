@@ -247,11 +247,12 @@ public class PythonPlanBinder {
 	private enum Parameters {
 		DOP,
 		MODE,
-		RETRY
+		RETRY,
+		LARGETUPLES
 	}
 
 	private void receiveParameters() throws IOException {
-		for (int x = 0; x < 3; x++) {
+		for (int x = 0; x < 4; x++) {
 			Tuple value = (Tuple) streamer.getRecord(true);
 			switch (Parameters.valueOf(((String) value.getField(0)).toUpperCase())) {
 				case DOP:
@@ -264,6 +265,10 @@ public class PythonPlanBinder {
 				case RETRY:
 					int retry = (Integer) value.getField(1);
 					env.setRestartStrategy(RestartStrategies.fixedDelayRestart(retry, 10000L));
+					break;
+				case LARGETUPLES:
+					Boolean lt = (Boolean)value.getField(1);
+					env.setLargeTuples(lt);
 					break;
 			}
 		}

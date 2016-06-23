@@ -286,6 +286,7 @@ class Environment(object):
         collect(("dop", self._dop))
         collect(("mode", self._local_mode))
         collect(("retry", self._retry))
+        collect(("largetuples", self._sendLargeTuples))
 
     def _send_operations(self):
         self._collector.collect(len(self._sources) + len(self._sets) + len(self._sinks) + len(self._broadcast))

@@ -130,7 +130,6 @@ public abstract class ExecutionEnvironment {
 	/** Flag to indicate whether sinks have been cleared in previous executions */
 	private boolean wasExecuted = false;
 
-
 	/**
 	 * Creates a new Execution Environment.
 	 */
@@ -182,6 +181,10 @@ public abstract class ExecutionEnvironment {
 		config.setParallelism(parallelism);
 	}
 
+
+	public boolean getLargeTuples() {return this.config.isLargeTuples();}
+
+	public void setLargeTuples(boolean largeTuples) {this.config.setLargeTuples(largeTuples);}
 	/**
 	 * Sets the restart strategy configuration. The configuration specifies which restart strategy
 	 * will be used for the execution graph in case of a restart.

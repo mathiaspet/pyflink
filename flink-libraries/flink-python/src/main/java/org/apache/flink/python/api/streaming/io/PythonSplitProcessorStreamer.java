@@ -14,6 +14,7 @@ package org.apache.flink.python.api.streaming.io;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.io.RichInputFormat;
+import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -39,13 +40,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Iterator;
 
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_DC_ID;
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_TMP_DATA_DIR;
-import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
-import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_NAME_PREFIX;
+import static org.apache.flink.python.api.PythonPlanBinder.*;
 import static org.apache.flink.python.api.streaming.util.SerializationUtils.getSerializer;
 
 /**
@@ -59,6 +54,9 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	private static final int SIGNAL_FINISHED = -1;
 	private static final int SIGNAL_ERROR = -2;
 	private static final byte SIGNAL_LAST = 32;
+
+	private static final int SIGNAL_MULTIPLES = -5;
+	private static final int SIGNAL_MULTIPLES_END = -6;
 
 	private final int id;
 	private final boolean usePython3;
@@ -264,6 +262,16 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	}
 
 	public final boolean receiveResults(Collector c) throws IOException {
+		boolean largeTuples = this.format.getRuntimeContext().getExecutionConfig().isLargeTuples();
+		if(largeTuples) {
+			return receiveBufferedResults(c);
+		} else {
+			return receiveUnbufferedResults(c);
+		}
+	}
+
+
+	public final boolean receiveUnbufferedResults(Collector c) throws IOException {
 		try {
 			int sig = in.readInt();
 			switch (sig) {
@@ -285,7 +293,6 @@ public class PythonSplitProcessorStreamer implements Serializable {
 			throw new RuntimeException("External process for task " + this.format.getRuntimeContext().getTaskName() + " stopped responding." + msg);
 		}
 	}
-
 	/**
 	 * TODO: atm just a copy to test
 	 * @param c
@@ -294,21 +301,49 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	 */
 	public final boolean receiveBufferedResults(Collector c) throws IOException {
 		try {
-			int sig = in.readInt();
-			switch (sig) {
-				case SIGNAL_FINISHED:
-					return false;
-				case SIGNAL_ERROR:
-					try { //wait before terminating to ensure that the complete error message is printed
-						Thread.sleep(2000);
-					} catch (InterruptedException ex) {
-					}
-					throw new RuntimeException(
-						"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
-				default:
-					receiver.collectBuffer(c, sig);
-					sendReadConfirmation();
-					return true;
+			while(true) {
+				int sig = in.readInt();
+				System.out.println("caught signal: " + sig);
+				switch (sig) {
+					case SIGNAL_MULTIPLES_END:
+						System.out.println("end collecting buffered results");
+						sendReadConfirmation();
+						return true;
+					case SIGNAL_FINISHED:
+						System.out.println("end collecting buffered results(finished)");
+						sendReadConfirmation();
+						return true;
+					case SIGNAL_MULTIPLES:
+						System.out.println("begin collecting buffered results");
+					default:
+						int size = in.readInt();
+
+						int numTrips = in.readInt();
+						System.out.println("collecting data in " + numTrips + " buffer trips");
+
+						int remainder = size % MAPPED_FILE_SIZE;
+						byte[] recBuff = new byte[size];
+						for(int i = 0; i < numTrips - 1; i++) {
+							//read normal case
+							//TODO: remove the following variable
+							byte[] buff = receiver.collectUnserialized(MAPPED_FILE_SIZE);
+							int currSize = in.readInt();
+							sendReadConfirmation();
+							System.arraycopy(buff, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
+						}
+						//read remainder
+
+						if(remainder == 0) {
+							//TODO: remove the following variable
+							remainder = MAPPED_FILE_SIZE;
+						}
+						byte[] buff = receiver.collectUnserialized(remainder);
+						int currSize = in.readInt();
+						sendReadConfirmation();
+						System.arraycopy(buff, 0, recBuff, (numTrips - 1)*MAPPED_FILE_SIZE, remainder);
+						//deserialize and collect
+
+				}
 			}
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + this.format.getRuntimeContext().getTaskName() + " stopped responding." + msg);
