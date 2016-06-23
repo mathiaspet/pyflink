@@ -28,6 +28,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
+import org.apache.flink.api.java.spatial.TileInfoWrapper;
 import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
 import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -66,11 +67,8 @@ public class TileOverlap {
         env.execute("Tile Overlap");
 
         /* TODO:
-            - AOI und Tiles an Mapper verteilen. --> filter
-            - Je Mapper: AOI und Tiles vergleichen, ob Ueberlappung
             - Reducer für Scenenweise Berechnung der Tile Überlappung
             - Reducer für Berechnung der Tile Überlappung im Schnittbereich der Scenen
-            - Vll einen Coordinaten-"extracter" schreiben
          */
 
     }
@@ -127,9 +125,7 @@ public class TileOverlap {
     }
 
     private static DataSet<Tuple3<String, byte[], byte[]>> getTiles(ExecutionEnvironment env) {
-        //TODO: auf ueberlappende Tiles anpassen
         OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
-        enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
         enviFormat.setTileSize(blockSize, blockSize);
         TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<>(BasicTypeInfo.STRING_TYPE_INFO,
                 PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO,
@@ -144,9 +140,12 @@ public class TileOverlap {
 
         @Override
         public boolean filter(Tuple3<String, byte[], byte[]> tile) throws Exception {
-            // TODO aus dem Tuple3 die Tile Koordinaten extrahieren
             OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
-            Coordinate tileLeftUpper, tileRightLower;
+            TileInfoWrapper info = new TileInfoWrapper();
+            Coordinate tileLeftUpper = info.getLeftUpper();
+            Coordinate tileRightLower = info.getLowerRightCoordinate();
+            enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
+
             return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
         }
     }
