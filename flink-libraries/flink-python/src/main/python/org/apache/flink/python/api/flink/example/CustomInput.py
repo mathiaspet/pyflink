@@ -20,6 +20,7 @@ import numpy as np
 import gdal
 import sys
 from gdalconst import GA_ReadOnly
+from flink.plan.Constants import BYTES, STRING
 
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
@@ -32,7 +33,7 @@ from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
 
 class Tokenizer(FlatMapFunction):
     def flat_map(self, value, collector):
-        print("collecting")
+        print("collecting in Tokenizer")
         sys.stdout.flush()
         collector.collect(value)
 
@@ -97,6 +98,8 @@ class GDALInputFormat(PythonInputFormat):
         metaBytes = ImageWrapper._meta_to_bytes(metaData)
         bArr = bytearray(imageData)
         retVal = (metaData['scene id'], metaBytes, bArr)
+        print("in pif before collect", type(retVal))
+        sys.stdout.flush()
         collector.collect(retVal)
 
     def readMetaData(self, path):
@@ -152,6 +155,7 @@ class Filter(FilterFunction):
 
     def filter(self, value):
         print(0)
+        sys.stdout.flush()
         return False
 
 
@@ -162,12 +166,14 @@ def main():
     inputFormat = GDALInputFormat(26184107)
 
     data = env.read_custom("/opt/gms_sample/", ".*?\\.bsq", True,
-                           inputFormat)
+                           inputFormat, [STRING, BYTES, BYTES])
 
-    result = data \
-        .flat_map(TupleToTile()) \
-        .flat_map(Tokenizer()) \
-        .flat_map(TileToTuple())
+    #result = data \
+    #    .flat_map(TupleToTile()) \
+    #    .flat_map(Tokenizer()) \
+    #    .flat_map(TileToTuple())
+
+    result = data
 
     result.write_custom(GMSOF("/opt/output"))
 

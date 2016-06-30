@@ -12,6 +12,7 @@
  */
 package org.apache.flink.python.api.streaming.data;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -40,6 +41,8 @@ public class PythonReceiver implements Serializable {
 	private final boolean readAsByteArray;
 
 	private Deserializer<?> deserializer = null;
+
+	private DataOutputStream out;
 
 	public PythonReceiver(boolean usesByteArray) {
 		readAsByteArray = usesByteArray;
@@ -78,6 +81,11 @@ public class PythonReceiver implements Serializable {
 		inputRAF.close();
 	}
 
+	public void setOut(DataOutputStream dos){
+		this.out = dos;
+	}
+
+
 
 	//=====IO===========================================================================================================
 	/**
@@ -96,6 +104,7 @@ public class PythonReceiver implements Serializable {
 		while (fileBuffer.position() < bufferSize) {
 			c.collect(deserializer.deserialize());
 		}
+		this.sendReadConfirmation();
 	}
 
 	public byte[] collectUnserialized(int bufferSize) throws IOException {
@@ -106,8 +115,14 @@ public class PythonReceiver implements Serializable {
 		return retVal;
 	}
 
-	public void collectBufferedResult(byte[] buffer, Collector c) {
+	public void collectBufferedResult(byte[] buffer, Collector c) throws IOException {
 		c.collect(deserializer.deserializeFromBytes(buffer));
+		this.sendReadConfirmation();
+	}
+
+	private void sendReadConfirmation() throws IOException {
+		out.writeByte(1);
+		out.flush();
 	}
 
 	//=====Deserializer=================================================================================================

@@ -17,6 +17,7 @@
 ################################################################################
 from struct import unpack
 from collections import deque
+import sys
 
 try:
     import _abcoll as defIter
@@ -177,6 +178,7 @@ class Iterator(defIter.Iterator):
         self._deserializer = None
         self._env = env
         self._size = 0
+        self._largeTuples = env.get_sendLargeTuples()
 
     def __next__(self):
         return self.next()
@@ -184,8 +186,16 @@ class Iterator(defIter.Iterator):
     def _read(self, des_size):
         return self._connection.read(des_size, self._group)
 
+    #TODO: remove this hack
+    #TODO: replace with proper flag per operator?
+    def _setLargeTuples(self, largeTuples = False):
+        self._largeTuples = largeTuples
+
     def next(self):
         if self.has_next():
+            if self._largeTuples:
+                self._connection.readLargeTuple()
+
             custom_types = self._env._types
             read = self._read
             if self._deserializer is None:

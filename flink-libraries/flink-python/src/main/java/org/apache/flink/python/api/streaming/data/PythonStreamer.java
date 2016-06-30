@@ -65,8 +65,11 @@ public class PythonStreamer implements Serializable {
 	private Thread shutdownThread;
 	protected ServerSocket server;
 	protected Socket socket;
+
 	protected DataInputStream in;
+	/*TODO: move to PythonSender & PythonReceiver*/
 	protected DataOutputStream out;
+
 	protected int port;
 
 	protected PythonSender sender;
@@ -150,6 +153,9 @@ public class PythonStreamer implements Serializable {
 		socket = server.accept();
 		in = new DataInputStream(socket.getInputStream());
 		out = new DataOutputStream(socket.getOutputStream());
+		this.sender.setOut(this.out);
+		this.sender.setIn(this.in);
+		this.receiver.setOut(this.out);
 	}
 
 	/**
@@ -193,12 +199,13 @@ public class PythonStreamer implements Serializable {
 		}
 	}
 
+	@Deprecated
 	private void sendWriteNotification(int size, boolean hasNext) throws IOException {
 		out.writeInt(size);
 		out.writeByte(hasNext ? 0 : SIGNAL_LAST);
 		out.flush();
 	}
-
+	@Deprecated
 	private void sendReadConfirmation() throws IOException {
 		out.writeByte(1);
 		out.flush();
@@ -248,48 +255,46 @@ public class PythonStreamer implements Serializable {
 	 */
 	public final void streamBufferWithoutGroups(Iterator i, Collector c) throws IOException {
 		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
-			transferLargeTuples(i, c);
-		}else {
+			this.sender.setLargeTuples(true);
+		}
 
-			try {
-				int size;
-				if (i.hasNext()) {
-					while (true) {
-						int sig = in.readInt();
-						switch (sig) {
-							case SIGNAL_BUFFER_REQUEST:
-								if (i.hasNext() || sender.hasRemaining(0)) {
-									size = sender.sendBuffer(i, 0);
-									sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
-								} else {
-									throw new RuntimeException("External process requested data even though none is available.");
-								}
-								break;
-							case SIGNAL_FINISHED:
-								return;
-							case SIGNAL_ERROR:
-								try { //wait before terminating to ensure that the complete error message is printed
-									Thread.sleep(2000);
-								} catch (InterruptedException ex) {
-								}
-								throw new RuntimeException(
-									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
-							default:
-								receiver.collectBuffer(c, sig);
-								sendReadConfirmation();
-								break;
-						}
+		try {
+			//int size;
+			if (i.hasNext()) {
+				while (true) {
+					int sig = in.readInt();
+					switch (sig) {
+						case SIGNAL_BUFFER_REQUEST:
+							if (i.hasNext() || sender.hasRemaining(0)) {
+								sender.sendBuffer(i, 0);
+							} else {
+								throw new RuntimeException("External process requested data even though none is available.");
+							}
+							break;
+						case SIGNAL_FINISHED:
+							return;
+						case SIGNAL_ERROR:
+							try { //wait before terminating to ensure that the complete error message is printed
+								Thread.sleep(2000);
+							} catch (InterruptedException ex) {
+							}
+							throw new RuntimeException(
+								"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+						default:
+							receiver.collectBuffer(c, sig);
+							break;
 					}
 				}
-			} catch (SocketTimeoutException ste) {
-				throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
 			}
+		} catch (SocketTimeoutException ste) {
+			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
 		}
 	}
 
+	@Deprecated
 	private void transferLargeTuples(Iterator i, Collector c) throws IOException {
 		try {
-			int size;
+			//int size;
 			if (i.hasNext()) {
 				while (true) {
 					int sig = in.readInt();
@@ -306,7 +311,7 @@ public class PythonStreamer implements Serializable {
 								ByteBuffer buffer = sender.serialize(i.next());
 								int tupleSize = buffer.limit();
 								//send size
-								sender.sendRecord(tupleSize);
+								sender.sendRecord(tupleSize, false);
 								int numTrips = tupleSize / MAPPED_FILE_SIZE;
 								//send numTrips?
 								int remainder = tupleSize % MAPPED_FILE_SIZE;
@@ -370,13 +375,11 @@ public class PythonStreamer implements Serializable {
 						case SIGNAL_BUFFER_REQUEST_G0:
 							if (i1.hasNext() || sender.hasRemaining(0)) {
 								size = sender.sendBuffer(i1, 0);
-								sendWriteNotification(size, sender.hasRemaining(0) || i1.hasNext());
 							}
 							break;
 						case SIGNAL_BUFFER_REQUEST_G1:
 							if (i2.hasNext() || sender.hasRemaining(1)) {
 								size = sender.sendBuffer(i2, 1);
-								sendWriteNotification(size, sender.hasRemaining(1) || i2.hasNext());
 							}
 							break;
 						case SIGNAL_FINISHED:
@@ -390,7 +393,6 @@ public class PythonStreamer implements Serializable {
 									"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
 						default:
 							receiver.collectBuffer(c, sig);
-							sendReadConfirmation();
 							break;
 					}
 				}
@@ -402,8 +404,7 @@ public class PythonStreamer implements Serializable {
 
 	public final void sendMessage(String closeMessage) throws IOException {
 		try {
-			int size = sender.sendRecord(closeMessage);
-			sendWriteNotification(size, false);
+			int size = sender.sendRecord(closeMessage, false);
 			sender.reset();
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
