@@ -31,6 +31,7 @@ class PythonInputFormat(Function.Function):
         super(PythonInputFormat, self).__init__()
 
     def _run(self):
+        self._iterator._setLargeTuples(False)
         collector = self._collector
         function = self.deliver
         split = self._iterator.next()

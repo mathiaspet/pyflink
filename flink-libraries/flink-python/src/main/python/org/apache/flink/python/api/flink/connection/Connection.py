@@ -150,6 +150,26 @@ class BufferingTCPMappedFileConnection(object):
             raise Exception("BufferUnderFlowException")
         return self._input[old_offset:self._input_offset]
 
+    def readLargeTuple(self):
+        self._socket.send(SIGNAL_REQUEST_BUFFER)
+        meta_size = recv_all(self._socket, 5)
+        size = unpack(">I", meta_size[:4])[0]
+        numTrips = int(size / MAPPED_FILE_SIZE)
+        remainder = size % MAPPED_FILE_SIZE
+
+        buffer = b""
+        for i in range(0, numTrips):
+            self._read_buffer()
+            buffer += self._input
+
+        #read remainder
+        if remainder:
+            self._read_buffer()
+            buffer += self._input
+
+        self._socket.send(SIGNAL_MULTIPLES_DONE)
+        self._input = buffer
+
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)
         self._file_input_buffer.seek(0, 0)
@@ -189,11 +209,15 @@ class TwinBufferingTCPMappedFileConnection(BufferingTCPMappedFileConnection):
         self._was_last = [False, False]
 
     def read(self, des_size, group):
-        if self._input_size[group] == self._input_offset[group]:
-            self._read_buffer(group)
-        old_offset = self._input_offset[group]
-        self._input_offset[group] += des_size
-        return self._input[group][old_offset:self._input_offset[group]]
+        if self._transferLargeMsg:
+            print("reading large messages")
+            sys.stdout.flush()
+        else:
+            if self._input_size[group] == self._input_offset[group]:
+                self._read_buffer(group)
+            old_offset = self._input_offset[group]
+            self._input_offset[group] += des_size
+            return self._input[group][old_offset:self._input_offset[group]]
 
     def _read_buffer(self, group):
         if group:

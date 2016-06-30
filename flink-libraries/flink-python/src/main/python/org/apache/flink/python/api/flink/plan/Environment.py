@@ -121,7 +121,7 @@ class Environment(object):
         self._sources.append(child)
         return child_set
 
-    def read_custom(self, path, filter, splits, format):
+    def read_custom(self, path, filter, splits, format, types = None):
         """
         Creates a DataSet using a custom input format that is executed directly in the Python process.
         """
@@ -133,7 +133,10 @@ class Environment(object):
         child.filter = filter
         child.computeSplits = splits
         child.operator = copy.deepcopy(format)
-        child.types = _createArrayTypeInfo()
+        if types is None:
+            child.types = _createArrayTypeInfo()
+        else:
+            child.types = types
         self._sources.append(child)
         return child_set
 

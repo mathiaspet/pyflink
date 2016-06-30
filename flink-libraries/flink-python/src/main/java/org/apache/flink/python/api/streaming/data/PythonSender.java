@@ -12,6 +12,8 @@
  */
 package org.apache.flink.python.api.streaming.data;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -20,7 +22,9 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.Iterator;
+
 import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_TMP_DATA_DIR;
@@ -35,10 +39,19 @@ public class PythonSender<IN> implements Serializable {
 	public static final byte TYPE_VALUE_VALUE = (byte) 61;
 	public static final byte TYPE_STRING_VALUE = (byte) 28;
 
+	private static final byte SIGNAL_LAST = 32;
+	private static final int SIGNAL_BUFFER_REQUEST = 0;
+
 	private File outputFile;
 	private RandomAccessFile outputRAF;
 	private FileChannel outputChannel;
 	private MappedByteBuffer fileBuffer;
+
+	/* TODO: moved here from PythonStreamer */
+	private DataOutputStream out;
+	private DataInputStream in;
+	private boolean largeTuples;
+
 
 	private final ByteBuffer[] saved = new ByteBuffer[2];
 
@@ -66,6 +79,12 @@ public class PythonSender<IN> implements Serializable {
 		outputChannel = outputRAF.getChannel();
 		fileBuffer = outputChannel.map(FileChannel.MapMode.READ_WRITE, 0, MAPPED_FILE_SIZE);
 	}
+
+	public void setOut(DataOutputStream out){this.out = out;}
+
+	public void setIn(DataInputStream in){this.in = in;}
+
+	public void setLargeTuples(boolean large){this.largeTuples = large;}
 
 	public void close() throws IOException {
 		closeMappedFile();
@@ -97,7 +116,7 @@ public class PythonSender<IN> implements Serializable {
 	 * @throws IOException
 	 */
 	@SuppressWarnings("unchecked")
-	public int sendRecord(Object value) throws IOException {
+	public int sendRecord(Object value, boolean hasMore) throws IOException {
 		fileBuffer.clear();
 		int group = 0;
 
@@ -111,6 +130,7 @@ public class PythonSender<IN> implements Serializable {
 		int size = fileBuffer.position();
 
 		reset();
+		sendWriteNotification(size, hasMore);
 		return size;
 	}
 
@@ -130,39 +150,111 @@ public class PythonSender<IN> implements Serializable {
 	 */
 	@SuppressWarnings("unchecked")
 	public int sendBuffer(Iterator i, int group) throws IOException {
-		fileBuffer.clear();
+		if(this.largeTuples) {
+			return sendLargeTuples(i, group);
+		}else {
+			fileBuffer.clear();
 
+			Object value;
+			ByteBuffer bb;
+			if (serializer[group] == null) {
+				value = i.next();
+				serializer[group] = getSerializer(value);
+				bb = serializer[group].serialize(value);
+				if (bb.remaining() > MAPPED_FILE_SIZE) {
+					throw new RuntimeException("Serialized object does not fit into a single buffer.");
+				}
+				fileBuffer.put(bb);
+
+			}
+			if (saved[group] != null) {
+				fileBuffer.put(saved[group]);
+				saved[group] = null;
+			}
+			while (i.hasNext() && saved[group] == null) {
+				value = i.next();
+				bb = serializer[group].serialize(value);
+				if (bb.remaining() > MAPPED_FILE_SIZE) {
+					throw new RuntimeException("Serialized object does not fit into a single buffer.");
+				}
+				if (bb.remaining() <= fileBuffer.remaining()) {
+					fileBuffer.put(bb);
+				} else {
+					saved[group] = bb;
+				}
+			}
+
+			int size = fileBuffer.position();
+			sendWriteNotification(size, this.hasRemaining(0) || i.hasNext());
+			return size;
+		}
+	}
+
+	private int sendLargeTuples(Iterator i, int group) throws IOException {
+		//while iterator is not empty
+		//get next tuple
+		//serialize tuple
+		//chunk tuple
+		//transmit chunks
+
+		fileBuffer.clear();
 		Object value;
 		ByteBuffer bb;
 		if (serializer[group] == null) {
 			value = i.next();
 			serializer[group] = getSerializer(value);
 			bb = serializer[group].serialize(value);
-			if (bb.remaining() > MAPPED_FILE_SIZE) {
-				throw new RuntimeException("Serialized object does not fit into a single buffer.");
-			}
-			fileBuffer.put(bb);
 
-		}
-		if (saved[group] != null) {
-			fileBuffer.put(saved[group]);
-			saved[group] = null;
-		}
-		while (i.hasNext() && saved[group] == null) {
-			value = i.next();
-			bb = serializer[group].serialize(value);
-			if (bb.remaining() > MAPPED_FILE_SIZE) {
-				throw new RuntimeException("Serialized object does not fit into a single buffer.");
-			}
-			if (bb.remaining() <= fileBuffer.remaining()) {
-				fileBuffer.put(bb);
-			} else {
-				saved[group] = bb;
-			}
-		}
 
-		int size = fileBuffer.position();
-		return size;
+			int tupleSize = bb.limit();
+			//send size
+			sendWriteNotification(tupleSize, true);
+
+			int numTrips = tupleSize / MAPPED_FILE_SIZE;
+			//send numTrips?
+			int remainder = tupleSize % MAPPED_FILE_SIZE;
+
+			byte[] chunk = new byte[MAPPED_FILE_SIZE];
+			for(int j = 0; j < numTrips; j++) {
+				int nextBuffer = in.readInt();
+				if(nextBuffer != SIGNAL_BUFFER_REQUEST)
+				{
+					System.out.println("false signal: " + nextBuffer);
+				}
+				bb.get(chunk);
+				fileBuffer.put(chunk);
+
+				sendWriteNotification(MAPPED_FILE_SIZE, true);
+
+				fileBuffer.clear();
+			}
+
+			if(remainder != 0) {
+				int nextBuffer = in.readInt();
+				if(nextBuffer != SIGNAL_BUFFER_REQUEST)
+				{
+					System.out.println("false signal: " + nextBuffer);
+				}
+
+				chunk = new byte[remainder];
+				bb.get(chunk, 0, remainder);
+				fileBuffer.put(chunk);
+				sendWriteNotification(remainder, true);
+			}
+
+			int multiplesLast = in.readInt();
+			System.out.println("read signal: " + multiplesLast);
+
+			//send confirmation that this record has been the last
+			//sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
+		}
+		return 1;
+	}
+
+	private void sendWriteNotification(int size, boolean hasNext) throws IOException {
+		out.writeInt(size);
+		out.writeByte(hasNext ? 0 : SIGNAL_LAST);
+		out.flush();
 	}
 
 	//=====Serializer===================================================================================================

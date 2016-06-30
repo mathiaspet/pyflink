@@ -14,7 +14,6 @@ package org.apache.flink.python.api.streaming.io;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.io.RichInputFormat;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileInputSplit;
@@ -40,7 +39,15 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.Iterator;
 
-import static org.apache.flink.python.api.PythonPlanBinder.*;
+import static org.apache.flink.python.api.PythonPlanBinder.FLINK_TMP_DATA_DIR;
+import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_DC_ID;
+import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
+import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
+import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
+import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
+import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_NAME_PREFIX;
+import static org.apache.flink.python.api.PythonPlanBinder.MAPPED_FILE_SIZE;
+
 import static org.apache.flink.python.api.streaming.util.SerializationUtils.getSerializer;
 
 /**
@@ -156,6 +163,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		socket = server.accept();
 		in = new DataInputStream(socket.getInputStream());
 		out = new DataOutputStream(socket.getOutputStream());
+		this.sender.setOut(this.out);
+		this.receiver.setOut(this.out);
 	}
 
 	/**
@@ -165,8 +174,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	 */
 	public void close() throws IOException {
 		try {
-			int size = this.sender.sendRecord(getSerializer(null).serialize(null));
-			sendWriteNotification(size, false);
+			int size = this.sender.sendRecord(getSerializer(null).serialize(null), false);
+			//sendWriteNotification(size, false);
 			socket.close();
 			sender.close();
 			receiver.close();
@@ -258,8 +267,8 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		if (serializer == null) {
 			serializer = getSerializer(tuple);
 		}
-		int size = sender.sendRecord(this.serializer.serialize(tuple));
-		sendWriteNotification(size, true);
+		int size = sender.sendRecord(this.serializer.serialize(tuple), true);
+		//sendWriteNotification(size, true);
 	}
 
 	public final boolean receiveResults(Collector c) throws IOException {
@@ -293,7 +302,7 @@ public class PythonSplitProcessorStreamer implements Serializable {
 						"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
 				default:
 					receiver.collectBuffer(c, sig);
-					sendReadConfirmation();
+					//sendReadConfirmation();
 					return true;
 			}
 		} catch (SocketTimeoutException ste) {
@@ -306,6 +315,7 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	 * @return
 	 * @throws IOException
 	 */
+	@Deprecated
 	public final boolean receiveBufferedResults(Collector c) throws IOException {
 		try {
 			while(true) {
