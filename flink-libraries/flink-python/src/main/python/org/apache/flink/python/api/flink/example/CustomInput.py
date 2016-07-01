@@ -166,7 +166,7 @@ def main():
     inputFormat = GDALInputFormat(26184107)
 
     data = env.read_custom("/opt/gms_sample/", ".*?\\.bsq", True,
-                           inputFormat, [STRING, BYTES, BYTES])
+                           inputFormat)
 
     #result = data \
     #    .flat_map(TupleToTile()) \
