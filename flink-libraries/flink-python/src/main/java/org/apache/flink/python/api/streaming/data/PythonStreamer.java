@@ -199,18 +199,6 @@ public class PythonStreamer implements Serializable {
 		}
 	}
 
-	@Deprecated
-	private void sendWriteNotification(int size, boolean hasNext) throws IOException {
-		out.writeInt(size);
-		out.writeByte(hasNext ? 0 : SIGNAL_LAST);
-		out.flush();
-	}
-	@Deprecated
-	private void sendReadConfirmation() throws IOException {
-		out.writeByte(1);
-		out.flush();
-	}
-
 	/**
 	 * Sends all broadcast-variables encoded in the configuration to the external process.
 	 *
@@ -256,10 +244,10 @@ public class PythonStreamer implements Serializable {
 	public final void streamBufferWithoutGroups(Iterator i, Collector c) throws IOException {
 		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
 			this.sender.setLargeTuples(true);
+			this.receiver.setLargeTuples(true);
 		}
 
 		try {
-			//int size;
 			if (i.hasNext()) {
 				while (true) {
 					int sig = in.readInt();
@@ -291,72 +279,6 @@ public class PythonStreamer implements Serializable {
 		}
 	}
 
-	@Deprecated
-	private void transferLargeTuples(Iterator i, Collector c) throws IOException {
-		try {
-			//int size;
-			if (i.hasNext()) {
-				while (true) {
-					int sig = in.readInt();
-					switch (sig) {
-						case SIGNAL_BUFFER_REQUEST:
-							if (i.hasNext() || sender.hasRemaining(0)) {
-								//while iterator is not empty
-								//get next tuple
-								//serialize tuple
-								//chunk tuple
-								//transmit chunks
-
-
-								ByteBuffer buffer = sender.serialize(i.next());
-								int tupleSize = buffer.limit();
-								//send size
-								sender.sendRecord(tupleSize, false);
-								int numTrips = tupleSize / MAPPED_FILE_SIZE;
-								//send numTrips?
-								int remainder = tupleSize % MAPPED_FILE_SIZE;
-
-								byte[] chunk = new byte[MAPPED_FILE_SIZE];
-								for(int j = 0; j < numTrips; j++) {
-									buffer.get(chunk, j * MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
-									sender.transmitChunk(chunk);
-									sendWriteNotification(MAPPED_FILE_SIZE, true);
-								}
-
-								if(remainder != 0) {
-									chunk = new byte[remainder];
-									buffer.get(chunk, numTrips * MAPPED_FILE_SIZE, remainder);
-									sender.transmitChunk(chunk);
-									sendWriteNotification(MAPPED_FILE_SIZE, true);
-								}
-								//send confirmation that this record has been the last
-								//sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
-							} else {
-								throw new RuntimeException("External process requested data even though none is available.");
-							}
-							break;
-						case SIGNAL_FINISHED:
-							return;
-						case SIGNAL_ERROR:
-							try { //wait before terminating to ensure that the complete error message is printed
-								Thread.sleep(2000);
-							} catch (InterruptedException ex) {
-							}
-							throw new RuntimeException(
-								"External process for task " + function.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
-						default:
-							//TODO: rewrite this like in PythonSplitProcessorStreamer
-							receiver.collectBuffer(c, sig);
-							sendReadConfirmation();
-							break;
-					}
-				}
-			}
-		} catch (SocketTimeoutException ste) {
-			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);
-		}
-	}
-
 	/**
 	 * Sends all values contained in both iterators to the external process and collects all results.
 	 *
@@ -366,20 +288,25 @@ public class PythonStreamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithGroups(Iterator i1, Iterator i2, Collector c) throws IOException {
+		//TODO: what happens if one side is large and the other is not!
+		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
+			this.sender.setLargeTuples(true);
+			this.receiver.setLargeTuples(true);
+		}
+
 		try {
-			int size;
 			if (i1.hasNext() || i2.hasNext()) {
 				while (true) {
 					int sig = in.readInt();
 					switch (sig) {
 						case SIGNAL_BUFFER_REQUEST_G0:
 							if (i1.hasNext() || sender.hasRemaining(0)) {
-								size = sender.sendBuffer(i1, 0);
+								sender.sendBuffer(i1, 0);
 							}
 							break;
 						case SIGNAL_BUFFER_REQUEST_G1:
 							if (i2.hasNext() || sender.hasRemaining(1)) {
-								size = sender.sendBuffer(i2, 1);
+								sender.sendBuffer(i2, 1);
 							}
 							break;
 						case SIGNAL_FINISHED:
@@ -404,7 +331,7 @@ public class PythonStreamer implements Serializable {
 
 	public final void sendMessage(String closeMessage) throws IOException {
 		try {
-			int size = sender.sendRecord(closeMessage, false);
+			sender.sendRecord(closeMessage, false);
 			sender.reset();
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + function.getRuntimeContext().getTaskName() + " stopped responding." + msg);

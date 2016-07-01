@@ -12,6 +12,7 @@
  */
 package org.apache.flink.python.api.streaming.data;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -43,6 +44,8 @@ public class PythonReceiver implements Serializable {
 	private Deserializer<?> deserializer = null;
 
 	private DataOutputStream out;
+	private DataInputStream in;
+	private boolean largeTuples;
 
 	public PythonReceiver(boolean usesByteArray) {
 		readAsByteArray = usesByteArray;
@@ -85,8 +88,9 @@ public class PythonReceiver implements Serializable {
 		this.out = dos;
 	}
 
+	public void setIn(DataInputStream in){this.in = in;}
 
-
+	public void setLargeTuples(boolean largeTuples) {this.largeTuples = largeTuples;}
 	//=====IO===========================================================================================================
 	/**
 	 * Reads a buffer of the given size from the memory-mapped file, and collects all records contained. This method
@@ -99,12 +103,15 @@ public class PythonReceiver implements Serializable {
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void collectBuffer(Collector c, int bufferSize) throws IOException {
-		fileBuffer.position(0);
-
-		while (fileBuffer.position() < bufferSize) {
-			c.collect(deserializer.deserialize());
+		if(this.largeTuples) {
+			this.collectLargeBuffer(c, bufferSize);
+		}else {
+			fileBuffer.position(0);
+			while (fileBuffer.position() < bufferSize) {
+				c.collect(deserializer.deserialize());
+			}
+			this.sendReadConfirmation();
 		}
-		this.sendReadConfirmation();
 	}
 
 	public byte[] collectUnserialized(int bufferSize) throws IOException {
@@ -115,8 +122,29 @@ public class PythonReceiver implements Serializable {
 		return retVal;
 	}
 
-	public void collectBufferedResult(byte[] buffer, Collector c) throws IOException {
-		c.collect(deserializer.deserializeFromBytes(buffer));
+	public void collectLargeBuffer(Collector c, int bufferSize) throws IOException{
+		int numTrips = in.readInt();
+
+		int remainder = bufferSize % MAPPED_FILE_SIZE;
+		byte[] recBuff = new byte[bufferSize];
+		for(int i = 0; i < numTrips - 1; i++) {
+			//read normal case
+			byte[] buff = this.collectUnserialized(MAPPED_FILE_SIZE);
+			int currSize = in.readInt();
+			sendReadConfirmation();
+			System.arraycopy(buff, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
+		}
+		//read remainder
+		if(remainder == 0) {
+			remainder = MAPPED_FILE_SIZE;
+		}
+		byte[] buff = this.collectUnserialized(remainder);
+		int currSize = in.readInt();
+		sendReadConfirmation();
+		System.arraycopy(buff, 0, recBuff, (numTrips - 1)*MAPPED_FILE_SIZE, remainder);
+
+		//deserialize and collect
+		c.collect(deserializer.deserializeFromBytes(recBuff));
 		this.sendReadConfirmation();
 	}
 

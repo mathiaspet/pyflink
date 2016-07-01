@@ -114,7 +114,7 @@ class BufferingTCPMappedFileConnection(object):
 
     def _write_large_msg(self, msg):
         #TODO: maybe write buffer first
-        self._socket.send(SIGNAL_MULTIPLES)
+        #self._socket.send(SIGNAL_MULTIPLES)
         length = len(msg)
         self._socket.send(pack(">i", length))
 

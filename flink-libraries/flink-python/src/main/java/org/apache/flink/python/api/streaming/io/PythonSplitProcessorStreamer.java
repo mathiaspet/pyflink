@@ -164,7 +164,9 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		in = new DataInputStream(socket.getInputStream());
 		out = new DataOutputStream(socket.getOutputStream());
 		this.sender.setOut(this.out);
+		this.sender.setIn(this.in);
 		this.receiver.setOut(this.out);
+		this.receiver.setIn(this.in);
 	}
 
 	/**
@@ -175,7 +177,6 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	public void close() throws IOException {
 		try {
 			int size = this.sender.sendRecord(getSerializer(null).serialize(null), false);
-			//sendWriteNotification(size, false);
 			socket.close();
 			sender.close();
 			receiver.close();
@@ -210,6 +211,7 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		}
 	}
 
+	@Deprecated
 	private void sendWriteNotification(int size, boolean hasNext) throws IOException {
 		out.writeInt(size);
 		out.writeByte(hasNext ? 0 : SIGNAL_LAST);
@@ -268,26 +270,13 @@ public class PythonSplitProcessorStreamer implements Serializable {
 			serializer = getSerializer(tuple);
 		}
 		int size = sender.sendRecord(this.serializer.serialize(tuple), true);
-		//sendWriteNotification(size, true);
 	}
 
 	public final boolean receiveResults(Collector c) throws IOException {
-		boolean largeTuples = this.format.getRuntimeContext().getExecutionConfig().isLargeTuples();
-		if(largeTuples) {
-			return receiveBufferedResults(c);
-		} else {
-			return receiveUnbufferedResults(c);
+		if(this.format.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
+			this.receiver.setLargeTuples(true);
 		}
-	}
 
-	/**
-	 * refactor this logic into the receiver such that it can be reused
-	 * @param c
-	 * @return
-	 * @throws IOException
-	 */
-	@Deprecated
-	public final boolean receiveUnbufferedResults(Collector c) throws IOException {
 		try {
 			int sig = in.readInt();
 			switch (sig) {
@@ -302,60 +291,11 @@ public class PythonSplitProcessorStreamer implements Serializable {
 						"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
 				default:
 					receiver.collectBuffer(c, sig);
-					//sendReadConfirmation();
 					return true;
 			}
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + this.format.getRuntimeContext().getTaskName() + " stopped responding." + msg);
 		}
 	}
-	/**
-	 * Receive tuples that are larger than the mapped file size. This is done in round trips and involves a different deserialization logic.
-	 * @param c the Collector to give the results to.
-	 * @return
-	 * @throws IOException
-	 */
-	@Deprecated
-	public final boolean receiveBufferedResults(Collector c) throws IOException {
-		try {
-			while(true) {
-				int sig = in.readInt();
-				switch (sig) {
-					case SIGNAL_FINISHED:
-						sendReadConfirmation();
-						return false;
-					case SIGNAL_MULTIPLES:
-						//just the start for receiving the actual data
-					default:
-						int size = in.readInt();
-						int numTrips = in.readInt();
 
-						int remainder = size % MAPPED_FILE_SIZE;
-						byte[] recBuff = new byte[size];
-						for(int i = 0; i < numTrips - 1; i++) {
-							//read normal case
-							//TODO: remove the following variable
-							byte[] buff = receiver.collectUnserialized(MAPPED_FILE_SIZE);
-							int currSize = in.readInt();
-							sendReadConfirmation();
-							System.arraycopy(buff, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
-						}
-						//read remainder
-						if(remainder == 0) {
-							//TODO: remove the following variable
-							remainder = MAPPED_FILE_SIZE;
-						}
-						byte[] buff = receiver.collectUnserialized(remainder);
-						int currSize = in.readInt();
-						sendReadConfirmation();
-						System.arraycopy(buff, 0, recBuff, (numTrips - 1)*MAPPED_FILE_SIZE, remainder);
-						//deserialize and collect
-						receiver.collectBufferedResult(recBuff, c);
-						return true;
-				}
-			}
-		} catch (SocketTimeoutException ste) {
-			throw new RuntimeException("External process for task " + this.format.getRuntimeContext().getTaskName() + " stopped responding." + msg);
-		}
-	}
 }
