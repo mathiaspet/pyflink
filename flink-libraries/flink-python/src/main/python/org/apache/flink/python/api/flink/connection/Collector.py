@@ -43,8 +43,6 @@ class Collector(object):
 
     def collect(self, value):
         self._serializer = ArraySerializer(value, self._env._types) if self._as_array else KeyValuePairSerializer(value, self._env._types)
-        print("ser: ", self._serializer, self._env._types)
-        sys.stdout.flush()
         self.collect = self._collect
         self.collect(value)
 
@@ -100,11 +98,7 @@ class Serializer(object):
 
 class KeyValuePairSerializer(Serializer):
     def __init__(self, value, custom_types):
-        print(value[0])
-        sys.stdout.flush()
         self._typeK = [_get_type_info(key, custom_types) for key in value[0]]
-        print(self._typeK)
-        sys.stdout.flush()
         self._typeV = _get_type_info(value[1], custom_types)
         self._typeK_length = [len(type) for type in self._typeK]
         self._typeV_length = len(self._typeV)

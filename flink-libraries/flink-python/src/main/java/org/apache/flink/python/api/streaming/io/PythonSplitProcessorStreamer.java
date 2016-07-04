@@ -278,20 +278,22 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		}
 
 		try {
-			int sig = in.readInt();
-			switch (sig) {
-				case SIGNAL_FINISHED:
-					return false;
-				case SIGNAL_ERROR:
-					try { //wait before terminating to ensure that the complete error message is printed
-						Thread.sleep(2000);
-					} catch (InterruptedException ex) {
-					}
-					throw new RuntimeException(
-						"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
-				default:
-					receiver.collectBuffer(c, sig);
-					return true;
+			while(true) {
+				int sig = in.readInt();
+				switch (sig) {
+					case SIGNAL_FINISHED:
+						return false;
+					case SIGNAL_ERROR:
+						try { //wait before terminating to ensure that the complete error message is printed
+							Thread.sleep(2000);
+						} catch (InterruptedException ex) {
+						}
+						throw new RuntimeException(
+							"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
+					default:
+						receiver.collectBuffer(c, sig);
+						//return true;
+				}
 			}
 		} catch (SocketTimeoutException ste) {
 			throw new RuntimeException("External process for task " + this.format.getRuntimeContext().getTaskName() + " stopped responding." + msg);

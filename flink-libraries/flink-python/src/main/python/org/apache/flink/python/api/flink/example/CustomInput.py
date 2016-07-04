@@ -97,8 +97,9 @@ class GDALInputFormat(PythonInputFormat):
 
         metaBytes = ImageWrapper._meta_to_bytes(metaData)
         bArr = bytearray(imageData)
-        retVal = (metaData['scene id'], metaBytes, bArr)
-        print("in pif before collect", type(retVal))
+        #retVal = (metaData['scene id'], metaBytes, bArr)
+        retVal = (metaData['scene id'], bytearray(), bytearray())
+        print(metaData['scene id'])
         sys.stdout.flush()
         collector.collect(retVal)
 
@@ -146,7 +147,7 @@ class GDALInputFormat(PythonInputFormat):
 
 class GMSOF(PythonOutputFormat):
     def write(self, value):
-        print("value", type(value))
+        print("value: ", value[0])
         sys.stdout.flush()
 
 class Filter(FilterFunction):
@@ -154,7 +155,7 @@ class Filter(FilterFunction):
         super(Filter, self).__init__()
 
     def filter(self, value):
-        print(0)
+        print(value[0])
         sys.stdout.flush()
         return False
 

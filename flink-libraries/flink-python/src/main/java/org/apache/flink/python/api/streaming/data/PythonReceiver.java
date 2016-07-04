@@ -171,7 +171,9 @@ public class PythonReceiver implements Serializable {
 
 		@Override
 		public byte[] deserializeFromBytes(byte[] buffer) {
-			return buffer;
+			byte[] ret = new byte[buffer.length - 4];
+			System.arraycopy(buffer, 4, ret, 0, ret.length);
+			return ret;
 		}
 	}
 

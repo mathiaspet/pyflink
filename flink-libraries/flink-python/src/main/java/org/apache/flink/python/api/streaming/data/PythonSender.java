@@ -239,14 +239,11 @@ public class PythonSender<IN> implements Serializable {
 				chunk = new byte[remainder];
 				bb.get(chunk, 0, remainder);
 				fileBuffer.put(chunk);
-				sendWriteNotification(remainder, true);
+				sendWriteNotification(remainder, i.hasNext());
 			}
 
 			int multiplesLast = in.readInt();
-			System.out.println("read signal: " + multiplesLast);
 
-			//send confirmation that this record has been the last
-			//sendWriteNotification(size, sender.hasRemaining(0) || i.hasNext());
 		}
 		return 1;
 	}
