@@ -114,37 +114,53 @@ public class PythonReceiver implements Serializable {
 		}
 	}
 
-	public byte[] collectUnserialized(int bufferSize) throws IOException {
+	/*
+	public void collectUnserialized(byte[] target) throws IOException {
 		fileBuffer.position(0);
-		byte[] retVal = new byte[bufferSize];
-		fileBuffer.get(retVal);
-
-		return retVal;
-	}
+		fileBuffer.get(target);
+}
+*/
 
 	public void collectLargeBuffer(Collector c, int bufferSize) throws IOException{
 		int numTrips = in.readInt();
 
 		int remainder = bufferSize % MAPPED_FILE_SIZE;
-		byte[] recBuff = new byte[bufferSize];
+		byte[] recBuff = new byte[bufferSize - 4]; //-4 because buffersize includes the length information of the tuple
+		byte[] reusable = new byte[MAPPED_FILE_SIZE];
+		byte[] begin = new byte[MAPPED_FILE_SIZE-4];
 		for(int i = 0; i < numTrips - 1; i++) {
 			//read normal case
-			byte[] buff = this.collectUnserialized(MAPPED_FILE_SIZE);
-			int currSize = in.readInt();
-			sendReadConfirmation();
-			System.arraycopy(buff, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE);
+			//this.collectUnserialized(reusable);
+			if(i == 0)
+			{
+				fileBuffer.position(4);
+				fileBuffer.get(begin);
+				int currSize = in.readInt();
+				sendReadConfirmation();
+				System.arraycopy(begin, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE-4);
+				begin = null;
+			}else {
+				fileBuffer.position(0);
+				fileBuffer.get(reusable);
+				int currSize = in.readInt();
+				sendReadConfirmation();
+				System.arraycopy(reusable, 0, recBuff, (i*MAPPED_FILE_SIZE) - 4, MAPPED_FILE_SIZE);
+			}
 		}
 		//read remainder
 		if(remainder == 0) {
 			remainder = MAPPED_FILE_SIZE;
 		}
-		byte[] buff = this.collectUnserialized(remainder);
+		reusable = new byte[remainder];
+		fileBuffer.position(0);
+		fileBuffer.get(reusable);
 		int currSize = in.readInt();
 		sendReadConfirmation();
-		System.arraycopy(buff, 0, recBuff, (numTrips - 1)*MAPPED_FILE_SIZE, remainder);
-
+		System.arraycopy(reusable, 0, recBuff, ((numTrips - 1)*MAPPED_FILE_SIZE) - 4, remainder);
+		reusable = null;
 		//deserialize and collect
 		c.collect(deserializer.deserializeFromBytes(recBuff));
+		recBuff = null;
 		this.sendReadConfirmation();
 	}
 
@@ -171,9 +187,10 @@ public class PythonReceiver implements Serializable {
 
 		@Override
 		public byte[] deserializeFromBytes(byte[] buffer) {
-			byte[] ret = new byte[buffer.length - 4];
-			System.arraycopy(buffer, 4, ret, 0, ret.length);
-			return ret;
+			//byte[] ret = new byte[buffer.length - 4];
+			//System.arraycopy(buffer, 4, ret, 0, ret.length);
+			//return ret;
+			return buffer;
 		}
 	}
 

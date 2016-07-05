@@ -165,7 +165,7 @@ class BufferingTCPMappedFileConnection(object):
             self._read_buffer()
             buffer += self._input
 
-        self._socket.send(SIGNAL_MULTIPLES_DONE)
+        #self._socket.send(SIGNAL_MULTIPLES_DONE)
         self._input = buffer
         self._input_size = size
         self._input_offset = 0

@@ -46,7 +46,6 @@ import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON3_BINARY_
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
 import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_COUNT;
 import static org.apache.flink.python.api.PythonPlanBinder.PLANBINDER_CONFIG_BCVAR_NAME_PREFIX;
-import static org.apache.flink.python.api.PythonPlanBinder.MAPPED_FILE_SIZE;
 
 import static org.apache.flink.python.api.streaming.util.SerializationUtils.getSerializer;
 
@@ -282,7 +281,7 @@ public class PythonSplitProcessorStreamer implements Serializable {
 				int sig = in.readInt();
 				switch (sig) {
 					case SIGNAL_FINISHED:
-						return false;
+						return true;
 					case SIGNAL_ERROR:
 						try { //wait before terminating to ensure that the complete error message is printed
 							Thread.sleep(2000);

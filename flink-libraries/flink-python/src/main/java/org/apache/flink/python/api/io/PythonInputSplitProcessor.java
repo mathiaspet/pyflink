@@ -36,11 +36,14 @@ public class PythonInputSplitProcessor<T> implements Serializable {
 
 	private PythonCollector<T> collector;
 	private PythonSplitProcessorStreamer streamer;
+	/** denotes whether a split has already been collected from the python process */
+	private boolean splitCollected;
 
 	public PythonInputSplitProcessor(RichInputFormat format, int id, boolean asByteArray) {
 		this.format = format;
 		this.id = id;
 		this.streamer = new PythonSplitProcessorStreamer(format, id, asByteArray);
+		this.splitCollected = false;
 	}
 
 	public void configure(Configuration parameters) {
@@ -58,6 +61,7 @@ public class PythonInputSplitProcessor<T> implements Serializable {
 	}
 
 	public void closeSplit() {
+		this.splitCollected = false;
 	}
 
 	public void close() {
@@ -69,7 +73,8 @@ public class PythonInputSplitProcessor<T> implements Serializable {
 	}
 
 	public boolean reachedEnd() throws IOException {
-		if (this.collector.isEmpty()) {
+		if (!this.splitCollected) {
+			this.splitCollected = true;
 			return !this.streamer.receiveResults(this.collector);
 		} else {
 			return this.collector.isEmpty();

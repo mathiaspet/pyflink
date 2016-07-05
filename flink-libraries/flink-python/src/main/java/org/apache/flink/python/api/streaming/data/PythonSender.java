@@ -22,7 +22,6 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.flink.api.java.tuple.Tuple;
@@ -197,15 +196,15 @@ public class PythonSender<IN> implements Serializable {
 		//chunk tuple
 		//transmit chunks
 
-		fileBuffer.clear();
-		Object value;
-		ByteBuffer bb;
-		if (serializer[group] == null) {
+		while(i.hasNext()) {
+			fileBuffer.clear();
+			Object value;
+			ByteBuffer bb;
 			value = i.next();
-			serializer[group] = getSerializer(value);
+			if (serializer[group] == null) {
+				serializer[group] = getSerializer(value);
+			}
 			bb = serializer[group].serialize(value);
-
-
 			int tupleSize = bb.limit();
 			//send size
 			sendWriteNotification(tupleSize, true);
@@ -215,10 +214,9 @@ public class PythonSender<IN> implements Serializable {
 			int remainder = tupleSize % MAPPED_FILE_SIZE;
 
 			byte[] chunk = new byte[MAPPED_FILE_SIZE];
-			for(int j = 0; j < numTrips; j++) {
+			for (int j = 0; j < numTrips; j++) {
 				int nextBuffer = in.readInt();
-				if(nextBuffer != SIGNAL_BUFFER_REQUEST)
-				{
+				if (nextBuffer != SIGNAL_BUFFER_REQUEST) {
 					System.out.println("false signal: " + nextBuffer);
 				}
 				bb.get(chunk);
@@ -229,13 +227,8 @@ public class PythonSender<IN> implements Serializable {
 				fileBuffer.clear();
 			}
 
-			if(remainder != 0) {
+			if (remainder != 0) {
 				int nextBuffer = in.readInt();
-				if(nextBuffer != SIGNAL_BUFFER_REQUEST)
-				{
-					System.out.println("false signal: " + nextBuffer);
-				}
-
 				chunk = new byte[remainder];
 				bb.get(chunk, 0, remainder);
 				fileBuffer.put(chunk);
