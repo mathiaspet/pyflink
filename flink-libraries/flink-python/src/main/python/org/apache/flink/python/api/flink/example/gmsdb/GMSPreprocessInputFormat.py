@@ -22,8 +22,7 @@ import sys
 import psycopg2
 import gdal
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
-from flink.example.gmsdb.lvl0a import process as lvl0a
-from flink.example.gmsdb.lvl0b import process as lvl0b
+from flink.example.gmsdb.GMSObject import GmsObject
 from flink.example.gmsdb.misc import get_path, get_scenes
 
 
@@ -33,12 +32,14 @@ class GMSDB(PythonInputFormat):
         gdal.AllRegister()  # TODO: register the ENVI driver only
         self.job = {
             'id': job_id,
-            'data_path': data_path,
+            'data_path': data_path,  # TODO: see imports from db
             'path_procdata': data_path,
             'path_archive': data_path,
+            'path_cloud_classif': data_path,
             'connection': connection,
             'skip_pan': False,
-            'skip_thermal': False
+            'skip_thermal': False,
+            'bench_CLD_class': False
         }
 
         # get base pathnames
@@ -82,14 +83,14 @@ class GMSDB(PythonInputFormat):
 
     def deliver(self, split, collector):
         path = split[0]
-        # get metadata for lvl0a
-        lvl0a_data = lvl0a(self.job, path)
-        if lvl0a_data is None:
-            return
-        lvl0b_data = lvl0b(self.job, lvl0a_data)
-        key = str(lvl0b_data['id'])
-        collector.collect((key, bytearray(pickle.dumps(lvl0b_data)), bytearray(1)))
+        # single file may lead to multiple objects (for subsystems)
+        for image in GmsObject.get_level0a_objects(self.job, path):
+            image.level0a()
+            key = str(image.scene_ID)
+
+            # TODO: write wrapper
+            collector.collect((key, bytearray(pickle.dumps(image.__dict__)), bytearray(1)))
 
         print("py: received path:", path)
-        print("py: retrieved metadata:", lvl0b_data)
+        print("py: retrieved metadata:", image)
         sys.stdout.flush()

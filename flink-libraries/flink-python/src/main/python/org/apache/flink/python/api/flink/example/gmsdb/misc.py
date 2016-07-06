@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 ################################################################################
 #  Licensed to the Apache Software Foundation (ASF) under one
 #  or more contributor license agreements.  See the NOTICE file
@@ -30,7 +28,7 @@ def get_scenes(job):
     conn = psycopg2.connect(**job['connection'])
     curs = conn.cursor()
 
-    curs.execute("""SELECT unnest(sceneids) FROM scenes_jobs WHERE id = %s""", (job['id'],))
+    curs.execute("""SELECT unnest(sceneids) FROM scenes_jobs WHERE id = %s""", (job['id'], ))
     scenes = [s[0] for s in curs]
 
     curs.close()
@@ -55,7 +53,7 @@ def get_path(job, scene):
                 LEFT OUTER JOIN
                     sensors sen ON sen.id = s.sensorid
                 WHERE
-                    s.id = %s""", (scene,)
+                    s.id = %s""", (scene, )
         )
 
     row = curs.fetchone()
@@ -90,9 +88,9 @@ def open_in_archive(path_archive, matching_expression, read_mode='r'):
                 count_matching_files += 1
         archive.close()
 
-    assert count_matching_files > 0,\
+    assert count_matching_files > 0, \
         'Matching expression matches no file. Please revise your expression!'
-    assert count_matching_files == 1,\
+    assert count_matching_files == 1, \
         'Matching expression matches more than 1 file. Please revise your expression!'
 
     if isinstance(content_file, bytes) and read_mode == 'r':
@@ -101,56 +99,76 @@ def open_in_archive(path_archive, matching_expression, read_mode='r'):
     return content_file, filename_file
 
 
-class PathGenerator:
-    def __init__(self, job, metadata):
-        self.proc_level = metadata['proc_level'] or ''
-        self.image_type = metadata['image_type'] or ''
-        self.satellite = metadata['satellite'] or ''
-        self.sensor = metadata['sensor'] or ''
-        self.subsystem = metadata['subsystem'] or ''
-        self.AcqDate = metadata['acquisitiondate'] or ''
-        self.entity_ID = metadata['entityid'] or ''
-        self.job = job
+_obj_name_dic = {
+        'AVNIR-2': None,
+        'TM4': None,
+        # 'TM5': '9fe4af95-a16e-45e6-9397-7085c74a30d8.dill', # 16.9. class. bayesian
+        # 'TM5': 'xval_0.96_classicalBayesian_c723159c.dill', # 28.9. class. bayesian
+        'TM5': 'xval_0.96_classicalBayesian_b84d087e.dill',  # 28.9. fastest classifier
+        # 'TM7': '1c8560d9-8436-43e7-b170-416c15e732a7.dill', # ganz einfach
+        # 'TM7': '38bc1428-2775-4d0c-a551-dcea99ff9046.dill',
+        # 'TM7': '9fe4af95-a16e-45e6-9397-7085c74a30d8.dill', # 16.9. class. bayesian
+        # 'TM7': 'xval_0.96_classicalBayesian_c723159c.dill', # 28.9. class. bayesian
+        'TM7': 'xval_0.96_classicalBayesian_b84d087e.dill',  # 28.9. fastest classifier
+        # 'LDCM': 'xval_0.97_classicalBayesian_3ac27853.dill', # 28.9. class. bayesian
+        'LDCM': 'xval_0.97_classicalBayesian_305e7da1.dill',  # 28.9. fastest class. bayesian
+        # 'LDCM': glob.glob(os.path.join(path_cloud_classifier_objects, '*.dill'))[0]
+        #               if glob.glob(os.path.join(path_cloud_classifier_objects, '*.dill')) != [] else None,
+        'S1a': None,
+        'S1b': None,
+        'S2a': None,
+        'S2b': None,
+        'S3a': None,
+        'S3b': None,
+        'S4a': None,
+        'S4b': None,
+        'S5a': None,
+        'S5b': None,
+        'RE5': None,
+        'AST_V1': None,
+        'AST_V2': None,
+        'AST_S': None,
+        'AST_T': None
+    }
 
-    def get_path_procdata(self):
-        return os.path.join(self.job['path_procdata'], self.satellite, self.sensor,
-                            self.AcqDate.strftime('%Y-%m-%d'), self.entity_ID)
 
-    def get_baseN(self):
-        if not self.subsystem:
-            return '__'.join([self.sensor, self.entity_ID])
-        else:
-            return '__'.join([self.sensor, self.subsystem, self.entity_ID])
+_sensorcodes = {
+        'ALOS_AVNIR-2': 'AVNIR-2',
+        'Landsat-4_TM': 'TM4',  # call from layerstacker
+        'Landsat-4_TM_SAM': 'TM4',  # call from metadata object
+        'Landsat-5_TM': 'TM5',
+        'Landsat-5_TM_SAM': 'TM5',
+        'Landsat-7_ETM+': 'TM7',
+        'Landsat-7_ETM+_SAM': 'TM7',
+        'Landsat-8_OLI_TIRS': 'LDCM',
+        'Landsat-8_LDCM': 'LDCM',
+        'SPOT-1_HRV1': 'S1a',  # MS
+        'SPOT-1_HRV2': 'S1b',
+        'SPOT-2_HRV1': 'S2a',
+        'SPOT-2_HRV2': 'S2b',
+        'SPOT-3_HRV1': 'S3a',
+        'SPOT-3_HRV2': 'S3b',
+        'SPOT-4_HRVIR1': 'S4a',
+        'SPOT-4_HRVIR2': 'S4b',
+        'SPOT-5_HRG1': 'S5a',  # PAN HRG2A
+        'SPOT-5_HRG2': 'S5b',  # MS HRG2J
+        'RapidEye-5_MSI': 'RE5',
+        'SRTM_SRTM2': 'SRTM2',
+        'Terra_ASTER_VNIR1': 'AST_V1',
+        'Terra_ASTER_VNIR2': 'AST_V2',
+        'Terra_ASTER_SWIR': 'AST_S',
+        'Terra_ASTER_TIR': 'AST_T'
+    }
 
-    def get_path_logfile(self):
-        return os.path.join(self.get_path_procdata(), self.get_baseN()+'.log')
 
-    def get_local_archive_path_baseN(self):  # must be callable from L0A-P
-        if self.image_type == 'RSD' and self.satellite is not None:
-            folder_rawdata = os.path.join(self.job['path_archive'], self.satellite, self.sensor)
-            for ext in ['.tar.gz', '.zip', '.hdf']:
-                archive = os.path.join(folder_rawdata, self.entity_ID + ext)
-                if os.path.exists(archive):
-                    return archive
-
-            raise AssertionError("Can't find dataset for %s at %s"
-                                 % (self.entity_ID, folder_rawdata))
-
-        if self.image_type == 'DGM' and self.satellite and 'SRTM' in self.satellite.upper():
-            return os.path.join(self.job['path_archive'], 'srtm2/', self.entity_ID+'_sub.bsq')
-
-        if self.image_type == 'ATM':
-            return os.path.join(self.job['path_archive'], 'atm_data/', self.entity_ID + '.bsq')
-
-        # # unsupported image type
-        raise AssertionError('Given dataset specification is not yet supported. '
-                             'Specified parameters: image_type: %s; satellite: %s; sensor: %s'
-                             % (self.image_type, self.satellite, self.sensor))
-
-    def get_path_gmsfile(self):
-        return os.path.join(self.get_path_procdata(),
-                            '%s_%s.gms' % (self.get_baseN(), self.proc_level))
-
-    def get_path_imagedata(self):
-        return os.path.join(self.get_path_procdata(),
-                            '%s_%s.bsq' % (self.get_baseN(), self.proc_level))
+def get_GMS_sensorcode(satellite, sensor, subsystem, logger=None):
+    if satellite.startswith("SPOT") and sensor[-1] not in ['1', '2']:
+        sensor = sensor[:-1]
+    meta_sensorcode = "_".join(s for s in [satellite, sensor, subsystem] if s)
+    try:
+        return _sensorcodes[meta_sensorcode]
+    except KeyError:
+        if logger:
+            logger.warning('Sensor %s is not included in sensorcode dictionary'
+                           'and can not be converted into GMS sensorcode.'
+                           % meta_sensorcode)
