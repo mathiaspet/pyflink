@@ -151,6 +151,7 @@ public class PythonPlanBinder {
 			JobExecutionResult jer = env.execute();
 			sendResult(jer);
 			close();
+			clearPath(tmpPath);
 		} catch (Exception e) {
 			close();
 			throw e;
@@ -202,7 +203,6 @@ public class PythonPlanBinder {
 		clearPath(FLINK_HDFS_PATH);
 		FileCache.copy(new Path(tmpPath), new Path(FLINK_HDFS_PATH), true);
 		env.registerCachedFile(FLINK_HDFS_PATH, FLINK_PYTHON_DC_ID);
-		clearPath(tmpPath);
 	}
 
 	private void startPython(String tempPath, String[] args) throws IOException {
