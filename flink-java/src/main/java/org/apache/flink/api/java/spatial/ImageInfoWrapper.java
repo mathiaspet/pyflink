@@ -328,7 +328,8 @@ public class ImageInfoWrapper implements Serializable {
 			offset = nextBreak + 1;
 			nextBreak = asString.indexOf('\0', offset);
 			if (nextBreak == -1) {
-				throw new RuntimeException("Missing value for key: " + key);
+				//throw new RuntimeException("Missing value for key: " + key);
+				break;
 			}
 			value = asString.substring(offset, nextBreak);
 			metaData.put(key, value);

@@ -171,8 +171,6 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
                     Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + pxstart * pixelWidth, upperLeftCorner.lat - pystart * pixelHeight);
                     Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
 
-                    info.setLeftUpper(tileUpperLeft);
-
                     // Filter this tile if no pixel is contained in the selected region:
                     if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
                         if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); }
@@ -410,9 +408,15 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
 		/*
 		record.update(this.info, this.pos.leftUpperCorner, this.pos.rightLowerCorner, xsize, ysize, this.pos.band, this.pos.pathRow, this.pos.acqDate, pixelWidth, pixelHeight);
 		*/
-
         //just a first time init optimization
-        short[] values = record.getField(2);
+		//short[] values = record.getField(2);
+		System.out.println(record.getField(2));
+		byte[] bytes = record.getField(2);
+		short[] values = null;
+		for(int idx=0; idx < bytes.length; idx++){
+			values[idx] = (short)bytes[idx];
+		}
+
         if(values == null) {
             values = new short[xsize * ysize];
         }
@@ -451,7 +455,12 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
             values[pos++] = dataIgnoreValue;
         }
 
-        record.setField(values, 2);
+		// convert short array to back to byte array
+		ByteBuffer byteBuffer = ByteBuffer.allocate(2 * values.length);
+		byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+		byteBuffer.asShortBuffer().put(values);
+		byte[] byteInput = byteBuffer.array();
+        record.setField(byteInput, 2);
 
         return record;
     }

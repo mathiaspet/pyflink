@@ -18,23 +18,26 @@
 
 package org.apache.flink.api.java.spatial;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
 
-public class TileInfoWrapper {
+public class TileInfoWrapper implements Serializable{
 	private Map<String, String> metaData;
 
 	public TileInfoWrapper() {
@@ -305,12 +308,15 @@ public class TileInfoWrapper {
 		int nextBreak = -1;
 		String key;
 		String value;
+		//ArrayList<String> allKeys = new ArrayList<>();
 		while ((nextBreak = asString.indexOf('\0', offset)) != -1) {
 			key = asString.substring(offset, nextBreak);
+			//allKeys.add(key);
 			offset = nextBreak + 1;
 			nextBreak = asString.indexOf('\0', offset);
 			if (nextBreak == -1) {
-				throw new RuntimeException("Missing value for key: " + key);
+				break;
+				//throw new RuntimeException("Missing value for key: " + key);
 			}
 			value = asString.substring(offset, nextBreak);
 			metaData.put(key, value);

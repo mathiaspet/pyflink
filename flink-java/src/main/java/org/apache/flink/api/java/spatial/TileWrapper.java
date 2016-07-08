@@ -72,8 +72,7 @@ public class TileWrapper implements Serializable {
 	}
 
 	public TileWrapper(Tuple3<String, byte[], byte[]> content) {
-
-		this.s16Tile = new short[content.f2.length];
+		this.s16Tile = new short[content.f2.length/2];
 		ByteBuffer.wrap(content.f2).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(this.s16Tile);
 
 		TileInfoWrapper tiWrapper = new TileInfoWrapper(content.f1);

@@ -201,12 +201,14 @@ public class TileInputFormat<T extends Tuple3<String, byte[], byte[]>> extends F
 		}
 	}
 
+
+
+
 	/**
 	 * Return true iff the rectangle with the given left upper and lower right points, which is oriented along the latitudinal 
 	 * and longitudinal lines, intersects with the limits rectangle, which is oriented the same way.
 	 */
-	private final boolean rectIntersectsLimits(Coordinate tileUpperLeft,
-			Coordinate tileLowerRight) {
+	private final boolean rectIntersectsLimits(Coordinate tileUpperLeft, Coordinate tileLowerRight) {
 		// Rectangles intersect if the pairs of left and right latitudinal or longitudinal lines are not besides each other.
 		return !dotPairsDontMix(this.leftUpperLimit.lat, this.rightLowerLimit.lat, tileUpperLeft.lat, tileLowerRight.lat)
 				&& !dotPairsDontMix(this.leftUpperLimit.lon, this.rightLowerLimit.lon, tileUpperLeft.lon, tileLowerRight.lon);
