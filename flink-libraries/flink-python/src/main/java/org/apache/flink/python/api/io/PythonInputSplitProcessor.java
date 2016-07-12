@@ -31,6 +31,7 @@ public class PythonInputSplitProcessor<T> implements Serializable {
 	private static final Logger LOG = LoggerFactory.getLogger(PythonInputFormat.class);
 	private final RichInputFormat format;
 	private final int id;
+	private final String tmpPath;
 
 	private Configuration configuration;
 
@@ -39,11 +40,14 @@ public class PythonInputSplitProcessor<T> implements Serializable {
 	/** denotes whether a split has already been collected from the python process */
 	private boolean splitCollected;
 
-	public PythonInputSplitProcessor(RichInputFormat format, int id, boolean asByteArray) {
+
+
+	public PythonInputSplitProcessor(RichInputFormat format, int id, boolean asByteArray, String tmpPath) {
 		this.format = format;
 		this.id = id;
 		this.streamer = new PythonSplitProcessorStreamer(format, id, asByteArray);
 		this.splitCollected = false;
+		this.tmpPath = tmpPath;
 	}
 
 	public void configure(Configuration parameters) {

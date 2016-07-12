@@ -26,23 +26,23 @@ import org.apache.flink.python.api.streaming.io.PythonSplitGeneratorStreamer;
 import java.io.IOException;
 import java.io.Serializable;
 
-import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_DC_ID;
-
 public class PythonInputSplitGenerator implements Serializable {
 	private final int id;
 	private final Path path;
 	private final String filter;
 	private final String planArguments;
+	private final String tmpPath;
 
-	public PythonInputSplitGenerator(int id, Path path, String filter) {
+	public PythonInputSplitGenerator(int id, Path path, String filter, String tmpPath) {
 		this.id = id;
 		this.path = path;
 		this.filter = filter;
 		this.planArguments = PythonPlanBinder.arguments.toString();
+		this.tmpPath = tmpPath;
 	}
 
 	public FileInputSplit[] createInputSplits(int minNumSplits) throws IOException {
-		String tmpPath = System.getProperty("java.io.tmpdir") + "/" + FLINK_PYTHON_DC_ID;
+		//String tmpPath = System.getProperty("java.io.tmpdir") + "/" + FLINK_PYTHON_DC_ID;
 
 		PythonSplitGeneratorStreamer streamer = new PythonSplitGeneratorStreamer();
 		streamer.open(tmpPath, planArguments, this.id);

@@ -61,6 +61,14 @@ public class PythonSplitGeneratorStreamer {
 	private void startPython(String tmpPath, String args, int id) throws IOException {
 		String pythonBinaryPath = usePython3 ? FLINK_PYTHON3_BINARY_PATH : FLINK_PYTHON2_BINARY_PATH;
 
+		System.out.println("tempPath in split generator: " + tmpPath);
+		/*
+		try {
+			Thread.sleep(40000);
+		} catch (InterruptedException ex) {
+		}
+		*/
+
 		try {
 			Runtime.getRuntime().exec(pythonBinaryPath);
 		} catch (IOException ex) {
