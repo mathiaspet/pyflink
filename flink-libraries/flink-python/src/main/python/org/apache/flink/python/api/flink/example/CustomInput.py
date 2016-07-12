@@ -18,7 +18,7 @@
 from __future__ import print_function
 import numpy as np
 import gdal
-import sys
+import sys, glob
 from gdalconst import GA_ReadOnly
 from flink.plan.Constants import BYTES, STRING
 
@@ -49,10 +49,17 @@ class GDALInputFormat(PythonInputFormat):
         # get filenames for sceneids:
         # SELECT filename FROM scenes WHERE id = ?
         # filter bsq?
-        files = [
-                "file:/opt/gms_sample/227064_000202_BLA_SR.bsq",
-                "file:/opt/gms_sample/227064_000321_BLA_SR.bsq"
-            ]
+        #files = [
+        #        "file:/opt/gms_sample/227064_000202_BLA_SR.bsq",
+        #        "file:/opt/gms_sample/227064_000321_BLA_SR.bsq"
+        #    ]
+
+        files = []
+        for f in glob.glob("/opt/gms_sample/*.bsq"):
+            print("file:"+f)
+            files.append("file:"+f)
+
+
         return files
 
     def createInputSplits(self, minNumSplits, path, collector):
@@ -97,8 +104,8 @@ class GDALInputFormat(PythonInputFormat):
 
         metaBytes = ImageWrapper._meta_to_bytes(metaData)
         bArr = bytearray(imageData)
-        retVal = (metaData['scene id'], metaBytes, bArr)
-        #retVal = (metaData['scene id'], bytearray(), bytearray())
+        #retVal = (metaData['scene id'], metaBytes, bArr)
+        retVal = (metaData['scene id'], bytearray(), bytearray())
         print(metaData['scene id'])
         sys.stdout.flush()
         collector.collect(retVal)
@@ -184,7 +191,7 @@ def main():
 
     env.set_parallelism(2)
 
-    env.execute(local=True)
+    env.execute(local=False)
 
 
 if __name__ == "__main__":

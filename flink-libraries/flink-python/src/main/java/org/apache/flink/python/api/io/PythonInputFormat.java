@@ -38,12 +38,15 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 	private final PythonInputSplitGenerator splitGenerator;
 	private final PythonInputSplitProcessor<T> splitProcessor;
 
-	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter, boolean computeSplitsInPython) {
+	private String tmpPath;
+
+	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter, boolean computeSplitsInPython, String tmpPath) {
 		super(path);
-		this.splitGenerator = new PythonInputSplitGenerator(id, path, filter);
-		this.splitProcessor = new PythonInputSplitProcessor<>(this, id, info instanceof PrimitiveArrayTypeInfo);
+		this.splitGenerator = new PythonInputSplitGenerator(id, path, filter, tmpPath);
+		this.splitProcessor = new PythonInputSplitProcessor<>(this, id, info instanceof PrimitiveArrayTypeInfo, tmpPath);
 		this.typeInformation = info;
 		this.splitsInPython = computeSplitsInPython;
+		this.tmpPath = tmpPath;
 	}
 
 	//==================================================================================================================
