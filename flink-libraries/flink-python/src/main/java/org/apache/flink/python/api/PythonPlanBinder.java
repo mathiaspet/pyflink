@@ -190,7 +190,6 @@ public class PythonPlanBinder {
 	}
 
 	private static void copyFile(String path, String target, String name) throws IOException, URISyntaxException {
-		System.out.println("In copyFile: " + path + " target " + target + " name " + name);
 		if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
 		}
@@ -198,7 +197,6 @@ public class PythonPlanBinder {
 		String tmpFilePath = target + "/" + identifier;
 		clearPath(tmpFilePath);
 		Path p = new Path(path);
-		System.out.println(p);
 		FileCache.copy(p.makeQualified(FileSystem.get(p.toUri())), new Path(tmpFilePath), true);
 	}
 

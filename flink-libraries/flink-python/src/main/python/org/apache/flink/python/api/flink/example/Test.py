@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 ################################################################################
 #  Licensed to the Apache Software Foundation (ASF) under one
 #  or more contributor license agreements.  See the NOTICE file
@@ -17,27 +15,32 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-import os.path
+import sys, glob, os
+import xattr
+import simplejson as json
 
-from flink.example.gmsdb.misc import PathGenerator
 
+def main():
+    print("main")
+    sys.stdout.flush()
+    hosts = ("localhost",)
+    attrs = xattr.list("/opt/gms_sample/227064_000202_BLA_SR.bsq")
+    #print(attrs)
+    if len(attrs) > 0:
+        jsonString = xattr.get("/opt/gms_sample/227064_000202_BLA_SR.bsq", "xtreemfs.locations")
+        #jsonString = xattr.get("/home/mathiasp/mount/localScenes/227064_020717_BLA_SR.bsq", "xtreemfs.locations")
+        parsed = json.loads(jsonString)
+        print(parsed["replicas"][0]['osds'][0]['address'].split(":")[0])
+        hosts = ()
+        replicas = parsed["replicas"]
+        for replica in replicas:
+            #assume that scenes are not striped across osds
+            osd = replica["osds"][0]
+            address = osd['address'].split(":")[0]
+            hosts += (address, )
 
-def process(job, lvl0a_data):
-    assert os.path.isfile(lvl0a_data['path']) and not os.path.isdir(lvl0a_data['path'])
+    print(hosts)
 
-    print('lvl0b for', lvl0a_data)
+if __name__ == "__main__":
+    main()
 
-    path_gen = PathGenerator(job, lvl0a_data)
-    lvl0a_data['baseN'] = path_gen.get_baseN()
-    lvl0a_data['path_procdata'] = path_gen.get_path_procdata()
-    lvl0a_data['path_logfile'] = path_gen.get_path_logfile()
-    lvl0a_data['path_archive'] = path_gen.get_local_archive_path_baseN()
-    # self.logger = HLP_F.setup_logger('log__' + self.baseN, self.path_logfile, self.job_CPUs, append=0)
-    # path_gen = PG.path_generator(self.__dict__)  # passes a logger in addition to previous attributes
-
-    if lvl0a_data['image_type'] == 'RSD' and 'oli' in lvl0a_data['sensor']:
-        lvl0a_data['georef'] = True
-    else:
-        lvl0a_data['georef'] = False
-
-    return lvl0a_data
