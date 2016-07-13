@@ -149,26 +149,30 @@ class BufferingTCPMappedFileConnection(object):
         return self._input[old_offset:self._input_offset]
 
     def readLargeTuple(self):
-        self._socket.send(SIGNAL_REQUEST_BUFFER)
-        meta_size = recv_all(self._socket, 5)
-        size = unpack(">I", meta_size[:4])[0]
-        numTrips = int(size / MAPPED_FILE_SIZE)
-        remainder = size % MAPPED_FILE_SIZE
+        try:
+            self._socket.send(SIGNAL_REQUEST_BUFFER)
+            meta_size = recv_all(self._socket, 5)
+            size = unpack(">I", meta_size[:4])[0]
+            numTrips = int(size / MAPPED_FILE_SIZE)
+            remainder = size % MAPPED_FILE_SIZE
 
-        buffer = b""
-        for i in range(0, numTrips):
-            self._read_buffer()
-            buffer += self._input
+            buffer = b""
+            for i in range(0, numTrips):
+                self._read_buffer()
+                buffer += self._input
 
-        #read remainder
-        if remainder:
-            self._read_buffer()
-            buffer += self._input
+            #read remainder
+            if remainder:
+                self._read_buffer()
+                buffer += self._input
 
-        #self._socket.send(SIGNAL_MULTIPLES_DONE)
-        self._input = buffer
-        self._input_size = size
-        self._input_offset = 0
+            #self._socket.send(SIGNAL_MULTIPLES_DONE)
+            self._input = buffer
+            self._input_size = size
+            self._input_offset = 0
+        except:
+            e = sys.exc_info()[0]
+            print( "Error: %s" % e)
 
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)
