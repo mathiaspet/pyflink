@@ -17,26 +17,33 @@
  */
 package org.apache.flink.python.api.streaming.io;
 
+import org.apache.flink.python.api.PythonPlanBinder;
 import org.apache.flink.python.api.streaming.plan.PythonPlanReceiver;
 import org.apache.flink.python.api.streaming.plan.PythonPlanSender;
 import org.apache.flink.python.api.streaming.util.StreamPrinter;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON2_BINARY_PATH;
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON3_BINARY_PATH;
 import static org.apache.flink.python.api.PythonPlanBinder.FLINK_PYTHON_PLAN_NAME;
-import static org.apache.flink.python.api.PythonPlanBinder.usePython3;
 
-public class PythonSplitGeneratorStreamer {
+public class PythonSplitGeneratorStreamer implements Serializable {
+	private final boolean usePython3;
+
 	protected PythonPlanSender sender;
 	protected PythonPlanReceiver receiver;
 
 	private Process process;
 	private ServerSocket server;
 	private Socket socket;
+
+	public PythonSplitGeneratorStreamer() {
+		this.usePython3 = PythonPlanBinder.usePython3;
+	}
 
 	public Object getRecord() throws IOException {
 		return getRecord(false);
@@ -60,6 +67,14 @@ public class PythonSplitGeneratorStreamer {
 
 	private void startPython(String tmpPath, String args, int id) throws IOException {
 		String pythonBinaryPath = usePython3 ? FLINK_PYTHON3_BINARY_PATH : FLINK_PYTHON2_BINARY_PATH;
+
+		System.out.println("tempPath in split generator: " + tmpPath);
+		/*
+		try {
+			Thread.sleep(40000);
+		} catch (InterruptedException ex) {
+		}
+		*/
 
 		try {
 			Runtime.getRuntime().exec(pythonBinaryPath);

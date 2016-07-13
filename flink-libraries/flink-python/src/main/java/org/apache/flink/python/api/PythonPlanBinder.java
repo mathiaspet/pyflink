@@ -92,12 +92,13 @@ public class PythonPlanBinder {
 
 	public static boolean usePython3 = false;
 
-	private static String FLINK_HDFS_PATH = "hdfs:/tmp";
+	private static String FLINK_HDFS_PATH = "hdfs://gms41:50040/tmp";
 	public static final String FLINK_TMP_DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "flink_data";
 
 	private HashMap<Integer, Object> sets = new HashMap<>();
 	public ExecutionEnvironment env;
 	private PythonPlanStreamer streamer;
+	private String tmpPath;
 
 	public static final int MAPPED_FILE_SIZE = 1024 * 1024 * 64;
 
@@ -138,7 +139,7 @@ public class PythonPlanBinder {
 		}
 
 		try {
-			String tmpPath = FLINK_PYTHON_FILE_PATH + r.nextInt();
+			this.tmpPath = FLINK_PYTHON_FILE_PATH + r.nextInt();
 			prepareFiles(tmpPath, Arrays.copyOfRange(args, 0, split == 0 ? 1 : split));
 			startPython(tmpPath, Arrays.copyOfRange(args, split == 0 ? args.length : split + 1, args.length));
 			receivePlan();
@@ -189,6 +190,7 @@ public class PythonPlanBinder {
 	}
 
 	private static void copyFile(String path, String target, String name) throws IOException, URISyntaxException {
+		System.out.println("In copyFile: " + path + " target " + target + " name " + name);
 		if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
 		}
@@ -196,6 +198,7 @@ public class PythonPlanBinder {
 		String tmpFilePath = target + "/" + identifier;
 		clearPath(tmpFilePath);
 		Path p = new Path(path);
+		System.out.println(p);
 		FileCache.copy(p.makeQualified(FileSystem.get(p.toUri())), new Path(tmpFilePath), true);
 	}
 
@@ -260,7 +263,8 @@ public class PythonPlanBinder {
 					env.setParallelism(dop);
 					break;
 				case MODE:
-					FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs:/tmp/flink";
+					//FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs:/tmp/flink";
+					FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs://gms41:50040/tmp";
 					break;
 				case RETRY:
 					int retry = (Integer) value.getField(1);
@@ -679,7 +683,7 @@ public class PythonPlanBinder {
 	}
 
 	protected InputFormat createCustomInputFormat(PythonOperationInfo info) {
-		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter, info.computeSplits);
+		InputFormat format = new PythonInputFormat(new Path(info.path), info.setID, info.types, info.filter, info.computeSplits, this.tmpPath);
 		return format;
 	}
 
