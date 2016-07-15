@@ -20,11 +20,9 @@ import numpy as np
 import gdal
 import sys, glob
 from gdalconst import GA_ReadOnly
-from flink.plan.Constants import BYTES, STRING
 
 from flink.functions.FilterFunction import FilterFunction
 from flink.functions.FlatMapFunction import FlatMapFunction
-from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.io.PythonOutputFormat import PythonOutputFormat
 from flink.plan.Environment import get_environment
