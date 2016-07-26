@@ -171,6 +171,18 @@ public class TileInfoWrapper implements Serializable{
 		}
 	}
 
+	public String getSceneID(){
+		String[] description = getList("description");
+		String[] sceneInfo = description[0].trim().split("\\s*:\\s*");
+		String sceneID = sceneInfo[1];
+		return sceneID;}
+
+	public String getOverlap() {return this.metaData.get("overlap");}
+
+	public void setOverlap(String overlappingTile){
+		this.metaData.put("overlap", overlappingTile);
+	}
+
 	public int getBands() {
 		return Integer.parseInt(this.metaData.get("bands"));
 	}

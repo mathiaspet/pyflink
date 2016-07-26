@@ -59,6 +59,9 @@ public class TileWrapper implements Serializable {
 	// Tile width and height in pixels
 	private int tileWidth = -1, tileHeight = -1;
 
+	private String sceneID = null;
+	private  String overlap = null;
+
 	// TODO: decide whether to keep this public or not
 	public TileWrapper() {
 	}
@@ -87,6 +90,8 @@ public class TileWrapper implements Serializable {
 		this.tileWidth = tiWrapper.getSamples();
 		this.xPixelWidth = tiWrapper.getPixelWidth();
 		this.yPixelWidth = tiWrapper.getPixelHeight();
+		this.sceneID = tiWrapper.getSceneID();
+		this.overlap = tiWrapper.getOverlap();
 	}
 
 	public TileWrapper(TileWrapper tile) {
@@ -106,7 +111,21 @@ public class TileWrapper implements Serializable {
 		this.tileWidth = tile.getTileWidth();
 		this.xPixelWidth = tile.xPixelWidth;
 		this.yPixelWidth = tile.yPixelWidth;
+		this.sceneID = tile.getSceneID();
+		this.overlap = tile.getOverlap();
 	}
+
+	public String getOverlap(){return this.overlap;}
+
+	public void setOverlap4tile(Tuple3<String, byte[], byte[]> tile, String overlappingTiles){
+		//this.overlap = overlappingTiles;
+		TileInfoWrapper tiWrapper = new TileInfoWrapper(tile.f1);
+		tiWrapper.setOverlap(overlappingTiles);
+
+	}
+
+	public String getSceneID(){ return this.sceneID;}
+
 
 	public int getBand() {
 		return this.band;

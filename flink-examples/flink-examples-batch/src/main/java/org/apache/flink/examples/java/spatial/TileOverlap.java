@@ -21,21 +21,28 @@ package org.apache.flink.examples.java.spatial;
 
 
 import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.operators.DataSink;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.TileInfoWrapper;
 import org.apache.flink.api.java.spatial.TileWrapper;
 import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.api.java.spatial.envi.OverlappingTileInputFormat;
+import org.apache.flink.util.Collector;
+
+import java.util.ArrayList;
+
 import static org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE;
 
 
@@ -61,21 +68,16 @@ public class TileOverlap {
         env.setParallelism(dop);
 
         DataSet<Tuple3<String, byte[], byte[]>> allTiles = getTiles(env);
+
         DataSet<Tuple3<String, byte[], byte[]>> involvedTiles = allTiles.filter(new InvolvedTileSelector())
-																		.reduceGroup(new );
-
-
+																		.groupBy(new SceneIDExtractor())
+																		.reduceGroup(new TileIntersection());
 
         DataSink<Tuple3<String, byte[], byte[]>> writeAsEnvi = involvedTiles.write(new ImageOutputFormat(), outputFilePath, writeMode);
+
 		//writeAsText(outputFilePath, writeMode);
         writeAsEnvi.setParallelism(4);
         env.execute("Tile Overlap");
-
-        /** TODO:
-            - Reducer für Scenenweise Berechnung der Tile Überlappung
-            - Reducer für Berechnung der Tile Überlappung im Schnittbereich der Scenen
-         */
-
     }
 
     private static boolean parseParameters(String[] params) {
@@ -133,7 +135,7 @@ public class TileOverlap {
 
 
 	/** InvolvedTileSelector:
-	 * Returns only those Tiles that are intersecting with the given area of interest.
+	 * Returns only those tiles that are intersecting with the given area of interest.
 	 */
 
     public static class InvolvedTileSelector implements FilterFunction<Tuple3<String, byte[], byte[]>> {
@@ -145,28 +147,136 @@ public class TileOverlap {
             Coordinate tileLeftUpper = tileInfo.getNWCoord();
             Coordinate tileRightLower = tileInfo.getSECoord();
             enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
-			//System.out.println("Tile Coordinates: LeftUpper: " + tileLeftUpper + "// RightLower: " + tileRightLower);
-            return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
+			//System.out.println("...");
+			return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
         }
     }
 
 	/** TileIntersection:
-	 * Returns only those tiles that are intersecting with any given tile in order to calculate the overlap size.
+	 * Calculate tile overlap size.
 	 */
-	public static class TileIntersection implements FilterFunction<Tuple3<String, byte[], byte[]>> {
+	public static class TileIntersection implements GroupReduceFunction<Tuple3<String, byte[], byte[]>, Tuple3<String, byte[], byte[]>> {
 
 		@Override
-		public boolean filter(Tuple3<String, byte[], byte[]> tile) throws Exception {
+		public void reduce(Iterable<Tuple3<String, byte[], byte[]>> input,
+						   Collector<Tuple3<String, byte[], byte[]>> output) throws Exception {
+			System.out.println("enter reduce");
 			OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
-			TileInfoWrapper info = new TileInfoWrapper();
-			Coordinate tileLeftUpper = info.getLeftUpper();
-			Coordinate tileRightLower = info.getLowerRightCoordinate();
-			enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
+			ArrayList<Tuple3<String, byte[], byte[]>> copyTiles = new ArrayList<>();
+			ArrayList<Tuple3<String, byte[], byte[]>> inputTiles = new ArrayList<>();
+			String overlapProp = "";
 
-			return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
+
+			for(Tuple3<String, byte[], byte[]> tile : input) {
+				inputTiles.add(tile);
+				copyTiles.add(tile);
+			}
+
+			for(Tuple3<String, byte[], byte[]> tile : inputTiles) {
+				TileWrapper tileInfo = new TileWrapper(tile);
+				Coordinate tileLeftUpper = tileInfo.getNWCoord();
+				Coordinate tileRightLower = tileInfo.getSECoord();
+				enviFormat.setLimitRectangle(tileLeftUpper, tileRightLower);
+
+				for(Tuple3<String, byte[], byte[]> otherTile : copyTiles) {
+					TileWrapper otherTileInfo = new TileWrapper(otherTile);
+					Coordinate otherTileLeftUpper = otherTileInfo.getNWCoord();
+					Coordinate otherTileRightLower = otherTileInfo.getSECoord();
+
+					if(!(tileLeftUpper.equals(otherTileLeftUpper) && tileRightLower.equals(otherTileRightLower))){
+
+						if(enviFormat.rectIntersectsLimits(otherTileLeftUpper, otherTileRightLower)){
+							Double lonDiff = -1.0;
+							Double latDiff = -1.0;
+							Coordinate lu_rl_Diff = tileLeftUpper.diff(otherTileRightLower);
+							Coordinate rl_lu_Diff = tileRightLower.diff(otherTileLeftUpper);
+							
+							// 8 different cases of how the tiles might be located:
+							// upper-left corner
+							if((tileLeftUpper.lon > otherTileLeftUpper.lon) && (tileLeftUpper.lat < otherTileLeftUpper.lat)
+								&& (tileRightLower.lon > otherTileRightLower.lon) && (tileRightLower.lat < otherTileRightLower.lat)){
+								lonDiff = lu_rl_Diff.lon;
+								latDiff = lu_rl_Diff.lat;
+							}
+							// upper-right corner
+							if((tileLeftUpper.lon < otherTileLeftUpper.lon) && (tileLeftUpper.lat < otherTileLeftUpper.lat)
+								&& (tileRightLower.lon < otherTileRightLower.lon) && (tileRightLower.lat < otherTileRightLower.lat)){
+								lonDiff = rl_lu_Diff.lon;
+								latDiff = lu_rl_Diff.lat;
+							}
+							// upper-middle
+							if((tileLeftUpper.lon == otherTileLeftUpper.lon) && (tileLeftUpper.lat < otherTileLeftUpper.lat)
+								&& (tileRightLower.lon == otherTileRightLower.lon) && (tileRightLower.lat < otherTileRightLower.lat)){
+								lonDiff = 0.0;
+								latDiff = lu_rl_Diff.lat;
+							}
+							// lower-middle
+							if((tileLeftUpper.lon == otherTileLeftUpper.lon) && (tileLeftUpper.lat > otherTileLeftUpper.lat)
+								&& (tileRightLower.lon == otherTileRightLower.lon) && (tileRightLower.lat > otherTileRightLower.lat)){
+								lonDiff = 0.0;
+								latDiff = rl_lu_Diff.lat;
+							}
+							// lower-left corner
+							if((tileLeftUpper.lon > otherTileLeftUpper.lon) && (tileLeftUpper.lat > otherTileLeftUpper.lat)
+								&& (tileRightLower.lon > otherTileRightLower.lon) && (tileRightLower.lat > otherTileRightLower.lat)){
+								lonDiff = rl_lu_Diff.lon;
+								latDiff = lu_rl_Diff.lat;
+							}
+							// lower-right corner
+							if((tileLeftUpper.lon < otherTileLeftUpper.lon) && (tileLeftUpper.lat > otherTileLeftUpper.lat)
+								&& (tileRightLower.lon < otherTileRightLower.lon) && (tileRightLower.lat > otherTileRightLower.lat)){
+								lonDiff = rl_lu_Diff.lon;
+								latDiff = rl_lu_Diff.lat;
+							}
+							// right-middle
+							if ((tileLeftUpper.lon < otherTileLeftUpper.lon) && (tileLeftUpper.lat == otherTileLeftUpper.lat)
+								&& (tileRightLower.lon < otherTileRightLower.lon) && (tileRightLower.lat == otherTileRightLower.lat)){
+								lonDiff = rl_lu_Diff.lon;
+								latDiff = 0.0;
+							}
+							// left-middle
+							if((tileLeftUpper.lon > otherTileLeftUpper.lon) && (tileLeftUpper.lat == otherTileLeftUpper.lat)
+								&& (tileRightLower.lon > otherTileRightLower.lon) && (tileRightLower.lat == otherTileRightLower.lat)){
+								lonDiff = lu_rl_Diff.lat;
+								latDiff = 0.0;
+							}
+
+							if(lonDiff<0.0){lonDiff = lonDiff*(-1.0);}
+							if(latDiff<0.0){latDiff = latDiff*(-1.0);}
+
+							System.out.println("For tile A (Coord. LU: "+tileLeftUpper+", RL: "+tileRightLower+") and " +
+								"tile B (Coord. LU: "+otherTileLeftUpper+", RL: "+otherTileRightLower+") overlap size of:" +
+								" lon: "+lonDiff+", lat: "+latDiff+"");
+
+							// TODO: add overlap to tile header
+
+							overlapProp += ("(tile [LU: "+otherTileLeftUpper+", RL: "+otherTileRightLower+"]; " +
+											"overlap [lon: "+lonDiff+", lat: "+latDiff+"]), ");
+							tileInfo.setOverlap4tile(tile, overlapProp);
+							output.collect(new Tuple3<>(tile.f0, tile.f1, tile.f2));
+
+						}else{
+							System.out.println("These tiles do not intersect.");
+						}
+					}
+				}
+			}
 		}
 	}
 
+
+	/** Scene ID Extraction
+	 * Group incoming tiles by scene ID
+	 */
+	public static class SceneIDExtractor implements KeySelector<Tuple3<String, byte[], byte[]>, String> {
+
+		@Override
+		public String getKey(Tuple3<String, byte[], byte[]> tile) throws Exception {
+			TileWrapper tileInfo = new TileWrapper(tile);
+			String sceneID = tileInfo.getSceneID();
+			return sceneID;
+		}
+	}
 
 
 }

@@ -36,7 +36,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 
-public class ImageInfoWrapper implements Serializable {
+public class
+ImageInfoWrapper implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private Map<String, String> metaData;
