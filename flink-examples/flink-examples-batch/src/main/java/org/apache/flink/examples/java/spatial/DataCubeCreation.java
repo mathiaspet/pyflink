@@ -57,15 +57,13 @@ public class DataCubeCreation {
 			return;
 		}
 
-		final ExecutionEnvironment env = ExecutionEnvironment
-				.getExecutionEnvironment();
+		final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 		env.setParallelism(dop);
 		
 		DataSet<Tuple3<String, byte[], byte[]>> tiles = readTiles(env);
 		DataSet<Tuple3<String, byte[], byte[]>> stitchedTimeSlices = tiles.groupBy(
 				new TileTimeKeySelector<Tuple3<String, byte[], byte[]>>()).reduceGroup(
-				new TileStitchReduce().configure(leftUpper, rightLower,
-						blockSize, blockSize));
+				new TileStitchReduce().configure(leftUpper, rightLower, blockSize, blockSize));
 		DataSink<Tuple3<String, byte[], byte[]>> writeAsEnvi = stitchedTimeSlices.write(new ImageOutputFormat(), outputFilePath);
 		
 		writeAsEnvi.setParallelism(1);
@@ -116,7 +114,9 @@ public class DataCubeCreation {
 		TileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new TileInputFormat<Tuple3<String, byte[], byte[]>>(new Path(filePath));
 		enviFormat.setLimitRectangle(leftUpper, rightLower);
 		enviFormat.setTileSize(blockSize, blockSize);
-		TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, byte[], byte[]>>(BasicTypeInfo.STRING_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO, PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO);
+		TupleTypeInfo<Tuple3<String, byte[], byte[]>> typeInfo = new TupleTypeInfo<Tuple3<String, byte[], byte[]>>(BasicTypeInfo.STRING_TYPE_INFO,
+																				PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO,
+																				PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO);
 		return new DataSource<Tuple3<String, byte[], byte[]>>(env, enviFormat, typeInfo, "enviSource");
 	}
 

@@ -36,7 +36,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 
-public class ImageInfoWrapper implements Serializable {
+public class
+ImageInfoWrapper implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	private Map<String, String> metaData;
@@ -328,7 +329,8 @@ public class ImageInfoWrapper implements Serializable {
 			offset = nextBreak + 1;
 			nextBreak = asString.indexOf('\0', offset);
 			if (nextBreak == -1) {
-				throw new RuntimeException("Missing value for key: " + key);
+				//throw new RuntimeException("Missing value for key: " + key);
+				break;
 			}
 			value = asString.substring(offset, nextBreak);
 			metaData.put(key, value);
