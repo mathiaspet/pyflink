@@ -23,7 +23,7 @@ import zipfile
 import psycopg2
 import psycopg2.extras
 import xattr
-import simplejson as json
+import json
 
 
 
@@ -77,8 +77,7 @@ def get_hosts(path):
     attrs = xattr.list(path)
     if len(attrs) > 0:
         jsonString = xattr.get(path, "xtreemfs.locations")
-        #jsonString = xattr.get("/home/mathiasp/mount/localScenes/227064_020717_BLA_SR.bsq", "xtreemfs.locations")
-        parsed = json.loads(jsonString)
+        parsed = json.loads(jsonString.decode())
         print(parsed["replicas"][0]['osds'][0]['address'].split(":")[0])
 
         replicas = parsed["replicas"]

@@ -205,9 +205,20 @@ public class PythonSender<IN> implements Serializable {
 				serializer[group] = getSerializer(value);
 			}
 			bb = serializer[group].serialize(value);
+
+			//DEBUG out
+			System.out.print("JAVA: FIRST TEN BYTES: ");
+			for(int k = 0; k < 10; k++)
+			{
+				System.out.print(bb.get(k));
+			}
+			System.out.println();
+			bb.rewind();
+
 			int tupleSize = bb.limit();
 			//send size
 			sendWriteNotification(tupleSize, true);
+			//System.out.println("java: sent size " + tupleSize);
 
 			int numTrips = tupleSize / MAPPED_FILE_SIZE;
 			//send numTrips?

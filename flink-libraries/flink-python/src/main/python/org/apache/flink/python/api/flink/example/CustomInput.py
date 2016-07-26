@@ -27,6 +27,7 @@ from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.io.PythonOutputFormat import PythonOutputFormat
 from flink.plan.Environment import get_environment
 from flink.spatial.ImageWrapper import ImageWrapper, TupleToTile, TileToTuple
+from flink.example.gmsdb.misc import get_hosts
 
 
 class Tokenizer(FlatMapFunction):
@@ -53,7 +54,8 @@ class GDALInputFormat(PythonInputFormat):
         #    ]
 
         files = []
-        for f in glob.glob("/opt/gms_sample/*.bsq"):
+        for f in glob.glob("/home/mathiasp/mount/localScenes/*.bsq"):
+        #for f in glob.glob("/opt/gms_sample/*.bsq"):
             print("file:"+f)
             files.append("file:"+f)
 
@@ -62,7 +64,8 @@ class GDALInputFormat(PythonInputFormat):
 
     def createInputSplits(self, minNumSplits, path, collector):
         for f in self.getFiles():
-            collector.collect(FileInputSplit(f, 0, 1, ("localhost",)))
+            hosts = get_hosts(f[5:])
+            collector.collect(FileInputSplit(f, 0, 1, hosts))
 
 
     def _userInit(self):
@@ -102,8 +105,8 @@ class GDALInputFormat(PythonInputFormat):
 
         metaBytes = ImageWrapper._meta_to_bytes(metaData)
         bArr = bytearray(imageData)
-        #retVal = (metaData['scene id'], metaBytes, bArr)
-        retVal = (metaData['scene id'], bytearray(), bytearray())
+        retVal = (metaData['scene id'], metaBytes, bArr)
+        #retVal = (metaData['scene id'], bytearray(), bytearray())
         print(metaData['scene id'])
         sys.stdout.flush()
         collector.collect(retVal)
@@ -187,7 +190,7 @@ def main():
     filtered = result.filter(Filter())
     filtered.write_custom(GMSOF("/opt/output"))
 
-    env.set_parallelism(2)
+    env.set_parallelism(4)
 
     env.execute(local=False)
 

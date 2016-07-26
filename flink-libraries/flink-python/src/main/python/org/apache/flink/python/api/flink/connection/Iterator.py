@@ -193,39 +193,54 @@ class Iterator(defIter.Iterator):
 
     def next(self):
         if self.has_next():
-            if self._largeTuples:
-                self._connection.readLargeTuple()
+            try:
+                if self._largeTuples:
+                    self._connection.readLargeTuple()
 
-            custom_types = self._env._types
-            read = self._read
-            if self._deserializer is None:
-                type = read(1)
-                if type == Types.TYPE_ARRAY:
-                    key_des = _get_deserializer(read, custom_types)
-                    self._deserializer = ArrayDeserializer(key_des)
-                    return key_des.deserialize(read)
-                elif type == Types.TYPE_KEY_VALUE:
-                    size = ord(read(1))
-                    key_des = []
-                    keys = []
-                    for _ in range(size):
-                        new_d = _get_deserializer(read, custom_types)
-                        key_des.append(new_d)
-                        keys.append(new_d.deserialize(read))
-                    val_des = _get_deserializer(read, custom_types)
-                    val = val_des.deserialize(read)
-                    self._deserializer = KeyValueDeserializer(key_des, val_des)
-                    return (tuple(keys), val)
-                elif type == Types.TYPE_VALUE_VALUE:
-                    des1 = _get_deserializer(read, custom_types)
-                    field1 = des1.deserialize(read)
-                    des2 = _get_deserializer(read, custom_types)
-                    field2 = des2.deserialize(read)
-                    self._deserializer = ValueValueDeserializer(des1, des2)
-                    return (field1, field2)
-                else:
-                    raise Exception("Invalid type ID encountered: " + str(ord(type)))
-            return self._deserializer.deserialize(self._read)
+                custom_types = self._env._types
+                read = self._read
+                if self._deserializer is None:
+                    type = read(1)
+                    print("Iterator read type: ", type)
+                    if type == Types.TYPE_ARRAY:
+                        key_des = _get_deserializer(read, custom_types)
+                        self._deserializer = ArrayDeserializer(key_des)
+                        return key_des.deserialize(read)
+                    elif type == Types.TYPE_KEY_VALUE:
+                        size = ord(read(1))
+                        key_des = []
+                        keys = []
+                        for _ in range(size):
+                            new_d = _get_deserializer(read, custom_types)
+                            key_des.append(new_d)
+                            keys.append(new_d.deserialize(read))
+                        val_des = _get_deserializer(read, custom_types)
+                        val = val_des.deserialize(read)
+                        self._deserializer = KeyValueDeserializer(key_des, val_des)
+                        return (tuple(keys), val)
+                    elif type == Types.TYPE_VALUE_VALUE:
+                        des1 = _get_deserializer(read, custom_types)
+                        field1 = des1.deserialize(read)
+                        des2 = _get_deserializer(read, custom_types)
+                        field2 = des2.deserialize(read)
+                        self._deserializer = ValueValueDeserializer(des1, des2)
+                        return (field1, field2)
+                    else:
+                        raise Exception("Invalid type ID encountered: " + str(ord(type)))
+                return self._deserializer.deserialize(self._read)
+            except UnicodeDecodeError as err:
+                print("Handling UnicodeDecodeError: ", err)
+                sys.stdout.flush()
+                return self.next()
+            except Exception as ex:
+                print("Handling Exception: ", ex)
+                sys.stdout.flush()
+                return self.next()
+            except:
+                e = sys.exc_info()[0]
+                print( "Error in Iterator: %s" % e)
+                sys.stdout.flush()
+                return self.next()
         else:
             raise StopIteration
 

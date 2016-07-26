@@ -241,6 +241,8 @@ class Environment(object):
                     socket.send(struct.pack(">i", -2))
                     socket.close()
                 raise
+        print("leaving env.execute()")
+        sys.stdout.flush()
 
     def _optimize_plan(self):
         self._find_chains()

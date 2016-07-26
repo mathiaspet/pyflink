@@ -47,6 +47,9 @@ class Collector(object):
         self.collect(value)
 
     def _collect(self, value):
+        print("Python _collect: " + value[0])
+        sys.stdout.flush()
+
         serialized_value = self._serializer.serialize(value)
         self._connection.write(serialized_value)
 

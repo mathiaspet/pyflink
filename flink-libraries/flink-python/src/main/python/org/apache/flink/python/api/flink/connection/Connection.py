@@ -113,6 +113,9 @@ class BufferingTCPMappedFileConnection(object):
                 self._out_size = tmp
 
     def _write_large_msg(self, msg):
+        print("first ten bytes in write_large_msg: ", msg[4:14])
+        sys.stdout.flush()
+
         length = len(msg)
         self._socket.send(pack(">i", length))
 
@@ -151,8 +154,12 @@ class BufferingTCPMappedFileConnection(object):
     def readLargeTuple(self):
         try:
             self._socket.send(SIGNAL_REQUEST_BUFFER)
+            #print("sent buffer request")
+            sys.stdout.flush()
             meta_size = recv_all(self._socket, 5)
             size = unpack(">I", meta_size[:4])[0]
+            #print("received size", size)
+            sys.stdout.flush()
             numTrips = int(size / MAPPED_FILE_SIZE)
             remainder = size % MAPPED_FILE_SIZE
 
@@ -160,6 +167,8 @@ class BufferingTCPMappedFileConnection(object):
             for i in range(0, numTrips):
                 self._read_buffer()
                 buffer += self._input
+                if i == 0:
+                    print("Received the first ten bytes: ", buffer[0:10])
 
             #read remainder
             if remainder:
@@ -172,7 +181,7 @@ class BufferingTCPMappedFileConnection(object):
             self._input_offset = 0
         except:
             e = sys.exc_info()[0]
-            print( "Error: %s" % e)
+            print( "Error in Connection read large tuple: %s" % e)
 
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)
