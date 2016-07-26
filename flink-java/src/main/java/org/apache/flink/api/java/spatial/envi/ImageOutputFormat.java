@@ -30,6 +30,7 @@ public class ImageOutputFormat<T extends Tuple3<String, byte[], byte[]>> extends
 	private static final long serialVersionUID = 1L;
 
 	private byte[] header;
+	private boolean written = false;
 
 	public ImageOutputFormat() {
 		super();
@@ -42,6 +43,7 @@ public class ImageOutputFormat<T extends Tuple3<String, byte[], byte[]>> extends
 	@Override
 	public void writeRecord(T record) throws IOException {
 
+		this.written = true;
 		// When adding a band to an already written one, we need to adjust the header
 		if (this.header == null) {
 			this.header = record.f1;
@@ -59,6 +61,11 @@ public class ImageOutputFormat<T extends Tuple3<String, byte[], byte[]>> extends
 	@Override
 	public void close() throws IOException {
 		super.close();
+
+		if(!this.written){
+			return;
+		}
+
 
 		Path p = this.outputFilePath;
 		if (p == null) {

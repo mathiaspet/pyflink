@@ -21,6 +21,7 @@ package org.apache.flink.examples.java.spatial;
 
 
 import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
@@ -69,14 +70,28 @@ public class TileOverlap {
 
         DataSet<Tuple3<String, byte[], byte[]>> allTiles = getTiles(env);
 
+		/*
         DataSet<Tuple3<String, byte[], byte[]>> involvedTiles = allTiles.filter(new InvolvedTileSelector())
 																		.groupBy(new SceneIDExtractor())
 																		.reduceGroup(new TileIntersection());
+		*/
 
-        DataSink<Tuple3<String, byte[], byte[]>> writeAsEnvi = involvedTiles.write(new ImageOutputFormat(), outputFilePath, writeMode);
+		allTiles.flatMap(new FlatMapFunction<Tuple3<String,byte[],byte[]>, Tuple3<String,byte[],byte[]>>() {
+			@Override
+			public void flatMap(Tuple3<String, byte[], byte[]> value, Collector<Tuple3<String, byte[], byte[]>> out) throws Exception {
+				out.collect(value);
+			}
+		}).groupBy(0).reduceGroup(new GroupReduceFunction<Tuple3<String,byte[],byte[]>, Tuple3<String, byte[], byte[]>>() {
+			@Override
+			public void reduce(Iterable<Tuple3<String, byte[], byte[]>> values, Collector<Tuple3<String, byte[], byte[]>> out) throws Exception {
+				for(Tuple3<String, byte[], byte[]> i : values){
+					System.out.println("In reduceGroup: " + i.f0);
+					out.collect(i);
+				}
+			}
+		}).write(new ImageOutputFormat<Tuple3<String, byte[], byte[]>>(), outputFilePath, OVERWRITE);
 
-		//writeAsText(outputFilePath, writeMode);
-        writeAsEnvi.setParallelism(4);
+		//writeAsEnvi.setParallelism(4);
         env.execute("Tile Overlap");
     }
 
@@ -148,7 +163,8 @@ public class TileOverlap {
             Coordinate tileRightLower = tileInfo.getSECoord();
             enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
 			//System.out.println("...");
-			return enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
+			boolean value = enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
+			return value;
         }
     }
 
