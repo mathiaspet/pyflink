@@ -73,7 +73,7 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
 
         if(minNumSplits < 1) { minNumSplits = 1; }
 
-        List<FileInputSplit> inputSplits = new ArrayList<FileInputSplit>(minNumSplits);
+        List<FileInputSplit> inputSplits = new ArrayList<>(minNumSplits);
         for (FileStatus file : files) {
             // Read header file:
             FSDataInputStream fdis = fs.open(file.getPath());
@@ -136,6 +136,10 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
 	 *  Calculate pixel tile size: The rightmost column and lowest row of tiles may contain empty
 	 *  pixels.
 	 */
+
+		Coordinate tileUpperLeft, tileLowerRight;
+		tileLowerRight=null;
+		tileUpperLeft=null;
         int xsplits = (numColumns + xsize - 1) / xsize;
         int ysplits = (numRows + ysize - 1) / ysize;
 
@@ -168,10 +172,20 @@ public class OverlappingTileInputFormat<T extends Tuple3<String, byte[], byte[]>
                     int pxnext = ((currentXSplit + 1) % xsplits) * xsize - overlapSize;
                     int pxnextNoWrapped = (currentXSplit + 1) * xsize - overlapSize;
 
-                    Coordinate tileUpperLeft = new Coordinate(upperLeftCorner.lon + pxstart * pixelWidth, upperLeftCorner.lat - pystart * pixelHeight);
-                    Coordinate tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
+					if(currentXSplit==0){
+						tileUpperLeft = new Coordinate(upperLeftCorner.lon + pxstart * pixelWidth, upperLeftCorner.lat - pystart * pixelHeight);
+						tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
+					}else{
+						tileUpperLeft = new Coordinate(tileUpperLeft.lon + pxstart * pixelWidth, tileUpperLeft.lat - pystart * pixelHeight);
+						tileLowerRight = new Coordinate(tileUpperLeft.lon + (xsize-1) * pixelWidth, tileUpperLeft.lat - (ysize-1) * pixelHeight);
+					}
 
-                    // Filter this tile if no pixel is contained in the selected region:
+					info.setLeftUpper(tileUpperLeft);
+					info.setRightLower(tileLowerRight);
+					System.out.println("************  Cut tiles: Coordinates: " + tileUpperLeft + "    " + tileLowerRight);
+
+
+					// Filter this tile if no pixel is contained in the selected region:
                     if(this.leftUpperLimit != null && !rectIntersectsLimits(tileUpperLeft, tileLowerRight)) {
                         if(LOG.isDebugEnabled()) { LOG.debug("Skipping tile at " + currentXSplit + "x" + currentYSplit + ", coordinates " + tileUpperLeft + " -- " + tileLowerRight); }
                         continue;

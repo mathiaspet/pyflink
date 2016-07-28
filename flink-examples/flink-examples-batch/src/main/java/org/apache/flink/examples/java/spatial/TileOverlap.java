@@ -34,6 +34,7 @@ import org.apache.flink.api.java.spatial.Coordinate;
 import org.apache.flink.api.java.spatial.TileInfoWrapper;
 import org.apache.flink.api.java.spatial.TileWrapper;
 import org.apache.flink.api.java.spatial.envi.ImageOutputFormat;
+import org.apache.flink.api.java.spatial.envi.TileInputFormat;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
@@ -70,12 +71,15 @@ public class TileOverlap {
 
         DataSet<Tuple3<String, byte[], byte[]>> allTiles = getTiles(env);
 
-		/*
+
         DataSet<Tuple3<String, byte[], byte[]>> involvedTiles = allTiles.filter(new InvolvedTileSelector())
 																		.groupBy(new SceneIDExtractor())
+																		//.groupBy(0)
 																		.reduceGroup(new TileIntersection());
-		*/
 
+		DataSink<Tuple3<String, byte[], byte[]>> writeAsEnvi = involvedTiles.write(new ImageOutputFormat(), outputFilePath, writeMode).setParallelism(1);
+
+		/*
 		allTiles.flatMap(new FlatMapFunction<Tuple3<String,byte[],byte[]>, Tuple3<String,byte[],byte[]>>() {
 			@Override
 			public void flatMap(Tuple3<String, byte[], byte[]> value, Collector<Tuple3<String, byte[], byte[]>> out) throws Exception {
@@ -90,8 +94,8 @@ public class TileOverlap {
 				}
 			}
 		}).write(new ImageOutputFormat<Tuple3<String, byte[], byte[]>>(), outputFilePath, OVERWRITE);
+        */
 
-		//writeAsEnvi.setParallelism(4);
         env.execute("Tile Overlap");
     }
 
@@ -162,7 +166,6 @@ public class TileOverlap {
             Coordinate tileLeftUpper = tileInfo.getNWCoord();
             Coordinate tileRightLower = tileInfo.getSECoord();
             enviFormat.setLimitRectangle(aoiLeftUpper, aoiRightLower);
-			//System.out.println("...");
 			boolean value = enviFormat.rectIntersectsLimits(tileLeftUpper, tileRightLower);
 			return value;
         }
@@ -178,14 +181,14 @@ public class TileOverlap {
 						   Collector<Tuple3<String, byte[], byte[]>> output) throws Exception {
 			System.out.println("enter reduce");
 			OverlappingTileInputFormat<Tuple3<String, byte[], byte[]>> enviFormat = new OverlappingTileInputFormat<>(new Path(filePath), overlapSize);
-			ArrayList<Tuple3<String, byte[], byte[]>> copyTiles = new ArrayList<>();
 			ArrayList<Tuple3<String, byte[], byte[]>> inputTiles = new ArrayList<>();
 			String overlapProp = "";
 
-
 			for(Tuple3<String, byte[], byte[]> tile : input) {
-				inputTiles.add(tile);
-				copyTiles.add(tile);
+				System.out.println("Tile ID: " + tile.f0);
+				inputTiles.add(new Tuple3<>(tile.f0, tile.f1, tile.f2));
+				TileWrapper tileWrapper = new TileWrapper(tile);
+				System.out.println("Tile Coord. " + tileWrapper.getNWCoord() + tileWrapper.getSECoord());
 			}
 
 			for(Tuple3<String, byte[], byte[]> tile : inputTiles) {
@@ -194,7 +197,7 @@ public class TileOverlap {
 				Coordinate tileRightLower = tileInfo.getSECoord();
 				enviFormat.setLimitRectangle(tileLeftUpper, tileRightLower);
 
-				for(Tuple3<String, byte[], byte[]> otherTile : copyTiles) {
+				for(Tuple3<String, byte[], byte[]> otherTile : inputTiles) {
 					TileWrapper otherTileInfo = new TileWrapper(otherTile);
 					Coordinate otherTileLeftUpper = otherTileInfo.getNWCoord();
 					Coordinate otherTileRightLower = otherTileInfo.getSECoord();
@@ -264,8 +267,6 @@ public class TileOverlap {
 								"tile B (Coord. LU: "+otherTileLeftUpper+", RL: "+otherTileRightLower+") overlap size of:" +
 								" lon: "+lonDiff+", lat: "+latDiff+"");
 
-							// TODO: add overlap to tile header
-
 							overlapProp += ("(tile [LU: "+otherTileLeftUpper+", RL: "+otherTileRightLower+"]; " +
 											"overlap [lon: "+lonDiff+", lat: "+latDiff+"]), ");
 							tileInfo.setOverlap4tile(tile, overlapProp);
@@ -289,6 +290,7 @@ public class TileOverlap {
 		@Override
 		public String getKey(Tuple3<String, byte[], byte[]> tile) throws Exception {
 			TileWrapper tileInfo = new TileWrapper(tile);
+			System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ ");
 			String sceneID = tileInfo.getSceneID();
 			return sceneID;
 		}

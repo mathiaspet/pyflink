@@ -290,17 +290,14 @@ public class TileInfoWrapper implements Serializable{
 		putList("map info", mapInfo);
 	}
 
+	public void setRightLower(Coordinate rightLower){
+		this.metaData.put("rightLower_lon", Double.toString(rightLower.lon));
+		this.metaData.put("rightLower_lat", Double.toString(rightLower.lat));
+	}
+
 	public Coordinate getLowerRightCoordinate() {
-		Coordinate upperLeft = getLeftUpper();
-		int lines = getLines();
-		int samples = getSamples();
-		double pixelWidth = getPixelWidth();
-		double pixelHeight = getPixelHeight();
-
-		double lowerRightEasting = upperLeft.lon + (samples - 1) * pixelWidth;
-		double lowerRightNorthing = upperLeft.lat - (lines - 1) * pixelHeight;
-
-		return new Coordinate(lowerRightEasting, lowerRightNorthing);
+		return new Coordinate(Double.parseDouble(this.metaData.get("rightLower_lon")),
+			Double.parseDouble(this.metaData.get("rightLower_lat")));
 	}
 
 	public byte[] toBytes() {
