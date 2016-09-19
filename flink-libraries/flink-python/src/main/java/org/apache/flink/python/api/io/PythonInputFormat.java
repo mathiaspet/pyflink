@@ -90,13 +90,13 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 
 	@Override
 	public void open(FileInputSplit split) throws IOException {
-		super.open(split);
+		//super.open(split);
 		this.splitProcessor.openSplit(split);
 	}
 
 	@Override
 	public void close() throws IOException {
-		super.close();
+		//super.close();
 		this.splitProcessor.closeSplit();
 	}
 
