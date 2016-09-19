@@ -38,8 +38,9 @@ class PythonInputFormat(Function.Function):
         while split is not None:
             function(split, collector)
             self._iterator._reset()
-            collector._close()
+            self._connection.send_end_signal()
             split = self._iterator.next()
+        collector._close()
 
     def deliver(self, path, collector):
         pass
