@@ -17,6 +17,8 @@
 ################################################################################
 from flink.connection import Connection, Iterator, Collector
 from flink.functions import RuntimeContext, Function
+import sys
+
 
 class FileInputSplit(object):
     def __init__(self, path, start, end, hosts):
@@ -29,17 +31,49 @@ class FileInputSplit(object):
 class PythonInputFormat(Function.Function):
     def __init__(self):
         super(PythonInputFormat, self).__init__()
+        self.close_called = False
 
     def _run(self):
         self._iterator._setLargeTuples(False)
         collector = self._collector
         function = self.deliver
+        print("before iterator next")
+        sys.stdout.flush()
         split = self._iterator.next()
-        while split is not None:
-            function(split, collector)
-            self._iterator._reset()
-            self._connection.send_end_signal()
-            split = self._iterator.next()
+        print("after iterator next")
+        print(split)
+        print(type(split))
+        print(type("close"))
+        sys.stdout.flush()
+
+        if split[0] == "close":
+            self.close_called = True
+        while split is not None and split[0] != "close":
+            try:
+                function(split, collector)
+            except:
+                print("in function call:", sys.exc_info()[0])
+            try:
+                self._iterator._reset()
+            except:
+                print("in iterator reset call:", sys.exc_info()[0])
+                sys.stdout.flush()
+            try:
+                self._connection.send_end_signal()
+            except:
+                print("in connection end call:", sys.exc_info()[0])
+                sys.stdout.flush()
+            try:
+                split = self._iterator.next()
+            except:
+                print("in iterator next call:" + str(self.close_called), sys.exc_info()[0])
+                sys.stdout.flush()
+            if split[0] == "close":
+                print("close split encountered")
+                sys.stdout.flush()
+                self.close_called = True
+
+
         collector._close()
 
     def deliver(self, path, collector):

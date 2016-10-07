@@ -175,7 +175,14 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	 */
 	public void close() throws IOException {
 		try {
-			int size = this.sender.sendRecord(getSerializer(null).serialize(null), false);
+			int signal = in.readInt(); //for debugging
+			if (signal != SIGNAL_BUFFER_REQUEST) {
+				throw new RuntimeException("yo aint getting no buffer");
+			}
+
+			Tuple3<String, Long, Long> closeTuple = new Tuple3<>("close", -1L, -1L);
+			int size = this.sender.sendRecord(this.serializer.serialize(closeTuple), true);
+			System.out.println("sent close tuple");
 			socket.close();
 			sender.close();
 			receiver.close();

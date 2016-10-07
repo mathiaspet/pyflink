@@ -32,6 +32,7 @@ class PythonOutputFormat(Function.Function):
             if result is not None:
                 for res in result:
                     collector.collect(res)
+        self.close()
         collector._close()
 
     def collect(self, value):
@@ -40,4 +41,7 @@ class PythonOutputFormat(Function.Function):
 
 
     def write(self, value):
+        pass
+
+    def close(self):
         pass

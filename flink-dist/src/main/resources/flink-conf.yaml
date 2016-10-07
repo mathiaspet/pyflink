@@ -115,8 +115,7 @@ jobmanager.web.port: 8081
 # If not specified, the system-specific Java temporary directory (java.io.tmpdir
 # property) is taken.
 #
-# taskmanager.tmp.dirs: /tmp
-
+taskmanager.tmp.dirs: /media/mathiasp/Elements4/GMS/tmp
 
 # Path to the Hadoop configuration directory.
 #
