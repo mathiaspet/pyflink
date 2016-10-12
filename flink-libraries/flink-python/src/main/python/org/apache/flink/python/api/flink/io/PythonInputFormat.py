@@ -37,18 +37,10 @@ class PythonInputFormat(Function.Function):
         self._iterator._setLargeTuples(False)
         collector = self._collector
         function = self.deliver
-        print("before iterator next")
-        sys.stdout.flush()
         split = self._iterator.next()
-        print("after iterator next")
-        print(split)
-        print(type(split))
-        print(type("close"))
-        sys.stdout.flush()
-
         if split[0] == "close":
             self.close_called = True
-        while split is not None and split[0] != "close":
+        while split is not None and not self.close_called:
             try:
                 function(split, collector)
             except:
@@ -69,11 +61,7 @@ class PythonInputFormat(Function.Function):
                 print("in iterator next call:" + str(self.close_called), sys.exc_info()[0])
                 sys.stdout.flush()
             if split[0] == "close":
-                print("close split encountered")
-                sys.stdout.flush()
                 self.close_called = True
-
-
         collector._close()
 
     def deliver(self, path, collector):

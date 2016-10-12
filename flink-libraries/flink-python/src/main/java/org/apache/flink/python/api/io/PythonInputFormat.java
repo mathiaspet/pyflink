@@ -38,6 +38,8 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 	private final PythonInputSplitGenerator splitGenerator;
 	private final PythonInputSplitProcessor<T> splitProcessor;
 
+	private boolean openedProcessor = false;
+
 	private String tmpPath;
 
 	public PythonInputFormat(Path path, int id, TypeInformation<T> info, String filter, boolean computeSplitsInPython, String tmpPath) {
@@ -81,28 +83,37 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 	@Override
 	public void openInputFormat() {
 		super.openInputFormat();
-		try {
-			this.splitProcessor.open();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 	}
 
 	@Override
 	public void open(FileInputSplit split) throws IOException {
-		//super.open(split);
+		if(!this.openedProcessor) {
+			try {
+				this.splitProcessor.open();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			this.openedProcessor = true;
+		}
+
 		this.splitProcessor.openSplit(split);
 	}
 
 	@Override
 	public void close() throws IOException {
-		//super.close();
-		this.splitProcessor.closeSplit();
+		if(this.openedProcessor) {
+			this.splitProcessor.closeSplit();
+		}
 	}
 
 	@Override
 	public boolean reachedEnd() throws IOException {
-		return this.splitProcessor.reachedEnd();
+		if(this.openedProcessor) {
+			return this.splitProcessor.reachedEnd();
+		}else {
+			return true;
+		}
+
 	}
 
 	@Override
@@ -113,7 +124,9 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 	@Override
 	public void closeInputFormat() {
 		super.closeInputFormat();
-		this.splitProcessor.close();
+		if(this.openedProcessor) {
+			this.splitProcessor.close();
+		}
 	}
 
 	@Override
