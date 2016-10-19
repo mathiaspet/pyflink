@@ -17,8 +17,7 @@
 ################################################################################
 from __future__ import print_function
 import numpy as np
-import gdal
-import sys, glob
+import gdal, sys, glob, pickle
 from gdalconst import GA_ReadOnly
 
 from flink.functions.FilterFunction import FilterFunction
@@ -61,8 +60,10 @@ class GDALInputFormat(PythonInputFormat):
         return files
 
     def createInputSplits(self, minNumSplits, path, collector):
+        additional = dict()
+        pickled = pickle.dumps(additional, pickle.HIGHEST_PROTOCOL)
         for f in self.getFiles():
-            collector.collect(FileInputSplit(f, 0, 1, ("localhost",)))
+            collector.collect(FileInputSplit(f, 0, 1, ("localhost",), pickled))
 
 
     def _userInit(self):

@@ -17,6 +17,7 @@
 ################################################################################
 from struct import pack
 from flink.connection.Constants import Types
+import sys
 
 
 #=====Compatibility====================================================================================================
@@ -80,6 +81,7 @@ class SplitCollector(object):
             write(len(split.hosts))
             for host in split.hosts:
                 write(host)
+            write(split.additional)
 
     def collect(self, value):
         self._splits.append(value)

@@ -65,8 +65,9 @@ public class PythonInputSplitGenerator implements Serializable {
 			for (int y = 0; y < numHosts; y++) {
 				hosts[y] = (String) this.streamer.getRecord();
 			}
+			byte[] additional = (byte[])this.streamer.getRecord(true);
 
-			splits[x] = new FileInputSplit(x, new Path(path), from, to, hosts);
+			splits[x] = new PythonInputSplit(x, new Path(path), from, to, hosts, additional);
 		}
 		this.streamer.close();
 		return splits;

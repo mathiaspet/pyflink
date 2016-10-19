@@ -15,9 +15,11 @@ package org.apache.flink.python.api.streaming.io;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.common.io.RichInputFormat;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.python.api.PythonPlanBinder;
+import org.apache.flink.python.api.io.PythonInputSplit;
 import org.apache.flink.python.api.streaming.data.PythonReceiver;
 import org.apache.flink.python.api.streaming.data.PythonSender;
 import org.apache.flink.python.api.streaming.util.SerializationUtils;
@@ -267,12 +269,14 @@ public class PythonSplitProcessorStreamer implements Serializable {
 
 	private SerializationUtils.Serializer serializer;
 
-	public final void transmitSplit(FileInputSplit split) throws IOException {
+	public final void transmitSplit(FileInputSplit inputSplit) throws IOException {
+		PythonInputSplit split = (PythonInputSplit)inputSplit;
+
 		int signal = in.readInt(); //for debugging
 		if (signal != SIGNAL_BUFFER_REQUEST) {
 			throw new RuntimeException("yo aint getting no buffer");
 		}
-		Tuple3<String, Long, Long> tuple = new Tuple3<>(split.getPath().toString(), split.getStart(), split.getLength());
+		Tuple4<String, Long, Long, byte[]> tuple = new Tuple4<>(split.getPath().toString(), split.getStart(), split.getLength(), split.getAdditional());
 		if (serializer == null) {
 			serializer = getSerializer(tuple);
 		}

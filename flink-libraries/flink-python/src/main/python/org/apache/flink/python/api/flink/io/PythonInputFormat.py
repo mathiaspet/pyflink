@@ -21,11 +21,12 @@ import sys
 
 
 class FileInputSplit(object):
-    def __init__(self, path, start, end, hosts):
+    def __init__(self, path, start, end, hosts, additional):
         self.path = path
         self.start = start
         self.end = end
         self.hosts = hosts
+        self.additional = additional
 
 
 class PythonInputFormat(Function.Function):
