@@ -44,25 +44,16 @@ class PythonInputFormat(Function.Function):
         while split is not None and not self.close_called:
             try:
                 function(split, collector)
-            except:
-                print("in function call:", sys.exc_info()[0])
-            try:
                 self._iterator._reset()
-            except:
-                print("in iterator reset call:", sys.exc_info()[0])
-                sys.stdout.flush()
-            try:
                 self._connection.send_end_signal()
-            except:
-                print("in connection end call:", sys.exc_info()[0])
-                sys.stdout.flush()
-            try:
                 split = self._iterator.next()
-            except:
-                print("in iterator next call:" + str(self.close_called), sys.exc_info()[0])
+            except Exception, e:
+                print("in function call:", sys.exc_info()[0])
                 sys.stdout.flush()
+                raise e
             if split[0] == "close":
                 self.close_called = True
+
         collector._close()
 
     def deliver(self, path, collector):
