@@ -262,8 +262,7 @@ public class PythonPlanBinder {
 					env.setParallelism(dop);
 					break;
 				case MODE:
-					//FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs:/tmp/flink";
-					FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs://gms41:50040/tmp";
+					FLINK_HDFS_PATH = (Boolean) value.getField(1) ? "file:/tmp/flink" : "hdfs:/tmp/flink";
 					break;
 				case RETRY:
 					int retry = (Integer) value.getField(1);

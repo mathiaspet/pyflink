@@ -50,7 +50,7 @@ class PythonInputFormat(Function.Function):
             except Exception:
                 print("in function call:", sys.exc_info()[0])
                 sys.stdout.flush()
-                raise
+                #raise
             if split[0] == "close":
                 self.close_called = True
 

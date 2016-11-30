@@ -95,7 +95,6 @@ public class PythonInputFormat<T> extends FileInputFormat<T> implements ResultTy
 			}
 			this.openedProcessor = true;
 		}
-
 		this.splitProcessor.openSplit(split);
 	}
 

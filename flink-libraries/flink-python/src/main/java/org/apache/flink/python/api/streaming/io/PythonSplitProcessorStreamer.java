@@ -106,19 +106,24 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	public void open() throws IOException {
 		server = new ServerSocket(0);
 		startPython();
+		System.out.println("Started python");
+
 	}
 
 	private void startPython() throws IOException {
+		System.out.println("starting python for IF");
 		RuntimeContext ctx = this.format.getRuntimeContext();
 		this.outputFilePath = FLINK_TMP_DATA_DIR + "/" + id + ctx.getIndexOfThisSubtask() + "output";
 		this.inputFilePath = FLINK_TMP_DATA_DIR + "/" + id + ctx.getIndexOfThisSubtask() + "input";
-
+		System.out.println("paths");
 		sender.open(inputFilePath);
+		System.out.println("sender");
 		receiver.open(outputFilePath);
+		System.out.println("receiver");
 
 		String path = ctx.getDistributedCache().getFile(FLINK_PYTHON_DC_ID).getAbsolutePath();
 		String planPath = path + FLINK_PYTHON_PLAN_NAME;
-
+		System.out.println(planPath);
 		String pythonBinaryPath = usePython3 ? FLINK_PYTHON3_BINARY_PATH : FLINK_PYTHON2_BINARY_PATH;
 
 		try {
@@ -126,8 +131,9 @@ public class PythonSplitProcessorStreamer implements Serializable {
 		} catch (IOException ex) {
 			throw new RuntimeException(pythonBinaryPath + " does not point to a valid python binary.");
 		}
-
+		System.out.println("pythontest");
 		process = Runtime.getRuntime().exec(pythonBinaryPath + " -O -B " + planPath + planArguments);
+		System.out.println(pythonBinaryPath + " -O -B " + planPath + planArguments);
 		new StreamPrinter(process.getInputStream()).start();
 		new StreamPrinter(process.getErrorStream(), true, msg).start();
 
@@ -177,19 +183,16 @@ public class PythonSplitProcessorStreamer implements Serializable {
 	 */
 	public void close() throws IOException {
 		try {
-			System.out.println("sending close tuple");
 			int signal = in.readInt(); //for debugging
 			if (signal != SIGNAL_BUFFER_REQUEST) {
 				throw new RuntimeException("yo aint getting no buffer");
 			}
 			Tuple3<String, Long, Long> closeTuple = new Tuple3<>("close", -1L, -1L);
 			int size = this.sender.sendRecord(getSerializer(closeTuple).serialize(closeTuple), true);
-			System.out.println("sent close tuple");
 			socket.close();
 			sender.close();
 			receiver.close();
 		} catch (Exception e) {
-			System.out.println("unlogged exception here");
 			LOG.error("Exception occurred while closing Streamer. :" + e.getMessage());
 		}
 		destroyProcess();
@@ -303,7 +306,6 @@ public class PythonSplitProcessorStreamer implements Serializable {
 							"External process for task " + this.format.getRuntimeContext().getTaskName() + " terminated prematurely due to an error." + msg);
 					default:
 						receiver.collectBuffer(c, sig);
-						//return true;
 				}
 			}
 		} catch (SocketTimeoutException ste) {
