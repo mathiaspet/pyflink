@@ -157,12 +157,6 @@ class Environment(object):
         """
         return self._dop
 
-    def set_sendLargeTuples(self, large):
-        self._sendLargeTuples = large
-
-    def get_sendLargeTuples(self):
-        return self._sendLargeTuples
-
     def set_number_of_execution_retries(self, count):
         self._retry = count
 
@@ -255,27 +249,17 @@ class Environment(object):
             if child_type in chainable:
                 parent = child.parent
                 if parent.operator is not None and len(parent.children) == 1 and len(parent.sinks) == 0:
-                    #print("child: " + child.name + "; id: " + str(child.id))
-                    #print("child op:" + str(child.operator) )
-                    sys.stdout.flush()
                     parent.chained_info = child
                     parent.name += " -> " + child.name
-                    #print("parent: " + parent.name + "; id: " + str(parent.id))
-                    #print("parent op: " + str(parent.operator))
-                    sys.stdout.flush()
                     parent.types = child.types
                     for grand_child in child.children:
                         if grand_child.identifier in dual_input:
                             if grand_child.parent.id == child.id:
                                 grand_child.parent = parent
-                                #print("gc name: " + str(grand_child.operator))
-                                sys.stdout.flush()
                             else:
                                 grand_child.other = parent
-                            #parent.children.append(grand_child)
                         else:
                             grand_child.parent = parent
-                            #parent.children.append(grand_child)
                         parent.children.append(grand_child)
                     parent.children.remove(child)
                     for sink in child.sinks:
@@ -299,7 +283,6 @@ class Environment(object):
         collect(("dop", self._dop))
         collect(("mode", self._local_mode))
         collect(("retry", self._retry))
-        collect(("largetuples", self._sendLargeTuples))
 
     def _send_operations(self):
         self._collector.collect(len(self._sources) + len(self._sets) + len(self._sinks) + len(self._broadcast))

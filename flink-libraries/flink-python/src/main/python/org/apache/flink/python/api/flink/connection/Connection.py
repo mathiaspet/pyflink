@@ -70,7 +70,7 @@ class PureTCPConnection(object):
 
 
 class BufferingTCPMappedFileConnection(object):
-    def __init__(self, input_file, output_file, port, transferLargeMsg = False):
+    def __init__(self, input_file, output_file, port):
         self._input_file = open(input_file, "rb+")
         self._output_file = open(output_file, "rb+")
         if hasattr(mmap, 'MAP_SHARED'):
@@ -89,47 +89,24 @@ class BufferingTCPMappedFileConnection(object):
         self._input_offset = 0
         self._input_size = 0
         self._was_last = False
-        self._transferLargeMsg = transferLargeMsg
 
     def close(self):
         self._socket.close()
 
     def write(self, msg):
         length = len(msg)
-        if self._transferLargeMsg:
-            self._write_large_msg(msg)
-        else:
-            if length > MAPPED_FILE_SIZE:
-                raise Exception("Serialized object does not fit into a single buffer.")
-            tmp = self._out_size + length
-            #current msg does not fit into buffer anymore
-            if tmp > MAPPED_FILE_SIZE:
-                #empty the buffer first
-                self._write_buffer()
-                #write message to the buffer
-                self.write(msg)
-            else:
-                self._out.append(msg)
-                self._out_size = tmp
-
-    def _write_large_msg(self, msg):
-        length = len(msg)
-        self._socket.send(pack(">i", length))
-
-        numTrips = int(length / MAPPED_FILE_SIZE)
-        if length % MAPPED_FILE_SIZE > 0:
-            numTrips += 1
-
-        self._socket.send(pack(">i", numTrips))
-        for i in range(0, numTrips):
-            chunk = msg[i*MAPPED_FILE_SIZE:(i+1)*MAPPED_FILE_SIZE]
-            self._out.append(chunk)
-            if i < numTrips-1:
-                self._out_size = MAPPED_FILE_SIZE
-            else:
-                self._out_size = length % MAPPED_FILE_SIZE
+        if length > MAPPED_FILE_SIZE:
+            raise Exception("Serialized object does not fit into a single buffer.")
+        tmp = self._out_size + length
+        #current msg does not fit into buffer anymore
+        if tmp > MAPPED_FILE_SIZE:
+            #empty the buffer first
             self._write_buffer()
-        recv_all(self._socket, 1)
+            #write message to the buffer
+            self.write(msg)
+        else:
+            self._out.append(msg)
+            self._out_size = tmp
 
     def _write_buffer(self):
         self._file_output_buffer.seek(0, 0)
@@ -147,32 +124,6 @@ class BufferingTCPMappedFileConnection(object):
         if self._input_offset > self._input_size:
             raise Exception("BufferUnderFlowException")
         return self._input[old_offset:self._input_offset]
-
-    def readLargeTuple(self):
-        try:
-            self._socket.send(SIGNAL_REQUEST_BUFFER)
-            meta_size = recv_all(self._socket, 5)
-            size = unpack(">I", meta_size[:4])[0]
-            numTrips = int(size / MAPPED_FILE_SIZE)
-            remainder = size % MAPPED_FILE_SIZE
-
-            buffer = b""
-            for i in range(0, numTrips):
-                self._read_buffer()
-                buffer += self._input
-
-            #read remainder
-            if remainder:
-                self._read_buffer()
-                buffer += self._input
-
-            #self._socket.send(SIGNAL_MULTIPLES_DONE)
-            self._input = buffer
-            self._input_size = size
-            self._input_offset = 0
-        except:
-            e = sys.exc_info()[0]
-            print( "Error: %s" % e)
 
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)
@@ -213,15 +164,11 @@ class TwinBufferingTCPMappedFileConnection(BufferingTCPMappedFileConnection):
         self._was_last = [False, False]
 
     def read(self, des_size, group):
-        if self._transferLargeMsg:
-            print("reading large messages")
-            sys.stdout.flush()
-        else:
-            if self._input_size[group] == self._input_offset[group]:
-                self._read_buffer(group)
-            old_offset = self._input_offset[group]
-            self._input_offset[group] += des_size
-            return self._input[group][old_offset:self._input_offset[group]]
+        if self._input_size[group] == self._input_offset[group]:
+            self._read_buffer(group)
+        old_offset = self._input_offset[group]
+        self._input_offset[group] += des_size
+        return self._input[group][old_offset:self._input_offset[group]]
 
     def _read_buffer(self, group):
         if group:

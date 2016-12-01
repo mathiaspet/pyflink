@@ -254,7 +254,7 @@ public class PythonPlanBinder {
 	}
 
 	private void receiveParameters() throws IOException {
-		for (int x = 0; x < 4; x++) {
+		for (int x = 0; x < 3; x++) {
 			Tuple value = (Tuple) streamer.getRecord(true);
 			switch (Parameters.valueOf(((String) value.getField(0)).toUpperCase())) {
 				case DOP:
