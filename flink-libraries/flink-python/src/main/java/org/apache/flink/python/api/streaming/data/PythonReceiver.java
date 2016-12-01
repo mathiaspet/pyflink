@@ -45,7 +45,6 @@ public class PythonReceiver implements Serializable {
 
 	private DataOutputStream out;
 	private DataInputStream in;
-	private boolean largeTuples;
 
 	public PythonReceiver(boolean usesByteArray) {
 		readAsByteArray = usesByteArray;
@@ -90,7 +89,6 @@ public class PythonReceiver implements Serializable {
 
 	public void setIn(DataInputStream in){this.in = in;}
 
-	public void setLargeTuples(boolean largeTuples) {this.largeTuples = largeTuples;}
 	//=====IO===========================================================================================================
 	/**
 	 * Reads a buffer of the given size from the memory-mapped file, and collects all records contained. This method
@@ -103,24 +101,14 @@ public class PythonReceiver implements Serializable {
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void collectBuffer(Collector c, int bufferSize) throws IOException {
-		if(this.largeTuples) {
-			this.collectLargeBuffer(c, bufferSize);
-		}else {
-			fileBuffer.position(0);
-			while (fileBuffer.position() < bufferSize) {
-				c.collect(deserializer.deserialize());
-			}
-			this.sendReadConfirmation();
+		fileBuffer.position(0);
+		while (fileBuffer.position() < bufferSize) {
+			c.collect(deserializer.deserialize());
 		}
+		this.sendReadConfirmation();
 	}
 
-	/*
-	public void collectUnserialized(byte[] target) throws IOException {
-		fileBuffer.position(0);
-		fileBuffer.get(target);
-}
-*/
-
+	@Deprecated
 	public void collectLargeBuffer(Collector c, int bufferSize) throws IOException{
 		int numTrips = in.readInt();
 

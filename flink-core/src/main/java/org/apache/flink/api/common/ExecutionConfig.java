@@ -116,8 +116,6 @@ public class ExecutionConfig implements Serializable {
 
 	private long autoWatermarkInterval = 0;
 
-	private boolean largeTuples;
-
 	/**
 	 * @deprecated Should no longer be used because it is subsumed by RestartStrategyConfiguration
 	 */
@@ -218,13 +216,6 @@ public class ExecutionConfig implements Serializable {
 		return this.autoWatermarkInterval;
 	}
 
-
-	public ExecutionConfig setLargeTuples(boolean largeTuples) {
-		this.largeTuples = largeTuples;
-		return this;
-	}
-
-	public boolean isLargeTuples() {return this.largeTuples;}
 	/**
 	 * Gets the parallelism with which operation are executed by default. Operations can
 	 * individually override this value to use a specific parallelism.

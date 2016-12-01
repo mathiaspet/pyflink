@@ -49,8 +49,6 @@ public class PythonSender<IN> implements Serializable {
 	/* TODO: moved here from PythonStreamer */
 	private DataOutputStream out;
 	private DataInputStream in;
-	private boolean largeTuples;
-
 
 	private final ByteBuffer[] saved = new ByteBuffer[2];
 
@@ -82,8 +80,6 @@ public class PythonSender<IN> implements Serializable {
 	public void setOut(DataOutputStream out){this.out = out;}
 
 	public void setIn(DataInputStream in){this.in = in;}
-
-	public void setLargeTuples(boolean large){this.largeTuples = large;}
 
 	public void close() throws IOException {
 		closeMappedFile();
@@ -149,46 +145,44 @@ public class PythonSender<IN> implements Serializable {
 	 */
 	@SuppressWarnings("unchecked")
 	public int sendBuffer(Iterator i, int group) throws IOException {
-		if(this.largeTuples) {
-			return sendLargeTuples(i, group);
-		}else {
-			fileBuffer.clear();
+		fileBuffer.clear();
 
-			Object value;
-			ByteBuffer bb;
-			if (serializer[group] == null) {
-				value = i.next();
-				serializer[group] = getSerializer(value);
-				bb = serializer[group].serialize(value);
-				if (bb.remaining() > MAPPED_FILE_SIZE) {
-					throw new RuntimeException("Serialized object does not fit into a single buffer.");
-				}
-				fileBuffer.put(bb);
+		Object value;
+		ByteBuffer bb;
+		if (serializer[group] == null) {
+			value = i.next();
+			serializer[group] = getSerializer(value);
+			bb = serializer[group].serialize(value);
+			if (bb.remaining() > MAPPED_FILE_SIZE) {
+				throw new RuntimeException("Serialized object does not fit into a single buffer.");
+			}
+			fileBuffer.put(bb);
 
-			}
-			if (saved[group] != null) {
-				fileBuffer.put(saved[group]);
-				saved[group] = null;
-			}
-			while (i.hasNext() && saved[group] == null) {
-				value = i.next();
-				bb = serializer[group].serialize(value);
-				if (bb.remaining() > MAPPED_FILE_SIZE) {
-					throw new RuntimeException("Serialized object does not fit into a single buffer.");
-				}
-				if (bb.remaining() <= fileBuffer.remaining()) {
-					fileBuffer.put(bb);
-				} else {
-					saved[group] = bb;
-				}
-			}
-
-			int size = fileBuffer.position();
-			sendWriteNotification(size, this.hasRemaining(0) || i.hasNext());
-			return size;
 		}
+		if (saved[group] != null) {
+			fileBuffer.put(saved[group]);
+			saved[group] = null;
+		}
+		while (i.hasNext() && saved[group] == null) {
+			value = i.next();
+			bb = serializer[group].serialize(value);
+			if (bb.remaining() > MAPPED_FILE_SIZE) {
+				throw new RuntimeException("Serialized object does not fit into a single buffer.");
+			}
+			if (bb.remaining() <= fileBuffer.remaining()) {
+				fileBuffer.put(bb);
+			} else {
+				saved[group] = bb;
+			}
+		}
+
+		int size = fileBuffer.position();
+		sendWriteNotification(size, this.hasRemaining(0) || i.hasNext());
+		return size;
+
 	}
 
+	@Deprecated
 	private int sendLargeTuples(Iterator i, int group) throws IOException {
 		//while iterator is not empty
 		//get next tuple

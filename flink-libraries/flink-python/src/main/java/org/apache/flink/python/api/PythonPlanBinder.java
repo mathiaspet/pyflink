@@ -268,10 +268,6 @@ public class PythonPlanBinder {
 					int retry = (Integer) value.getField(1);
 					env.setRestartStrategy(RestartStrategies.fixedDelayRestart(retry, 10000L));
 					break;
-				case LARGETUPLES:
-					Boolean lt = (Boolean)value.getField(1);
-					env.setLargeTuples(lt);
-					break;
 			}
 		}
 		if (env.getParallelism() < 0) {

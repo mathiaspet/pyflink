@@ -50,7 +50,6 @@ public class PythonStreamer implements Serializable {
 	private static final int SIGNAL_BUFFER_REQUEST_G1 = -4;
 	private static final int SIGNAL_FINISHED = -1;
 	private static final int SIGNAL_ERROR = -2;
-	private static final byte SIGNAL_LAST = 32;
 
 	private final int id;
 	private final boolean usePython3;
@@ -240,11 +239,6 @@ public class PythonStreamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithoutGroups(Iterator i, Collector c) throws IOException {
-		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
-			this.sender.setLargeTuples(true);
-			this.receiver.setLargeTuples(true);
-		}
-
 		try {
 			if (i.hasNext()) {
 				while (true) {
@@ -286,12 +280,6 @@ public class PythonStreamer implements Serializable {
 	 * @throws IOException
 	 */
 	public final void streamBufferWithGroups(Iterator i1, Iterator i2, Collector c) throws IOException {
-		//TODO: what happens if one side is large and the other is not!
-		if(this.function.getRuntimeContext().getExecutionConfig().isLargeTuples()) {
-			this.sender.setLargeTuples(true);
-			this.receiver.setLargeTuples(true);
-		}
-
 		try {
 			if (i1.hasNext() || i2.hasNext()) {
 				while (true) {
