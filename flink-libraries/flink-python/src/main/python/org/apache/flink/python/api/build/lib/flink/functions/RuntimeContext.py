@@ -1,4 +1,4 @@
-# ###############################################################################
+################################################################################
 #  Licensed to the Apache Software Foundation (ASF) under one
 #  or more contributor license agreements.  See the NOTICE file
 #  distributed with this work for additional information
@@ -16,12 +16,15 @@
 # limitations under the License.
 ################################################################################
 
-class KeySelectorFunction:
-    def __call__(self, value):
-        return self.get_key(value)
 
-    def callable(self):
-        return True
+class RuntimeContext(object):
+    def __init__(self, iterator, collector):
+        self.iterator = iterator
+        self.collector = collector
+        self.broadcast_variables = dict()
 
-    def get_key(self, value):
-        pass
+    def _add_broadcast_variable(self, name, var):
+        self.broadcast_variables[name] = var
+
+    def get_broadcast_variable(self, name):
+        return self.broadcast_variables[name]

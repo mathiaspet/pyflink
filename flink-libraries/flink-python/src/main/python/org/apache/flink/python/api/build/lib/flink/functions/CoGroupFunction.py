@@ -54,7 +54,7 @@ class CoGroupFunction(Function.Function):
                 while iterator.p2.has_next():
                     iterator.p2.next()
         except Exception:
-            logger.error("Error while executing cogroup function")
+            logger.error("Error while excecuting cogroup function")
             raise
         collector._close()
 
