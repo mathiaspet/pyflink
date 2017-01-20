@@ -29,7 +29,7 @@ from struct import pack
 import logging
 
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=1, filename="/home/mathiasp/Workspaces/gms010/pyflink/flink-dist/target/flink-1.1-SNAPSHOT-bin/flink-1.1-SNAPSHOT/log/flink-mathiasp-jobmanager-1-mifune2.out")
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=1)
 
 
 def get_environment():

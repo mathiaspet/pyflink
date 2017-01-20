@@ -424,7 +424,6 @@ public class PythonPlanBinder {
 				.map(new SerializerMap<Long>()).setParallelism(getParallelism(info)).name("SequenceSourcePostStep"));
 	}
 
-	//TODO: is the post step really necessary?
 	private void createCustomSource(PythonOperationInfo info) {
 		InputFormat format = createCustomInputFormat(info);
 		sets.put(info.setID, env.createInput(format).setParallelism(getParallelism(info)).name("CustomSource"));
