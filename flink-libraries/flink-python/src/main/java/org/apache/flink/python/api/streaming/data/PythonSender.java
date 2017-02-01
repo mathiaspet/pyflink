@@ -205,6 +205,14 @@ public class PythonSender<IN> implements Serializable {
 				serializer[group] = getSerializer(value);
 			}
 			bb = serializer[group].serialize(value);
+			System.out.println("java\tserialized: " + bb.get(0));
+			System.out.println("java\tserialized: " + bb.get(1));
+			System.out.println("java\tserialized: " + bb.get(2));
+			System.out.println("java\tserialized: " + bb.get(3));
+			System.out.println("java\tserialized: " + bb.get(4));
+			System.out.println("java\tserialized: " + bb.get(5));
+			System.out.println("java\tserialized: " + bb.get(6));
+			System.out.println("java\tserialized: " + bb.get(7));
 			int tupleSize = bb.limit();
 			//send size
 			sendWriteNotification(tupleSize, true);
@@ -242,6 +250,7 @@ public class PythonSender<IN> implements Serializable {
 	}
 
 	private void sendWriteNotification(int size, boolean hasNext) throws IOException {
+		System.out.println("java\tsending write notification: " + size);
 		out.writeInt(size);
 		out.writeByte(hasNext ? 0 : SIGNAL_LAST);
 		out.flush();

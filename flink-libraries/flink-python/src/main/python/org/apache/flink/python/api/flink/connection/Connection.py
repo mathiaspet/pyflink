@@ -20,6 +20,7 @@ import socket as SOCKET
 from struct import pack, unpack
 from collections import deque
 import sys
+from pprint import pprint
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 
@@ -116,7 +117,7 @@ class BufferingTCPMappedFileConnection(object):
         length = len(msg)
         self._socket.send(pack(">i", length))
 
-        numTrips = int(length / MAPPED_FILE_SIZE)
+        numTrips = length // MAPPED_FILE_SIZE
         if length % MAPPED_FILE_SIZE > 0:
             numTrips += 1
 
@@ -149,30 +150,38 @@ class BufferingTCPMappedFileConnection(object):
         return self._input[old_offset:self._input_offset]
 
     def readLargeTuple(self):
+        print("python\treading large tuple")
         try:
             self._socket.send(SIGNAL_REQUEST_BUFFER)
             meta_size = recv_all(self._socket, 5)
             size = unpack(">I", meta_size[:4])[0]
-            numTrips = int(size / MAPPED_FILE_SIZE)
-            remainder = size % MAPPED_FILE_SIZE
+            trips, remainder = divmod(size, MAPPED_FILE_SIZE)
 
-            buffer = b""
-            for i in range(0, numTrips):
+            print("python\tmeta_size", meta_size)
+            print("python\tsize", size)
+            print("python\ttrips", trips)
+            print("python\tremainder", remainder)
+            sys.stdout.flush()
+
+            in_buf = b""
+            for _ in range(0, trips):
                 self._read_buffer()
-                buffer += self._input
+                in_buf += self._input
 
             #read remainder
             if remainder:
                 self._read_buffer()
-                buffer += self._input
+                in_buf += self._input
+            print("python\tbuffer" in_buf[0:20])
+            sys.stdout.flush()
 
             #self._socket.send(SIGNAL_MULTIPLES_DONE)
-            self._input = buffer
+            self._input = in_buf
             self._input_size = size
             self._input_offset = 0
         except:
             e = sys.exc_info()[0]
-            print( "Error: %s" % e)
+            print("Error: %s" % e)
 
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)

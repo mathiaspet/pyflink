@@ -48,9 +48,9 @@ class PythonInputFormat(Function.Function):
                 self._connection.send_end_signal()
                 split = self._iterator.next()
             except Exception:
-                print("in function call:", sys.exc_info()[0])
+                print("exception in function call:")
                 sys.stdout.flush()
-                #raise
+                raise
             if split[0] == "close":
                 self.close_called = True
 

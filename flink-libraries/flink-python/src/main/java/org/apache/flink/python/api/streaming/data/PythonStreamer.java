@@ -116,7 +116,7 @@ public class PythonStreamer implements Serializable {
 
 		process = Runtime.getRuntime().exec(pythonBinaryPath + " -O -B " + planPath + planArguments);
 		new StreamPrinter(process.getInputStream()).start();
-		new StreamPrinter(process.getErrorStream(), true, msg).start();
+		new StreamPrinter(process.getErrorStream()).start();
 
 		shutdownThread = new Thread() {
 			@Override

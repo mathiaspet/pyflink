@@ -131,15 +131,14 @@ public class PythonReceiver implements Serializable {
 		for(int i = 0; i < numTrips - 1; i++) {
 			//read normal case
 			//this.collectUnserialized(reusable);
-			if(i == 0)
-			{
+			if(i == 0) {
 				fileBuffer.position(4);
 				fileBuffer.get(begin);
 				int currSize = in.readInt();
 				sendReadConfirmation();
 				System.arraycopy(begin, 0, recBuff, i*MAPPED_FILE_SIZE, MAPPED_FILE_SIZE-4);
 				begin = null;
-			}else {
+			} else {
 				fileBuffer.position(0);
 				fileBuffer.get(reusable);
 				int currSize = in.readInt();
