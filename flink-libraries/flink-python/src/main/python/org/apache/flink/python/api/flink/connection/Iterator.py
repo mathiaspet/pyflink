@@ -18,6 +18,8 @@
 from struct import unpack
 from collections import deque
 import sys
+import logging
+logger = logging.getLogger(__name__)
 
 try:
     import _abcoll as defIter
@@ -193,39 +195,54 @@ class Iterator(defIter.Iterator):
 
     def next(self):
         if self.has_next():
-            if self._largeTuples:
-                self._connection.readLargeTuple()
+            try:
+                if self._largeTuples:
+                    print("py: iterator before read large tuples")
+                    sys.stdout.flush()
+                    self._connection.readLargeTuple()
+                    print("py: after read large tuples")
+                    sys.stdout.flush()
 
-            custom_types = self._env._types
-            read = self._read
-            if self._deserializer is None:
-                type = read(1)
-                if type == Types.TYPE_ARRAY:
-                    key_des = _get_deserializer(read, custom_types)
-                    self._deserializer = ArrayDeserializer(key_des)
-                    return key_des.deserialize(read)
-                elif type == Types.TYPE_KEY_VALUE:
-                    size = ord(read(1))
-                    key_des = []
-                    keys = []
-                    for _ in range(size):
-                        new_d = _get_deserializer(read, custom_types)
-                        key_des.append(new_d)
-                        keys.append(new_d.deserialize(read))
-                    val_des = _get_deserializer(read, custom_types)
-                    val = val_des.deserialize(read)
-                    self._deserializer = KeyValueDeserializer(key_des, val_des)
-                    return (tuple(keys), val)
-                elif type == Types.TYPE_VALUE_VALUE:
-                    des1 = _get_deserializer(read, custom_types)
-                    field1 = des1.deserialize(read)
-                    des2 = _get_deserializer(read, custom_types)
-                    field2 = des2.deserialize(read)
-                    self._deserializer = ValueValueDeserializer(des1, des2)
-                    return (field1, field2)
-                else:
-                    raise Exception("Invalid type ID encountered: " + str(ord(type)))
-            return self._deserializer.deserialize(self._read)
+                custom_types = self._env._types
+                print("py: iterator after custom types")
+                sys.stdout.flush()
+                read = self._read
+                print("py: iterator after _read")
+                sys.stdout.flush()
+                if self._deserializer is None:
+                    type = read(1)
+                    print("py: iterator type: " + str(type))
+                    sys.stdout.flush()
+                    if type == Types.TYPE_ARRAY:
+                        key_des = _get_deserializer(read, custom_types)
+                        print("py iterator arr key_des: " + str(key_des))
+                        sys.stdout.flush()
+                        self._deserializer = ArrayDeserializer(key_des)
+                        return key_des.deserialize(read)
+                    elif type == Types.TYPE_KEY_VALUE:
+                        size = ord(read(1))
+                        key_des = []
+                        keys = []
+                        for _ in range(size):
+                            new_d = _get_deserializer(read, custom_types)
+                            key_des.append(new_d)
+                            keys.append(new_d.deserialize(read))
+                        val_des = _get_deserializer(read, custom_types)
+                        val = val_des.deserialize(read)
+                        self._deserializer = KeyValueDeserializer(key_des, val_des)
+                        return (tuple(keys), val)
+                    elif type == Types.TYPE_VALUE_VALUE:
+                        des1 = _get_deserializer(read, custom_types)
+                        field1 = des1.deserialize(read)
+                        des2 = _get_deserializer(read, custom_types)
+                        field2 = des2.deserialize(read)
+                        self._deserializer = ValueValueDeserializer(des1, des2)
+                        return (field1, field2)
+                    else:
+                        raise Exception("Invalid type ID encountered: " + str(ord(type)))
+                return self._deserializer.deserialize(self._read)
+            except:
+                logger.exception("Exception while reading tuples")
         else:
             raise StopIteration
 

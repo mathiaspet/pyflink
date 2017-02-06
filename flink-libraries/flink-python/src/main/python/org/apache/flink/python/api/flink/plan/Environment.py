@@ -26,6 +26,9 @@ import socket as SOCKET
 import copy
 import sys
 from struct import pack
+import logging
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=1)
 
 def get_environment():
     """

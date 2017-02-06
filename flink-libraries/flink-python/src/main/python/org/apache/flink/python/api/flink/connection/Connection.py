@@ -21,6 +21,10 @@ from struct import pack, unpack
 from collections import deque
 import sys
 from pprint import pprint
+import logging
+
+logger = logging.getLogger(__name__)
+
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
 
@@ -158,8 +162,11 @@ class BufferingTCPMappedFileConnection(object):
             trips, remainder = divmod(size, MAPPED_FILE_SIZE)
 
             print("python\tmeta_size", meta_size)
+            sys.stdout.flush()
             print("python\tsize", size)
+            sys.stdout.flush()
             print("python\ttrips", trips)
+            sys.stdout.flush()
             print("python\tremainder", remainder)
             sys.stdout.flush()
 
@@ -172,22 +179,26 @@ class BufferingTCPMappedFileConnection(object):
             if remainder:
                 self._read_buffer()
                 in_buf += self._input
-            print("python\tbuffer" in_buf[0:20])
-            sys.stdout.flush()
+                print("py: read buffer")
+            #print("python\tbuffer" + str(in_buf[0:20]))
+            #sys.stdout.flush()
 
             #self._socket.send(SIGNAL_MULTIPLES_DONE)
             self._input = in_buf
             self._input_size = size
             self._input_offset = 0
         except:
-            e = sys.exc_info()[0]
-            print("Error: %s" % e)
+            logger.exception("error while reading large tuple: ")
 
     def _read_buffer(self):
         self._socket.send(SIGNAL_REQUEST_BUFFER)
+        print("sent signal request buffer")
+        sys.stdout.flush()
         self._file_input_buffer.seek(0, 0)
         self._input_offset = 0
         meta_size = recv_all(self._socket, 5)
+        print("received meta size in _read_buffer: " + str(unpack(">I", meta_size[:4])))
+        sys.stdout.flush()
         self._input_size = unpack(">I", meta_size[:4])[0]
         self._was_last = meta_size[4] == SIGNAL_WAS_LAST
         self._input = self._file_input_buffer.read(self._input_size)

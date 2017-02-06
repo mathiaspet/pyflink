@@ -23,6 +23,7 @@ from flink.functions.FilterFunction import FilterFunction
 from flink.functions.GroupReduceFunction import GroupReduceFunction
 from flink.io.PythonInputFormat import PythonInputFormat, FileInputSplit
 from flink.io.PythonOutputFormat import PythonOutputFormat
+import pickle
 
 
 class Tokenizer(FlatMapFunction):
@@ -43,7 +44,9 @@ class MyFormat(PythonInputFormat):
         super(MyFormat, self).__init__()
 
     def createInputSplits(self, minNumSplits, path, collector):
-        collector.collect(FileInputSplit(path, 0, 1, ("localhost",)))
+        additional = dict()
+        pickled = bytearray(pickle.dumps(additional, pickle.HIGHEST_PROTOCOL))
+        collector.collect(FileInputSplit(path, 0, 1, ("localhost",), pickled))
 
     def deliver(self, path, collector):
         collector.collect("hello")
@@ -89,5 +92,5 @@ if __name__ == "__main__":
         #result.output()
 
     env.set_parallelism(1)
-
+    env.set_sendLargeTuples(True)
     env.execute(local=True)
