@@ -78,15 +78,17 @@ public class PythonPlanBinder {
 	public static final String FLINK_PYTHON3_BINARY_KEY = "python.binary.python3";
 	public static final String PLANBINDER_CONFIG_BCVAR_COUNT = "PLANBINDER_BCVAR_COUNT";
 	public static final String PLANBINDER_CONFIG_BCVAR_NAME_PREFIX = "PLANBINDER_BCVAR_";
+	public static final String NAME_KEY = "--name";
 	public static String FLINK_PYTHON2_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON2_BINARY_KEY, "python");
 	public static String FLINK_PYTHON3_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON3_BINARY_KEY, "python3");
+	public static String TMP_DIR_Property;
 
 	private static final Random r = new Random();
 
 	public static final String FLINK_PYTHON_FILE_PATH = System.getProperty("java.io.tmpdir") + File.separator + "flink_plan";
 	private static final String FLINK_PYTHON_REL_LOCAL_PATH = File.separator + "resources" + File.separator + "python";
 	private static final String FLINK_DIR = System.getenv("FLINK_ROOT_DIR");
-	private static String FULL_PATH;
+	private static String FULL_PATH = null;
 
 	public static StringBuilder arguments = new StringBuilder();
 
@@ -115,12 +117,24 @@ public class PythonPlanBinder {
 		}
 		usePython3 = args[0].equals(ARGUMENT_PYTHON_3);
 		PythonPlanBinder binder = new PythonPlanBinder();
-		binder.runPlan(Arrays.copyOfRange(args, 1, args.length));
+
+		String jobName = null;
+		if (args[1].startsWith(NAME_KEY) && args[1].length() > 8) {
+			jobName = args[1].substring(7);
+		}
+
+		int fromIndex = 1;
+		if (jobName != null) {
+			fromIndex = 2;
+		}
+
+		binder.runPlan(jobName, Arrays.copyOfRange(args, fromIndex, args.length));
 	}
 
 	public PythonPlanBinder() throws IOException {
 		FLINK_PYTHON2_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON2_BINARY_KEY, "python");
 		FLINK_PYTHON3_BINARY_PATH = GlobalConfiguration.getString(FLINK_PYTHON3_BINARY_KEY, "python3");
+		TMP_DIR_Property = GlobalConfiguration.getString("dist.tmp.dir", "/tmp");
 		FULL_PATH = FLINK_DIR != null
 				//command-line
 				? FLINK_DIR + FLINK_PYTHON_REL_LOCAL_PATH
@@ -128,7 +142,7 @@ public class PythonPlanBinder {
 				: new Path(FileSystem.getLocalFileSystem().getWorkingDirectory(), "src/main/python/org/apache/flink/python/api").toString();
 	}
 
-	private void runPlan(String[] args) throws Exception {
+	private void runPlan(String jobName, String[] args) throws Exception {
 		env = ExecutionEnvironment.getExecutionEnvironment();
 
 		int split = 0;
@@ -146,10 +160,18 @@ public class PythonPlanBinder {
 
 			if (env instanceof LocalEnvironment) {
 				FLINK_HDFS_PATH = "file:" + System.getProperty("java.io.tmpdir") + File.separator + "flink";
+			} else if(TMP_DIR_Property != null) {
+				FLINK_HDFS_PATH = "file:" + TMP_DIR_Property + File.separator + "flink";
 			}
 
 			distributeFiles(tmpPath, env);
-			JobExecutionResult jer = env.execute();
+			JobExecutionResult jer;
+
+			if (jobName != null) {
+				jer = env.execute(jobName);
+			}else {
+				jer = env.execute();
+			}
 			sendResult(jer);
 			close();
 			clearPath(tmpPath);
